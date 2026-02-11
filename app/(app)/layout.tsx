@@ -5,6 +5,7 @@ import { syncTasks } from "@/lib/tasks";
 import SignOutButton from "@/components/SignOutButton";
 import TaskPanel from "@/components/TaskPanel";
 import { ToastProvider } from "@/components/ToastProvider";
+import Logo from "@/components/Logo";
 
 export default async function AppLayout({
   children,
@@ -24,11 +25,7 @@ export default async function AppLayout({
         <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-32 items-center justify-center rounded-2xl border border-black/10 bg-white px-3 py-2 shadow-sm">
-              <img
-                src="/logo.gif"
-                alt="Oto Basar"
-                className="h-auto w-full object-contain"
-              />
+              <Logo className="h-auto w-full object-contain" alt="Oto Basar" />
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-black/40">

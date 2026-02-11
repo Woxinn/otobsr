@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import Logo from "@/components/Logo";
 
 export default function LoginClient() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function LoginClient() {
     <div className="min-h-screen bg-[var(--background)] px-6 py-16 text-[var(--ink)]">
       <div className="mx-auto max-w-md rounded-3xl border border-black/10 bg-white/80 p-8 shadow-[0_20px_60px_-30px_rgba(15,61,62,0.55)] backdrop-blur">
         <div className="mb-6 flex items-center justify-center">
-          <img src="/logo.gif" alt="Oto Basar" className="h-10 w-auto" />
+          <Logo className="h-10 w-auto" alt="Oto Basar" />
         </div>
         <h1 className="text-3xl font-semibold [font-family:var(--font-display)]">
           Admin girisi

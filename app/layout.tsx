@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import RouteOverlayLoader from "@/components/RouteOverlayLoader";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-sans",
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${fraunces.variable} antialiased`}
       >
+        <RouteOverlayLoader />
         {children}
       </body>
     </html>
