@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3f0e8;
+  --foreground: #121212;
+  --ink: #1a1a1a;
+  --ocean: #0f3d3e;
+  --sand: #f6e7c5;
+  --clay: #ce7a3a;
+  --sky: #d7e3ef;
+  --peach: #f7b38a;
+  --mint: #b9d6c2;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), "Segoe UI", sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(60rem 40rem at 10% -10%, rgba(15, 61, 62, 0.25), transparent),
+    radial-gradient(50rem 50rem at 100% 10%, rgba(206, 122, 58, 0.25), transparent),
+    radial-gradient(40rem 30rem at 50% 110%, rgba(185, 214, 194, 0.35), transparent);
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slow-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}

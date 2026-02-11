@@ -1,0 +1,38 @@
+﻿import { NextRequest, NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export async function POST(req: NextRequest) {
+  const { rows } = await req.json();
+  if (!Array.isArray(rows) || !rows.length) {
+    return NextResponse.json({ error: "rows bos" }, { status: 400 });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  let updated = 0;
+  let missing = 0;
+
+  for (const r of rows) {
+    const code = (r.code ?? r.urun_kodu ?? "").trim();
+    const netsis = (r.netsis ?? r.netsis_stok ?? r.netsis_stok_kodu ?? "").trim();
+    if (!code || !netsis) continue;
+
+    const { data: prod } = await supabase
+      .from("products")
+      .select("id")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (!prod?.id) {
+      missing += 1;
+      continue;
+    }
+
+    const { error: updErr } = await supabase
+      .from("products")
+      .update({ netsis_stok_kodu: netsis })
+      .eq("id", prod.id);
+    if (!updErr) updated += 1;
+  }
+
+  return NextResponse.json({ ok: true, updated, missing });
+}

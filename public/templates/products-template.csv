@@ -1,0 +1,3 @@
+code,name,category,unit_price,description,notes,attr_name_1,attr_value_1,attr_unit_1,attr_type_1,attr_name_2,attr_value_2,attr_unit_2,attr_type_2
+PRD-1001,Metal Kol,Kol Aksam,12.5,Standart kol,Parti A,Uzunluk,120,mm,number,Renk,Siyah,,text
+PRD-1002,Plastik Kapak,Kaplama,3.8,Kapak seti,Kontrol,Cap,48,mm,number,,,

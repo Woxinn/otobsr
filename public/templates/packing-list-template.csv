@@ -1,0 +1,3 @@
+ctn_no,no_of_ctn,description,qty_pc,net_weight_kg,gross_weight_kg,product_code
+1-10,5,Sample Product,100,250,260,PRD-001
+11-20,3,Sample Product 2,60,120,130,PRD-002

@@ -1,0 +1,4 @@
+product_code,attribute_name,value,unit,value_type
+PRD-001,Uzunluk,120,mm,number
+PRD-001,Kaplama,Yesil,,text
+PRD-014,Cap,8,mm,number
