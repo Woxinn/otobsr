@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Space_Grotesk } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import RouteOverlayLoader from "@/components/RouteOverlayLoader";
 
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${fraunces.variable} antialiased`}
       >
-        <RouteOverlayLoader />
+        <Suspense fallback={null}>
+          <RouteOverlayLoader />
+        </Suspense>
         {children}
       </body>
     </html>
