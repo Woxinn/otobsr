@@ -1,11 +1,7 @@
 ﻿import Link from "next/link";
 import sql from "mssql";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import {
-  createSupplierProductAlias,
-  deleteProduct,
-  deleteSupplierProductAlias,
-} from "@/app/actions/products";
+import { deleteProduct } from "@/app/actions/products";
 import { computeCosts, pickWeightKg, GtipRow } from "@/lib/gtipCost";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
@@ -214,17 +210,6 @@ export default async function ProductDetailPage({
   });
 
   const mergedAttributeCards = [...standardAttributeCards, ...extraAttributeCards];
-
-  const { data: suppliers } = await supabase
-    .from("suppliers")
-    .select("id, name")
-    .order("name");
-
-  const { data: aliases } = await supabase
-    .from("supplier_product_aliases")
-    .select("id, supplier_id, supplier_name, supplier:suppliers(name)")
-    .eq("product_id", product.id)
-    .order("supplier_name");
 
   const { data: orderItems } = await supabase
     .from("order_items")
@@ -629,75 +614,6 @@ export default async function ProductDetailPage({
         )}
       </div>
 
-      {/* Supplier aliases */}
-      <div className="rounded-[30px] border border-black/10 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Tedarikçi urun adlari</p>
-          <form action={createSupplierProductAlias} className="flex flex-wrap gap-2">
-            <input type="hidden" name="product_id" value={product.id} />
-            <select
-              name="supplier_id"
-              className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-xs"
-            >
-              <option value="">Tedarikçi sec</option>
-              {suppliers?.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-            <input
-              name="supplier_name"
-              placeholder="Tedarikçi urun adi"
-              className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-xs"
-            />
-            <button className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-md">
-              Ekle
-            </button>
-          </form>
-        </div>
-
-        {aliases?.length ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
-                <tr>
-                  <th className="px-3 py-2">Tedarikçi</th>
-                  <th className="px-3 py-2">Ürün adi</th>
-                  <th className="px-3 py-2 text-right">Islem</th>
-                </tr>
-              </thead>
-              <tbody className="text-black/70">
-                {aliases.map((alias) => (
-                  <tr key={alias.id} className="border-t border-black/5">
-                    <td className="px-3 py-3 text-sm font-semibold text-black">
-                      {(Array.isArray((alias as any).supplier)
-                        ? (alias as any).supplier[0]?.name
-                        : (alias as any).supplier?.name) ?? "-"}
-                    </td>
-                    <td className="px-3 py-3">{alias.supplier_name}</td>
-                      <td className="px-3 py-3 text-right">
-                        <ConfirmActionForm
-                          action={deleteSupplierProductAlias}
-                          confirmText="Tedarikçi urun adi silinsin mi?"
-                          buttonText="Sil"
-                          className="inline"
-                        >
-                          <input type="hidden" name="id" value={alias.id} />
-                          <input type="hidden" name="product_id" value={product.id} />
-                        </ConfirmActionForm>
-                      </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
-            Tedarikçi urun adi bulunamadi.
-          </div>
-        )}
-      </div>
     </section>
   );
 }
