@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { CSSProperties } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createForwarder } from "@/app/actions/master-data";
@@ -173,7 +173,7 @@ export default async function ForwardersPage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henuz forwarder yok.
+              Henüz forwarder yok.
             </div>
           )}
         </div>
@@ -181,4 +181,5 @@ export default async function ForwardersPage() {
     </section>
   );
 }
+
 

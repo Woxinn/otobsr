@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+﻿import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createDocumentType,
   updateDocumentType,
@@ -111,13 +111,13 @@ export default async function DocumentTypesPage() {
                   </label>
                 </div>
                 <button className="rounded-full border border-black/20 px-4 py-2 text-xs font-semibold">
-                  Guncelle
+                  Güncelle
                 </button>
               </form>
             ))
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henuz evrak tipi yok.
+              Henüz evrak tipi yok.
             </div>
           )}
         </div>
@@ -125,4 +125,5 @@ export default async function DocumentTypesPage() {
     </section>
   );
 }
+
 

@@ -104,7 +104,7 @@ export default async function TaskPanel() {
                     <p className="text-[11px] text-black/60">
                       {(Array.isArray((order as any).suppliers)
                         ? (order as any).suppliers[0]?.name
-                        : (order as any).suppliers?.name) ?? "Tedarikci yok"}
+                        : (order as any).suppliers?.name) ?? "Tedarikçi yok"}
                     </p>
                   </div>
                   <form action={updateOrderStatus}>
@@ -243,4 +243,5 @@ export default async function TaskPanel() {
     </details>
   );
 }
+
 

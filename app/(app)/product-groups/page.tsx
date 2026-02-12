@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createProductGroup } from "@/app/actions/products";
 import ProductGroupTableClient from "@/components/ProductGroupTableClient";
@@ -34,17 +34,17 @@ export default async function ProductGroupsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Urun kategorileri
+            Ürün kategorileri
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Urun kategorileri
+            Ürün kategorileri
           </h2>
         </div>
         <Link
           href="/products"
           className="rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold"
         >
-          Urunler
+          Ürünler
         </Link>
       </div>
 
@@ -79,10 +79,11 @@ export default async function ProductGroupsPage() {
           />
         ) : (
           <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-            Henuz kategori yok.
+            Henüz kategori yok.
           </div>
         )}
       </div>
     </section>
   );
 }
+

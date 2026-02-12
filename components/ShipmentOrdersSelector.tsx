@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 
@@ -179,7 +179,7 @@ export default function ShipmentOrdersSelector({
       ) : null}
 
       <div className="rounded-2xl border border-black/10 bg-white p-4">
-        <p className="font-semibold text-sm">Secili siparisler</p>
+        <p className="font-semibold text-sm">Seçili siparisler</p>
         <div className="mt-3 space-y-2">
           {selectedOrders.length ? (
             selectedOrders.map((order) => (
@@ -199,7 +199,7 @@ export default function ShipmentOrdersSelector({
             ))
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henuz siparis secilmedi.
+              Henüz siparis secilmedi.
             </div>
           )}
         </div>
@@ -207,3 +207,4 @@ export default function ShipmentOrdersSelector({
     </div>
   );
 }
+

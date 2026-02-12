@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 
@@ -50,7 +50,7 @@ export default function OrderPackingListCreateForm({
       <p className="font-semibold">Manuel packing list satiri ekle</p>
       <div className="mt-3 grid gap-3 lg:grid-cols-6">
         <label className="text-xs font-semibold text-black/60 lg:col-span-3">
-          Urun ara (siparise ekli urunler)
+          Ürün ara (siparise ekli urunler)
           <div className="relative mt-2">
             <input
               value={query}
@@ -61,7 +61,7 @@ export default function OrderPackingListCreateForm({
                 setDescription("");
               }}
               onFocus={() => setIsOpen(true)}
-              placeholder="Urun kodu veya adi ile ara"
+              placeholder="Ürün kodu veya adi ile ara"
               className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
               autoComplete="off"
             />
@@ -128,3 +128,4 @@ export default function OrderPackingListCreateForm({
     </form>
   );
 }
+

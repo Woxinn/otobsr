@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -469,7 +469,7 @@ export default function ForwarderQuotesClient({
                         >
                           {quote.is_selected ? (
                             <span className="rounded-full bg-[var(--ocean)] px-3 py-1 text-xs text-white">
-                              Secili
+                              Seçili
                             </span>
                           ) : null}
                           {isEditing ? (
@@ -496,7 +496,7 @@ export default function ForwarderQuotesClient({
                                 className="rounded-full border border-black/20 px-3 py-1 text-xs font-semibold"
                                 onClick={() => setEditId(quote.id)}
                               >
-                                Duzenle
+                                Düzenle
                               </button>
                               <button
                                 type="button"
@@ -525,7 +525,7 @@ export default function ForwarderQuotesClient({
             </table>
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henuz teklif yok.
+              Henüz teklif yok.
             </div>
           )}
         </div>
@@ -533,3 +533,4 @@ export default function ForwarderQuotesClient({
     </div>
   );
 }
+

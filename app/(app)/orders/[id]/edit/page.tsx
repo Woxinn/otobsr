@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateOrder } from "@/app/actions/orders";
@@ -69,7 +69,7 @@ export default async function OrderEditPage({
             />
           </label>
           <label className="text-sm font-medium">
-            Konşimento No
+            KonÅŸimento No
             <input
               name="consignment_no"
               defaultValue={order.consignment_no ?? ""}
@@ -77,7 +77,7 @@ export default async function OrderEditPage({
             />
           </label>
           <label className="text-sm font-medium">
-            Tedarikci
+            Tedarikçi
             <select
               name="supplier_id"
               defaultValue={order.supplier_id ?? ""}
@@ -151,9 +151,10 @@ export default async function OrderEditPage({
           </label>
         </div>
         <button className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
-          Guncelle
+          Güncelle
         </button>
       </form>
     </section>
   );
 }
+

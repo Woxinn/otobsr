@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createProduct, importProducts } from "@/app/actions/products";
 import ProductForm from "@/components/ProductForm";
@@ -32,7 +32,7 @@ export default async function NewProductPage() {
             Yeni urun
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Urun olustur
+            Ürün olustur
           </h2>
         </div>
         <Link
@@ -98,3 +98,4 @@ export default async function NewProductPage() {
     </section>
   );
 }
+

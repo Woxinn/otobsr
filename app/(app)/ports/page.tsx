@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createPort } from "@/app/actions/ports";
 
@@ -18,7 +18,7 @@ export default async function PortsPage() {
             <p className="text-xs uppercase tracking-[0.35em] text-white/70">Limanlar</p>
             <h1 className="text-3xl font-semibold [font-family:var(--font-display)]">Liman listesi</h1>
             <p className="mt-2 text-sm text-white/80">
-              Cikis / varis noktalarini yonetin, shipmentlara baglayin.
+              Çıkış / varis noktalarini yonetin, shipmentlara baglayin.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -116,7 +116,7 @@ export default async function PortsPage() {
                       <td className="px-3 py-3 font-semibold text-slate-900">{port.name ?? "-"}</td>
                       <td className="px-3 py-3 text-slate-600">{port.notes ?? "-"}</td>
                       <td className="px-3 py-3 text-slate-600">
-                        {port.lat && port.lon ? `${port.lat}, ${port.lon}` : "—"}
+                        {port.lat && port.lon ? `${port.lat}, ${port.lon}` : "â€”"}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-2 text-xs font-semibold">
@@ -130,7 +130,7 @@ export default async function PortsPage() {
                             href={`/ports/${port.id}/edit`}
                             className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-emerald-400 hover:text-emerald-600"
                           >
-                            Duzenle
+                            Düzenle
                           </Link>
                         </div>
                       </td>
@@ -141,7 +141,7 @@ export default async function PortsPage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Henuz liman yok.
+              Henüz liman yok.
             </div>
           )}
         </div>
@@ -149,3 +149,4 @@ export default async function PortsPage() {
     </section>
   );
 }
+

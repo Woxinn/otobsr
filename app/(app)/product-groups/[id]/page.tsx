@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
@@ -38,7 +38,7 @@ export default async function ProductGroupDetailPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Urun kategorisi
+            Ürün kategorisi
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
             {group.name}
@@ -80,7 +80,7 @@ export default async function ProductGroupDetailPage({
           />
         </div>
         <button className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
-          Guncelle
+          Güncelle
         </button>
       </form>
 
@@ -171,10 +171,11 @@ export default async function ProductGroupDetailPage({
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-            Henuz nitelik yok.
+            Henüz nitelik yok.
           </div>
         )}
       </div>
     </section>
   );
 }
+

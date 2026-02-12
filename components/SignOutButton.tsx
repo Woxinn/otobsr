@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -9,7 +9,7 @@ export default function SignOutButton() {
   const handleSignOut = async () => {
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut({ scope: "global" });
-    // Ek olarak olası sb-* auth çerezlerini temizle
+    // Ek olarak olasÄ± sb-* auth Ã§erezlerini temizle
     document.cookie
       .split(";")
       .map((c) => c.trim())
@@ -28,7 +28,8 @@ export default function SignOutButton() {
       onClick={handleSignOut}
       className="rounded-full border border-black/20 bg-white px-4 py-2 text-xs font-semibold"
     >
-      Cikis
+      Çıkış
     </button>
   );
 }
+

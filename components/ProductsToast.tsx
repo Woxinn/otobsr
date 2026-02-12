@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,11 +10,11 @@ const toastMessages: Record<string, { message: string; tone: "error" | "info" }>
     tone: "error",
   },
   "create-failed": {
-    message: "Urun kaydedilemedi.",
+    message: "Ürün kaydedilemedi.",
     tone: "error",
   },
   imported: {
-    message: "Urunler import edildi.",
+    message: "Ürünler import edildi.",
     tone: "info",
   },
   "import-empty": {
@@ -41,7 +41,7 @@ export default function ProductsToast() {
     if (config) {
       const message =
         toastKey === "imported" && added
-          ? `Urunler import edildi. (${added} adet)`
+          ? `Ürünler import edildi. (${added} adet)`
           : config.message;
       addToast(message, config.tone);
     }
@@ -55,3 +55,4 @@ export default function ProductsToast() {
 
   return null;
 }
+

@@ -10,11 +10,15 @@ export default function RouteOverlayLoader() {
   const [loading, setLoading] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Path or query degistiginde overlay'i hemen kapatmak yerine kisa bir gecikme
+  // birakiyoruz ki yeni sayfa gorunur hale gelene kadar loader kalsin.
   useEffect(() => {
     if (!loading) return;
     if (timerRef.current) clearTimeout(timerRef.current);
-    setLoading(false);
-  }, [pathname, searchParams]);
+    timerRef.current = setTimeout(() => {
+      setLoading(false);
+    }, 800); // min. 0.8s kal, sonra otomatik kapanir
+  }, [pathname, searchParams, loading]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -27,9 +31,10 @@ export default function RouteOverlayLoader() {
       if (!href || href.startsWith("http") || href.startsWith("mailto:")) return;
       setLoading(true);
       if (timerRef.current) clearTimeout(timerRef.current);
+      // en fazla 8 sn acik kalsin (ağır sayfa icin fail-safe)
       timerRef.current = setTimeout(() => {
         setLoading(false);
-      }, 4000);
+      }, 8000);
     };
     document.addEventListener("click", handleClick);
     return () => {

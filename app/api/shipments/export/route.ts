@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
 
@@ -129,10 +129,10 @@ export async function GET(request: Request) {
 
   const header = [
     "Dosya No",
-    "Konşimento No",
+    "KonÅŸimento No",
     "Etiketler",
     "Forwarder",
-    "Cikis limani",
+    "Çıkış limani",
     "Varis limani",
     "Konteyner tipi",
     "Konteyner no",
@@ -160,4 +160,5 @@ export async function GET(request: Request) {
     },
   });
 }
+
 

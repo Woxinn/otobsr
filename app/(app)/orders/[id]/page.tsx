@@ -601,7 +601,7 @@ export default async function OrderDetailPage({
           href={`/orders/${order.id}/edit`}
           className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
         >
-          Duzenle
+          Düzenle
         </Link>
         <ConfirmActionForm
           action={deleteOrder}
@@ -637,7 +637,7 @@ export default async function OrderDetailPage({
               {!isSales ? (
                 <>
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 font-semibold text-black/70">
-                    Tedarikci:{" "}
+                    Tedarikçi:{" "}
                     {suppliers?.find((supplier) => supplier.id === order.supplier_id)?.name ?? "-"}
                   </span>
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 font-semibold text-black/70">
@@ -758,9 +758,9 @@ export default async function OrderDetailPage({
           <h3 className="text-lg font-semibold">Siparis detaylari</h3>
           <div className="flex flex-wrap gap-2 text-sm">
             {(isSales
-              ? [{ key: "products", label: "Urunler" }]
+              ? [{ key: "products", label: "Ürünler" }]
               : [
-                  { key: "products", label: "Urunler" },
+                  { key: "products", label: "Ürünler" },
                   { key: "packing", label: "Packing Listesi" },
                   { key: "payments", label: "Odemeler" },
                   { key: "documents", label: "Belgeler" },
@@ -784,7 +784,7 @@ export default async function OrderDetailPage({
         {activeTab === "products" ? (
           <div className="mt-6 space-y-4 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-lg font-semibold">Urun kalemleri</h4>
+              <h4 className="text-lg font-semibold">Ürün kalemleri</h4>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
                   <span>
                     Toplam: {formatNumber(totalsAll.qty, 0)} adet
@@ -812,7 +812,7 @@ export default async function OrderDetailPage({
                     Uzun faturalar icin Excel/CSV import kullanin
                   </p>
                   <p className="mt-1 text-xs text-black/60">
-                    Excel (.xlsx) veya UTF-8 CSV kullanabilirsiniz. Urun kodu
+                    Excel (.xlsx) veya UTF-8 CSV kullanabilirsiniz. Ürün kodu
                     kullanabilirsiniz. Nitelikler urun kartindan gelir, dosyada
                     verilen fiyat ve nitelikler urun kartini da gunceller.
                   </p>
@@ -841,13 +841,13 @@ export default async function OrderDetailPage({
                     href="/templates/order-items-template.csv"
                     className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
                   >
-                    Urun CSV
+                    Ürün CSV
                   </Link>
                   <Link
                     href="/api/order-items/template"
                     className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
                   >
-                    Urun Excel (Guncel)
+                    Ürün Excel (Guncel)
                   </Link>
                 </div>
               </div>
@@ -876,7 +876,7 @@ export default async function OrderDetailPage({
                     <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">
                       Invoice lines
                     </p>
-                    <p className="text-lg font-semibold">Urun kalemleri</p>
+                    <p className="text-lg font-semibold">Ürün kalemleri</p>
                   </div>
                   <div className="rounded-full border border-black/10 bg-[var(--sky)]/60 px-4 py-2 text-xs font-semibold text-black/60">
                     Toplam: {formatNumber(totalsPage.qty, 0)} adet
@@ -886,7 +886,7 @@ export default async function OrderDetailPage({
                 <table className="mt-4 w-full min-w-[1100px]">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40">
-                      <th className="py-3">Urun</th>
+                      <th className="py-3">Ürün</th>
                       <th className="py-3">Adet</th>
                       {canSeeFinance ? <th className="py-3">Birim fiyat</th> : null}
                       {canSeeFinance ? <th className="py-3">Total</th> : null}
@@ -960,11 +960,11 @@ export default async function OrderDetailPage({
                                   href={`/orders/${order.id}/items/${item.id}/edit`}
                                   className="rounded-full border border-black/20 px-3 py-1 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
                                 >
-                                  Duzenle
+                                  Düzenle
                                 </Link>
                                 <ConfirmActionForm
                                   action={deleteOrderItem}
-                                  confirmText="Urun kalemi silinsin mi?"
+                                  confirmText="Ürün kalemi silinsin mi?"
                                   buttonText="Sil"
                                   className="inline"
                                 >
@@ -1011,7 +1011,7 @@ export default async function OrderDetailPage({
               </div>
             ) : (
               <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Urun kalemi bulunamadi. Ilk urunu ekleyin.
+                Ürün kalemi bulunamadi. Ilk urunu ekleyin.
               </div>
             )}
 
@@ -1136,13 +1136,13 @@ export default async function OrderDetailPage({
                     name="notes"
                     defaultValue={packingSummary?.notes ?? ""}
                     className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                    placeholder="Tedarikciden gelen ozet / aciklama"
+                    placeholder="Tedarikçiden gelen ozet / aciklama"
                     rows={3}
                   />
                 </label>
                 <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-black/60">
-                    Urun bazli satirlar yerine ozet bilgileri tutuyoruz.
+                    Ürün bazli satirlar yerine ozet bilgileri tutuyoruz.
                   </p>
                   <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
                     Kaydet
@@ -1159,7 +1159,7 @@ export default async function OrderDetailPage({
                   </p>
                   <p className="text-sm font-semibold">Belgeyi yukle ve goruntule</p>
                   <p className="mt-1 text-xs text-black/60">
-                    Urun ekleme/CSV yok; sadece tedarikcinin gonderdigi dokumani ve ozet
+                    Ürün ekleme/CSV yok; sadece tedarikcinin gonderdigi dokumani ve ozet
                     toplamlarini takip ediyoruz.
                   </p>
                 </div>
@@ -1586,6 +1586,7 @@ export default async function OrderDetailPage({
     </section>
   );
 }
+
 
 
 

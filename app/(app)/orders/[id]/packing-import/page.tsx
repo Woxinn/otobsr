@@ -194,7 +194,7 @@ export default function PackingImportPage() {
           <p className="text-sm text-black/60">
             Format:{" "}
             <span className="font-semibold">
-              KoliSayisi, UrunKodu, KolidekiAdet, NetKg, BrutKg
+              KoliSayisi, ÜrünKodu, KolidekiAdet, NetKg, BrutKg
             </span>
           </p>
         </div>
@@ -254,7 +254,7 @@ export default function PackingImportPage() {
         <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/40 px-4 py-3 text-xs text-black/70">
           <div className="flex flex-wrap gap-4">
             <span>Ham satir: {rows.length}</span>
-            <span>Urun grubu: {aggregated.length}</span>
+            <span>Ürün grubu: {aggregated.length}</span>
             <span>Toplam koli: {fmt(totals.totalBoxes)}</span>
             <span>Toplam adet: {fmt(totals.totalQty)}</span>
             <span>Toplam net: {fmt(totals.totalNet)}</span>
@@ -265,12 +265,12 @@ export default function PackingImportPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-semibold">Urun toplamlari</h3>
+          <h3 className="text-lg font-semibold">Ürün toplamlari</h3>
           <div className="mt-3 overflow-auto">
             <table className="min-w-full text-sm text-black/70">
               <thead className="text-left text-[11px] uppercase tracking-[0.2em] text-black/40">
                 <tr>
-                  <th className="py-2">Urun kodu</th>
+                  <th className="py-2">Ürün kodu</th>
                   <th className="py-2">Koli</th>
                   <th className="py-2">Adet</th>
                   <th className="py-2">Net</th>
@@ -291,7 +291,7 @@ export default function PackingImportPage() {
                 ) : (
                   <tr>
                     <td className="py-3 text-sm text-black/50" colSpan={5}>
-                      Henuz veri yok.
+                      Henüz veri yok.
                     </td>
                   </tr>
                 )}
@@ -307,7 +307,7 @@ export default function PackingImportPage() {
               <thead className="text-left text-[11px] uppercase tracking-[0.2em] text-black/40">
                 <tr>
                   <th className="py-2">Koli</th>
-                  <th className="py-2">Urun</th>
+                  <th className="py-2">Ürün</th>
                   <th className="py-2">Adet</th>
                   <th className="py-2">Net</th>
                   <th className="py-2">Brüt</th>
@@ -327,7 +327,7 @@ export default function PackingImportPage() {
                 ) : (
                   <tr>
                     <td className="py-3 text-sm text-black/50" colSpan={5}>
-                      Henuz veri yok.
+                      Henüz veri yok.
                     </td>
                   </tr>
                 )}
@@ -352,3 +352,4 @@ export default function PackingImportPage() {
     </section>
   );
 }
+

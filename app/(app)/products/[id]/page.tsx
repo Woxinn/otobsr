@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import sql from "mssql";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createSupplierProductAlias,
@@ -6,7 +7,6 @@ import {
   deleteSupplierProductAlias,
 } from "@/app/actions/products";
 import { computeCosts, pickWeightKg, GtipRow } from "@/lib/gtipCost";
-import NetsisStockFetch from "@/components/NetsisStockFetch";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 
@@ -34,6 +34,65 @@ const fmtDate = (value: string | null | undefined) => {
   });
 };
 
+const fmtInt = (value: number | null | undefined) => {
+  if (value === null || value === undefined) return "-";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toLocaleString("tr-TR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
+
+async function fetchNetsisStock(code: string | null | undefined) {
+  if (!code) return { value: null as number | null, error: "Netsis kodu yok" };
+
+  const {
+    MSSQL_SERVER,
+    MSSQL_PORT,
+    MSSQL_DB,
+    MSSQL_USER,
+    MSSQL_PASS,
+    MSSQL_TRUST_CERT,
+    MSSQL_ENCRYPT,
+  } = process.env;
+
+  const envOk = MSSQL_SERVER && MSSQL_DB && MSSQL_USER && MSSQL_PASS;
+  if (!envOk)
+    return { value: null, error: "MSSQL baglanti ayarlari eksik (.env.local)" };
+
+  try {
+    const pool = await sql.connect({
+      server: MSSQL_SERVER!,
+      port: MSSQL_PORT ? Number(MSSQL_PORT) : 1433,
+      database: MSSQL_DB!,
+      user: MSSQL_USER!,
+      password: MSSQL_PASS!,
+      options: {
+        encrypt: MSSQL_ENCRYPT !== "false",
+        trustServerCertificate: MSSQL_TRUST_CERT === "true",
+        cryptoCredentialsDetails: { minVersion: "TLSv1", maxVersion: "TLSv1.2" },
+        enableArithAbort: true,
+      },
+    });
+
+    const result = await pool
+      .request()
+      .input("stok", sql.VarChar, String(code).trim())
+      .query(`
+        SELECT SUM(CASE WHEN Har.STHAR_GCKOD='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
+        FROM TBLSTHAR Har
+        WHERE LTRIM(RTRIM(Har.STOK_KODU)) = @stok
+      `);
+
+    await pool.close();
+    return { value: result.recordset?.[0]?.NetMiktar ?? 0, error: null };
+  } catch (err: any) {
+    console.error("[product detail mssql]", err);
+    return { value: null, error: err?.message ?? String(err) };
+  }
+}
+
 export default async function ProductDetailPage({
   params,
 }: {
@@ -57,10 +116,12 @@ export default async function ProductDetailPage({
   if (!product) {
     return (
       <section className="rounded-3xl border border-black/10 bg-white p-8 text-sm text-black/60">
-        Urun bulunamadi.
+        Ürün bulunamadi.
       </section>
     );
   }
+
+  const stockResult = await fetchNetsisStock(product.netsis_stok_kodu);
 
   const { data: group } = product.group_id
     ? await supabase
@@ -354,7 +415,7 @@ export default async function ProductDetailPage({
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.15),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.12),transparent_30%)]" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-[0.35em] text-white/70">Urun detayi</p>
+            <p className="text-[11px] uppercase tracking-[0.35em] text-white/70">Ürün detayi</p>
             <h1 className="text-3xl font-semibold leading-tight [font-family:var(--font-display)]">{product.name}</h1>
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">Kod: {product.code}</span>
@@ -368,8 +429,16 @@ export default async function ProductDetailPage({
                 Netsis kod: {product.netsis_stok_kodu ?? "-"}
               </span>
             </div>
-            <div className="mt-2">
-              <NetsisStockFetch productId={product.id} />
+            <div className="mt-3 inline-flex items-center gap-3 rounded-2xl border border-white/25 bg-white/15 px-4 py-3 text-sm backdrop-blur shadow-[0_14px_38px_-26px_rgba(15,61,62,0.8)]">
+              <div className="flex flex-col leading-tight">
+                <span className="text-[11px] uppercase tracking-[0.2em] text-white/70">Netsis stok</span>
+                <span className="text-2xl font-semibold text-white">{fmtInt(stockResult.value)}</span>
+              </div>
+              {stockResult.error ? (
+                <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-amber-100">
+                  {stockResult.error}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -387,12 +456,12 @@ export default async function ProductDetailPage({
                   href={`/products/${product.id}/edit`}
                   className="rounded-full border border-white/50 bg-transparent px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
                 >
-                  Duzenle
+                  Düzenle
                 </Link>
                 <ConfirmActionForm
                   action={deleteProduct}
-                  confirmText="Urun silinsin mi? Bu islem geri alinamaz."
-                  buttonText="Urunu sil"
+                  confirmText="Ürün silinsin mi? Bu islem geri alinamaz."
+                  buttonText="Ürünu sil"
                   className="inline"
                   buttonClassName="rounded-full border border-white/50 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
                 >
@@ -482,14 +551,14 @@ export default async function ProductDetailPage({
                   <th className="px-3 py-2">Tarih</th>
                   {canSeeFinance ? <th className="px-3 py-2 text-right">Birim fiyat</th> : null}
                   <th className="px-3 py-2 text-right">Adet</th>
-                      {role !== "Satis" ? <th className="px-3 py-2">Tedarikci</th> : null}
+                      {role !== "Satis" ? <th className="px-3 py-2">Tedarikçi</th> : null}
                     <th className="px-3 py-2 text-right">Ulke</th>
                     {canSeeFinance ? (
                       <th className="px-3 py-2 text-right">Ekstra masraf (%)</th>
                     ) : null}
                   {canSeeFinance ? <th className="px-3 py-2 text-right">Birim maliyet*</th> : null}
                   {canSeeFinance ? (
-                    <th className="px-3 py-2 text-right">Onceki sip. fark (%)</th>
+                    <th className="px-3 py-2 text-right">Önceki sip. fark (%)</th>
                   ) : null}
                   <th className="px-3 py-2 text-right">Islem</th>
                 </tr>
@@ -555,7 +624,7 @@ export default async function ProductDetailPage({
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
-            Henuz bu urune bagli siparis yok.
+            Henüz bu urune bagli siparis yok.
           </div>
         )}
       </div>
@@ -563,14 +632,14 @@ export default async function ProductDetailPage({
       {/* Supplier aliases */}
       <div className="rounded-[30px] border border-black/10 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Tedarikci urun adlari</p>
+          <p className="text-sm font-semibold">Tedarikçi urun adlari</p>
           <form action={createSupplierProductAlias} className="flex flex-wrap gap-2">
             <input type="hidden" name="product_id" value={product.id} />
             <select
               name="supplier_id"
               className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-xs"
             >
-              <option value="">Tedarikci sec</option>
+              <option value="">Tedarikçi sec</option>
               {suppliers?.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.name}
@@ -579,7 +648,7 @@ export default async function ProductDetailPage({
             </select>
             <input
               name="supplier_name"
-              placeholder="Tedarikci urun adi"
+              placeholder="Tedarikçi urun adi"
               className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-xs"
             />
             <button className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-md">
@@ -593,8 +662,8 @@ export default async function ProductDetailPage({
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
                 <tr>
-                  <th className="px-3 py-2">Tedarikci</th>
-                  <th className="px-3 py-2">Urun adi</th>
+                  <th className="px-3 py-2">Tedarikçi</th>
+                  <th className="px-3 py-2">Ürün adi</th>
                   <th className="px-3 py-2 text-right">Islem</th>
                 </tr>
               </thead>
@@ -610,7 +679,7 @@ export default async function ProductDetailPage({
                       <td className="px-3 py-3 text-right">
                         <ConfirmActionForm
                           action={deleteSupplierProductAlias}
-                          confirmText="Tedarikci urun adi silinsin mi?"
+                          confirmText="Tedarikçi urun adi silinsin mi?"
                           buttonText="Sil"
                           className="inline"
                         >
@@ -625,10 +694,13 @@ export default async function ProductDetailPage({
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
-            Tedarikci urun adi bulunamadi.
+            Tedarikçi urun adi bulunamadi.
           </div>
         )}
       </div>
     </section>
   );
 }
+
+
+

@@ -15,8 +15,8 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Ithalat Takip Sistemi",
-  description: "Cin deniz ithalat operasyon takibi icin web tabanli sistem",
+  title: "İthalat Takip Sistemi",
+  description: "Çin deniz ithalat operasyon takibi için web tabanlı sistem",
   icons: {
     icon: "/favicon.png",
   },

@@ -352,8 +352,8 @@ export async function GET(req: NextRequest) {
   ws.columns = [
     { header: "Sira No", key: "sira", width: 8 },
     { header: "Fatura Sira No", key: "fatura_sira", width: 14 },
-    { header: "Urun Kodu", key: "urun_kodu", width: 18 },
-    { header: "Urun Adi", key: "urun_adi", width: 28 },
+    { header: "Ürün Kodu", key: "urun_kodu", width: 18 },
+    { header: "Ürün Adi", key: "urun_adi", width: 28 },
     { header: "Uzunluk", key: "uzunluk", width: 12 },
     { header: "Adet", key: "adet", width: 10 },
     { header: "Birim Fiyat", key: "birim_fiyat", width: 14 },
@@ -662,6 +662,7 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+
 
 
 

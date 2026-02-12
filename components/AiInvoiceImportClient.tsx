@@ -205,7 +205,7 @@ export default function AiInvoiceImportClient({
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-[0.25em] text-black/45">
                 <th className="px-4">Satir</th>
-                <th className="px-4">Urun Kodu</th>
+                <th className="px-4">Ürün Kodu</th>
                 <th className="px-4">Fatura Adi</th>
                 <th className="px-4">Adet</th>
                 <th className="px-4">Birim Fiyat</th>
@@ -241,3 +241,4 @@ export default function AiInvoiceImportClient({
     </section>
   );
 }
+

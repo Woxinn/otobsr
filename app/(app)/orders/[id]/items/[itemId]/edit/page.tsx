@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateOrderItem } from "@/app/actions/order-items";
@@ -42,10 +42,10 @@ export default async function OrderItemEditPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Urun duzenle
+            Ürün duzenle
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            {item.name ?? "Urun"}
+            {item.name ?? "Ürün"}
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -76,13 +76,13 @@ export default async function OrderItemEditPage({
           <input type="hidden" name="order_item_id" value={item.id} />
           <div className="grid gap-4 lg:grid-cols-3">
             <label className="text-sm font-medium lg:col-span-2">
-              Urun kodu
+              Ürün kodu
               <select
                 name="product_id"
                 defaultValue={item.product_id ?? ""}
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
               >
-                <option value="">Urun seciniz</option>
+                <option value="">Ürün seciniz</option>
                 {products?.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.code} - {product.name}
@@ -91,7 +91,7 @@ export default async function OrderItemEditPage({
               </select>
             </label>
             <label className="text-sm font-medium lg:col-span-2">
-              Tedarikci urun adi
+              Tedarikçi urun adi
               <input
                 name="name"
                 defaultValue={item.name ?? ""}
@@ -158,5 +158,6 @@ export default async function OrderItemEditPage({
     </section>
   );
 }
+
 
 

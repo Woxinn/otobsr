@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
 import { getCurrentUserRole, canViewFinance } from "@/lib/roles";
@@ -156,12 +156,12 @@ export default async function DashboardPage() {
   const normalizeStatus = (value: string | null | undefined) =>
     (value ?? "")
       .toLowerCase()
-      .replaceAll("ı", "i")
-      .replaceAll("ğ", "g")
-      .replaceAll("ş", "s")
-      .replaceAll("ö", "o")
-      .replaceAll("ü", "u")
-      .replaceAll("ç", "c")
+      .replaceAll("Ä±", "i")
+      .replaceAll("ÄŸ", "g")
+      .replaceAll("ÅŸ", "s")
+      .replaceAll("Ã¶", "o")
+      .replaceAll("Ã¼", "u")
+      .replaceAll("Ã§", "c")
       .trim();
 
   const shipmentStatusCounts = (shipments ?? []).reduce(
@@ -454,7 +454,7 @@ export default async function DashboardPage() {
                       <p className="text-[11px] text-black/60">
                         {(Array.isArray((o as any).suppliers)
                           ? (o as any).suppliers[0]?.name
-                          : (o as any).suppliers?.name) ?? "Tedarikci yok"}
+                          : (o as any).suppliers?.name) ?? "Tedarikçi yok"}
                       </p>
                     ) : null}
                   </div>
@@ -503,7 +503,7 @@ export default async function DashboardPage() {
                         ? ` | ${
                             (Array.isArray((order as any).suppliers)
                               ? (order as any).suppliers[0]?.name
-                              : (order as any).suppliers?.name) ?? "Tedarikci yok"
+                              : (order as any).suppliers?.name) ?? "Tedarikçi yok"
                           }`
                         : ""}
                     </p>
@@ -539,7 +539,7 @@ export default async function DashboardPage() {
                         ? ` | ${
                             (Array.isArray((o as any).suppliers)
                               ? (o as any).suppliers[0]?.name
-                              : (o as any).suppliers?.name) ?? "Tedarikci yok"
+                              : (o as any).suppliers?.name) ?? "Tedarikçi yok"
                           }`
                         : ""}
                     </p>
@@ -765,5 +765,6 @@ export default async function DashboardPage() {
     </section>
   );
 }
+
 
 

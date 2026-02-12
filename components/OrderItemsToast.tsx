@@ -1,15 +1,15 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
 
 const toastMessages: Record<string, string> = {
-  "item-created": "Urun eklendi.",
-  "item-updated": "Urun guncellendi.",
-  "item-deleted": "Urun silindi.",
+  "item-created": "Ürün eklendi.",
+  "item-updated": "Ürün guncellendi.",
+  "item-deleted": "Ürün silindi.",
   "items-deleted-all": "Tum urun kalemleri silindi.",
-  "items-imported": "Urunler import edildi.",
+  "items-imported": "Ürünler import edildi.",
   "items-import-empty": "Import dosyasi bos veya uygun satir yok.",
   "items-import-failed": "Import sirasinda hata olustu.",
   "pl-imported": "Packing list import edildi.",
@@ -49,3 +49,4 @@ export default function OrderItemsToast({ orderId }: { orderId: string }) {
 
   return null;
 }
+

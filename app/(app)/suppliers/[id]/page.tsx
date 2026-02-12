@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateSupplier } from "@/app/actions/master-data";
@@ -33,7 +33,7 @@ export default async function SupplierDetailPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Tedarikci detay
+            Tedarikçi detay
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
             {supplier.name}
@@ -54,7 +54,7 @@ export default async function SupplierDetailPage({
         <input type="hidden" name="id" value={supplier.id} />
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="text-sm font-medium">
-            Tedarikci adi
+            Tedarikçi adi
             <input
               name="name"
               defaultValue={supplier.name ?? ""}
@@ -127,7 +127,7 @@ export default async function SupplierDetailPage({
           </label>
         </div>
         <button className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
-          Guncelle
+          Güncelle
         </button>
       </form>
 
@@ -199,3 +199,4 @@ export default async function SupplierDetailPage({
     </section>
   );
 }
+

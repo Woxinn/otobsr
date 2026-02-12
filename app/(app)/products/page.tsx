@@ -75,7 +75,7 @@ const fetchNetsisStocks = async (products: any[]) => {
       },
     });
 
-    // Kod baÅŸÄ±na LIKE ile sorgula (\"22 6200%\" gibi) â€“ perPage <= 100 olduÄŸu iÃ§in kabul edilebilir
+    // Kod basina LIKE ile sorgula ("22 6200%" gibi) - perPage <= 100 oldugu icin kabul edilebilir
     for (const code of distinctCodes) {
       const key = code.trim();
       try {
@@ -98,11 +98,11 @@ const fetchNetsisStocks = async (products: any[]) => {
 
     await pool.close();
   } catch (err) {
-    // baÄŸlantÄ± hatasÄ± olursa tÃ¼m map boÅŸ kalÄ±r; logla ve geri dÃ¶n
+    // Baglanti hatasi olursa tum map bos kalir; logla ve geri don.
     // eslint-disable-next-line no-console
     console.error("[netsis-stock] connection failed", err);
   }
-  // Debug: kaÃ§ kod ve kaÃ§ sonuÃ§ dÃ¶ndÃ¼
+  // Debug: kac kod ve kac sonuc dondu.
   // eslint-disable-next-line no-console
   console.log("[netsis-stock] codes", distinctCodes.length, "map size", map.size);
   // eslint-disable-next-line no-console
@@ -253,7 +253,7 @@ export default async function ProductsPage({
   );
   logError("products", productsError);
 
-  // MSSQL stok Ã§ek (Netsis koduna gÃ¶re)
+  // MSSQL stok cek (Netsis koduna gore)
   const productsList = (products as any[] | null | undefined) ?? [];
 
   // MSSQL stok cek (Netsis koduna gore)
@@ -564,10 +564,10 @@ export default async function ProductsPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Urunler
+            Ürünler
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Urunler
+            Ürünler
           </h2>
         </div>
         {canEdit ? (
@@ -576,7 +576,7 @@ export default async function ProductsPage({
               href="/products/new"
               className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white"
             >
-              + Yeni urun
+              + Yeni ürün
             </Link>
             <Link
               href="/products/netsis-import"
@@ -588,18 +588,18 @@ export default async function ProductsPage({
               href="/products/import-update"
               className="rounded-full border border-black/20 bg-white px-4 py-2 text-xs font-semibold text-black/70"
             >
-              ÃœrÃ¼n gÃ¼ncelle (import)
+              Ürün güncelle (import)
             </Link>
             <Link
               href="/product-groups"
               className="rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-semibold"
             >
-              Kategori yonetimi
+              Kategori yönetimi
             </Link>
             <ConfirmActionForm
               action={deleteSelectedProducts}
-              confirmText="Secili urunler silinsin mi?"
-              buttonText="Seciliyi sil"
+              confirmText="Seçili urunler silinsin mi?"
+              buttonText="Seçiliyi sil"
               formId="products-delete-selected"
             />
             <ConfirmActionForm
@@ -620,7 +620,7 @@ export default async function ProductsPage({
             <input
               name="q"
               defaultValue={resolvedParams.q ?? ""}
-              placeholder="Urun kodu, adi, not (birden fazla kelime yazabilirsin)"
+              placeholder="Ürün kodu, adı, not (birden fazla kelime yazabilirsin)"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>
@@ -640,7 +640,7 @@ export default async function ProductsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            Tedarikci
+            Tedarikçi
             <select
               name="supplier"
               defaultValue={resolvedParams.supplier ?? ""}
@@ -679,7 +679,7 @@ export default async function ProductsPage({
             >
               {perPageOptions.map((option) => (
                 <option key={option} value={option}>
-                  {option} urun
+                  {option} ürün
                 </option>
               ))}
             </select>
@@ -702,10 +702,10 @@ export default async function ProductsPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-              Urun istatistikleri
+              Ürün istatistikleri
             </p>
             <p className="text-lg font-semibold text-black">
-              Toplam urun: {totalProductsCount ?? 0}
+              Toplam ürün: {totalProductsCount ?? 0}
             </p>
           </div>
           <div className="text-xs text-black/60">
@@ -735,7 +735,7 @@ export default async function ProductsPage({
         </div>
         {selectedGroupDetails.length ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-black/60">Secili kategoriler:</span>
+            <span className="text-black/60">Seçili kategoriler:</span>
             {selectedGroupDetails.map((group) => (
               <Link
                 key={group.id}
@@ -747,7 +747,7 @@ export default async function ProductsPage({
               >
                 {group.name}
                 <span className="rounded-full bg-[var(--ocean)]/20 px-2 py-[2px] text-[10px] font-bold text-[var(--ocean)]/80 group-hover:bg-[var(--ocean)]/30">
-                  Ã—
+                  ×
                 </span>
               </Link>
             ))}
@@ -775,7 +775,7 @@ export default async function ProductsPage({
                       </th>
                     ) : null}
                     <th className="px-4 pt-2">Kod</th>
-                    <th className="px-4 pt-2">Urun</th>
+                    <th className="px-4 pt-2">Ürün</th>
                     <th className="px-4 pt-2">Kategori</th>
                       <th className="px-4 pt-2">Netsis Stok</th>
                       <th className="px-4 pt-2">GTIP</th>
@@ -861,7 +861,7 @@ export default async function ProductsPage({
                             {productAttributes.length ? productAttributes.join(", ") : "-"}
                           {weightKg !== null ? (
                             <div className="mt-1 text-[11px] text-black/50">
-                              AÄŸÄ±rlÄ±k:{" "}
+                              Ağırlık:{" "}
                               {Number(weightKg).toLocaleString("tr-TR", {
                                 maximumFractionDigits: 2,
                               })}{" "}
@@ -896,7 +896,7 @@ export default async function ProductsPage({
           </div>
         ) : (
           <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-            Henuz urun yok.
+            Henüz ürün yok.
           </div>
         )}
         {totalCount > perPage ? (
@@ -914,7 +914,7 @@ export default async function ProductsPage({
                     : "border border-black/20 text-black/70"
                 }`}
               >
-                Onceki
+                Önceki
               </Link>
               <Link
                 href={`/products${buildQuery({ page: String(currentPage + 1) })}`}
@@ -934,6 +934,7 @@ export default async function ProductsPage({
     </section>
   );
 }
+
 
 
 

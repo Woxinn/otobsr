@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,18 +17,18 @@ export default function ProductsListToast() {
       const updated = searchParams.get("updated");
       const missing = searchParams.get("missing");
       addToast(
-        `Netsis import: ${updated ?? "-"} güncellendi, ${missing ?? "0"} bulunamadı.`,
+        `Netsis import: ${updated ?? "-"} gÃ¼ncellendi, ${missing ?? "0"} bulunamadÄ±.`,
         "info"
       );
     } else if (toastKey === "products-import-ok") {
       const updated = searchParams.get("updated");
       const missing = searchParams.get("missing");
       addToast(
-        `Ürün import: ${updated ?? "-"} güncellendi, ${missing ?? "0"} bulunamadı.`,
+        `Ürün import: ${updated ?? "-"} gÃ¼ncellendi, ${missing ?? "0"} bulunamadÄ±.`,
         "info"
       );
     } else if (toastKey === "delete-blocked") {
-      addToast("Urun silinemedi. Sipariste kullaniliyor.", "error");
+      addToast("Ürün silinemedi. Sipariste kullaniliyor.", "error");
     } else if (toastKey === "delete-blocked-all") {
       addToast("Tum urunler silinemedi. Sipariste kullanilan urunler var.", "error");
     }
@@ -41,3 +41,4 @@ export default function ProductsListToast() {
 
   return null;
 }
+

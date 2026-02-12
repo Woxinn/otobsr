@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/roles";
 import { createUserWithRole } from "@/app/actions/users";
 
@@ -11,7 +11,7 @@ export default async function NewUserPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-black/40">Kullanici</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-black/40">Kullanıcı</p>
         <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">Yeni kullanici ekle</h2>
       </div>
 
@@ -26,7 +26,7 @@ export default async function NewUserPage() {
           <input
             name="password"
             type="password"
-            placeholder="Sifre"
+            placeholder="Şifre"
             className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             required
           />
@@ -41,10 +41,10 @@ export default async function NewUserPage() {
           </select>
           <div className="md:col-span-3 flex gap-2">
             <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
-              Kullanici ekle
+              Kullanıcı ekle
             </button>
             <p className="text-xs text-black/60">
-              Kullanici email onaysiz acilir ve aninda giris yapabilir.
+              Kullanıcı email onaysiz acilir ve aninda giris yapabilir.
             </p>
           </div>
         </form>
@@ -52,3 +52,4 @@ export default async function NewUserPage() {
     </section>
   );
 }
+

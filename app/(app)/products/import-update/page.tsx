@@ -101,7 +101,7 @@ export default function ProductsImportUpdatePage() {
         </p>
         <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs text-slate-700">
           Örnek satır: <br />
-          <code>RXB-BCVB-2RXPB-2280-Lw-m;Urun adi;12,50;STK-001;0,85;18RHB;8414</code>
+          <code>RXB-BCVB-2RXPB-2280-Lw-m;Ürün adi;12,50;STK-001;0,85;18RHB;8414</code>
         </div>
       </div>
 
@@ -167,3 +167,4 @@ export default function ProductsImportUpdatePage() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit } from "@/lib/roles";
 import { getShipmentFlags } from "@/lib/shipments";
@@ -181,11 +181,9 @@ export default async function ShipmentsPage({
     id: string;
     packages: number | null;
   }) =>
-    Number(
-      order.packages ??
-        packingPackagesByOrder.get(order.id) ??
-        0
-    );
+    packingPackagesByOrder.has(order.id)
+      ? Number(packingPackagesByOrder.get(order.id) ?? 0)
+      : Number(order.packages ?? 0);
 
   shipmentOrdersRows?.forEach((item) => {
     if (!item.shipment_id) return;
@@ -456,7 +454,7 @@ export default async function ShipmentsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            Sıralama
+            SÄ±ralama
             <select
               name="sort"
               defaultValue={resolvedParams.sort ?? "created"}
@@ -468,7 +466,7 @@ export default async function ShipmentsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            Sıralama yönü
+            SÄ±ralama yÃ¶nÃ¼
             <select
               name="sortDir"
               defaultValue={resolvedParams.sortDir ?? (sortKey === "created" ? "desc" : "asc")}
@@ -479,7 +477,7 @@ export default async function ShipmentsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            Cikis limani
+            Çıkış limani
             <select
               name="origin"
               defaultValue={resolvedParams.origin ?? ""}
@@ -619,7 +617,7 @@ export default async function ShipmentsPage({
                         {shipment.file_no}
                       </span>
                       <span className="text-sm text-black/60">
-                        Konşimento No: {shipment.reference ?? "-"}
+                        KonÅŸimento No: {shipment.reference ?? "-"}
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -717,4 +715,5 @@ export default async function ShipmentsPage({
     </section>
   );
 }
+
 

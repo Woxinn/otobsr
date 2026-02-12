@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 
@@ -79,12 +79,12 @@ export default function MissingProductRow({ row, index, groups }: Props) {
       </div>
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <label className="text-xs font-semibold text-black/60">
-          Urun adi
+          Ürün adi
           <input
             name={`row_${index}_name`}
             defaultValue={row.name ?? row.code}
             className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-            placeholder="Urun adi"
+            placeholder="Ürün adi"
           />
         </label>
         <label className="text-xs font-semibold text-black/60">
@@ -250,3 +250,4 @@ export default function MissingProductRow({ row, index, groups }: Props) {
     </div>
   );
 }
+

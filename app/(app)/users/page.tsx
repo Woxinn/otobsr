@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/roles";
 import { updateUserRole, deleteUser } from "@/app/actions/users";
@@ -6,7 +6,14 @@ import { updateUserRole, deleteUser } from "@/app/actions/users";
 type UserRow = {
   user_id: string;
   email: string | null;
-  role: "Admin" | "Yonetim" | "Satis";
+  role: string | null;
+};
+
+const normalizeRoleValue = (value: string | null | undefined): "Admin" | "Yonetim" | "Satis" => {
+  const raw = String(value ?? "Admin").trim().toLowerCase();
+  if (raw === "yonetim") return "Yonetim";
+  if (raw === "satis") return "Satis";
+  return "Admin";
 };
 
 async function fetchUsers() {
@@ -34,14 +41,14 @@ export default async function UsersPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-black/40">Kullanicilar</p>
-        <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">Kullanici ve roller</h2>
+        <p className="text-xs uppercase tracking-[0.3em] text-black/40">Kullanıcılar</p>
+        <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">Kullanıcı ve roller</h2>
       </div>
 
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
         <h3 className="text-lg font-semibold">Aktif kullanici</h3>
         <p className="mt-2 text-sm text-black/70">
-          {user?.email ?? "Giris yapilmamis."}
+          {user?.email ?? "Giriş yapilmamis."}
         </p>
       </div>
 
@@ -75,7 +82,7 @@ export default async function UsersPage() {
                     <form action={updateUserRole}>
                       <input type="hidden" name="user_id" value={row.user_id} />
                       <select
-                        defaultValue={row.role}
+                        defaultValue={normalizeRoleValue(row.role)}
                         name="role"
                         className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                       >
@@ -102,7 +109,7 @@ export default async function UsersPage() {
           </table>
           {!users.length ? (
             <div className="mt-3 rounded-xl border border-black/10 bg-[var(--peach)] px-3 py-2 text-xs text-black/70">
-              Henuz kullanici yok.
+              Henüz kullanici yok.
             </div>
           ) : null}
         </div>
@@ -110,4 +117,5 @@ export default async function UsersPage() {
     </section>
   );
 }
+
 

@@ -28,7 +28,7 @@ export default function LoginClient() {
     setLoading(false);
 
     if (signInError) {
-      setError("Giris basarisiz. Eposta veya sifreyi kontrol edin.");
+      setError("Giriş başarısız. E-posta veya şifreyi kontrol edin.");
       return;
     }
 
@@ -43,14 +43,14 @@ export default function LoginClient() {
           <Logo className="h-10 w-auto" alt="Oto Basar" />
         </div>
         <h1 className="text-3xl font-semibold [font-family:var(--font-display)]">
-          Admin girisi
+          Admin girişi
         </h1>
         <p className="mt-2 text-sm text-black/60">
-          Ithalat takip sistemi icin yetkili girisi.
+          İthalat takip sistemi için yetkili girişi.
         </p>
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <label className="block text-sm font-medium">
-            Eposta
+            E-posta
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -60,7 +60,7 @@ export default function LoginClient() {
             />
           </label>
           <label className="block text-sm font-medium">
-            Sifre
+            Şifre
             <input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -79,7 +79,7 @@ export default function LoginClient() {
             disabled={loading}
             className="w-full rounded-full bg-[var(--ocean)] px-5 py-3 text-sm font-semibold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {loading ? "Giris yapiliyor..." : "Giris yap"}
+            {loading ? "Giriş yapılıyor..." : "Giriş yap"}
           </button>
         </form>
       </div>

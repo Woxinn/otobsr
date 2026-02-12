@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CSSProperties } from "react";
 
@@ -26,16 +26,16 @@ export default async function SuppliersPage() {
     <section className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-          Tedarikciler
+          Tedarikçiler
         </p>
         <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-          Tedarikci listesi
+          Tedarikçi listesi
         </h2>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-black/60">
-          Tedarikcileri tablo uzerinden guncelleyebilir, detaya gidebilirsiniz.
+          Tedarikçileri tablo uzerinden guncelleyebilir, detaya gidebilirsiniz.
         </p>
         <Link
           href="/suppliers/new"
@@ -49,7 +49,7 @@ export default async function SuppliersPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">
-              Tedarikci panosu
+              Tedarikçi panosu
             </p>
             <h3 className="text-lg font-semibold">Mevcut tedarikciler</h3>
           </div>
@@ -64,7 +64,7 @@ export default async function SuppliersPage() {
                 <table className="w-full border-separate border-spacing-y-4">
                   <thead>
                     <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
-                      <th className="px-4 pt-2">Tedarikci</th>
+                      <th className="px-4 pt-2">Tedarikçi</th>
                       <th className="px-4 pt-2">Yetkili</th>
                       <th className="px-4 pt-2">E-posta</th>
                       <th className="px-4 pt-2">Telefon</th>
@@ -123,7 +123,7 @@ export default async function SuppliersPage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henuz tedarikci yok.
+              Henüz tedarikci yok.
             </div>
           )}
         </div>
@@ -131,4 +131,5 @@ export default async function SuppliersPage() {
     </section>
   );
 }
+
 

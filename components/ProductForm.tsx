@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 
@@ -149,7 +149,7 @@ export default function ProductForm({
           </span>
         </label>
         <label className="text-sm font-medium">
-          Urun kodu
+          Ürün kodu
           <input
             name="code"
             defaultValue={product?.code ?? ""}
@@ -158,7 +158,7 @@ export default function ProductForm({
           />
         </label>
         <label className="text-sm font-medium">
-          Urun adi
+          Ürün adi
           <input
             name="name"
             defaultValue={product?.name ?? ""}
@@ -215,7 +215,7 @@ export default function ProductForm({
           <input
             name="description"
             defaultValue={product?.description ?? ""}
-            placeholder="Urun aciklamasi"
+            placeholder="Ürün aciklamasi"
             className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
           />
         </label>
@@ -343,8 +343,9 @@ export default function ProductForm({
       </div>
 
       <button className="mt-6 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
-        {mode === "edit" ? "Kaydet" : "Urun olustur"}
+        {mode === "edit" ? "Kaydet" : "Ürün olustur"}
       </button>
     </form>
   );
 }
+

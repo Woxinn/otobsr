@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -22,7 +22,7 @@ export default function CreateUserClient() {
     setMessage(null);
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error || !data?.user?.id) {
-      setMessage("Kullanici olusturulamadi.");
+      setMessage("Kullanıcı olusturulamadi.");
       setLoading(false);
       return;
     }
@@ -34,7 +34,7 @@ export default function CreateUserClient() {
     setEmail("");
     setPassword("");
     setRole("Admin");
-    setMessage("Kullanici olusturuldu.");
+    setMessage("Kullanıcı olusturuldu.");
     setLoading(false);
   };
 
@@ -52,7 +52,7 @@ export default function CreateUserClient() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           type="password"
-          placeholder="Sifre"
+          placeholder="Şifre"
           className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
         />
         <select
@@ -71,7 +71,7 @@ export default function CreateUserClient() {
           disabled={loading}
           className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
-          {loading ? "Kaydediliyor..." : "Kullanici ekle"}
+          {loading ? "Kaydediliyor..." : "Kullanıcı ekle"}
         </button>
         {message ? (
           <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-xs">
@@ -82,3 +82,4 @@ export default function CreateUserClient() {
     </div>
   );
 }
+

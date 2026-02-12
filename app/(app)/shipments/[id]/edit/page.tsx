@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
@@ -237,7 +237,7 @@ export default async function ShipmentEditPage({
                 />
               </label>
               <label className="block text-sm font-medium">
-                Konşimento No
+                KonÅŸimento No
                 <input
                   name="reference"
                   defaultValue={shipment.reference ?? ""}
@@ -282,7 +282,7 @@ export default async function ShipmentEditPage({
 
               <h3 className="pt-2 text-lg font-semibold">Liman & Konteyner</h3>
               <label className="block text-sm font-medium">
-                Cikis limani
+                Çıkış limani
                 <select
                   name="origin_port_id"
                   defaultValue={shipment.origin_port?.id ?? ""}
@@ -402,7 +402,7 @@ export default async function ShipmentEditPage({
           </div>
           {suggestedEta ? (
             <div className="mt-3 rounded-2xl border border-black/10 bg-[var(--sky)]/50 p-3 text-sm text-black/70">
-              Secili forwarder transit suresi ile otomatik ETA onerisi:{" "}
+              Seçili forwarder transit suresi ile otomatik ETA onerisi:{" "}
               <span className="font-semibold text-black">{suggestedEta}</span>
             </div>
           ) : null}
@@ -532,7 +532,7 @@ export default async function ShipmentEditPage({
                   </div>
                   <div className="mt-3 flex gap-2">
                     <button className="rounded-full bg-[var(--ocean)] px-4 py-1 text-xs font-semibold text-white">
-                      Guncelle
+                      Güncelle
                     </button>
                       <ConfirmActionForm
                         action={deleteDocument}
@@ -563,3 +563,4 @@ export default async function ShipmentEditPage({
     </section>
   );
 }
+

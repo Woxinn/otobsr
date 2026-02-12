@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -101,7 +101,7 @@ export default function OrderItemCreateForm({
       <p className="font-semibold">Yeni urun ekle</p>
       <div className="mt-3 grid gap-3 lg:grid-cols-4">
         <label className="text-xs font-semibold text-black/60 lg:col-span-2">
-          Urun sec
+          Ürün sec
           <div className="relative mt-2">
             <input
               value={query}
@@ -145,14 +145,14 @@ export default function OrderItemCreateForm({
                   setHighlightIndex(-1);
                 }
               }}
-              placeholder="Urun kodu veya adi ile ara"
+              placeholder="Ürün kodu veya adi ile ara"
               className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
               autoComplete="off"
             />
             {isOpen && (filtered.length || isLoading) ? (
               <div className="absolute left-0 right-0 z-20 mt-2 max-h-56 overflow-auto rounded-2xl border border-black/10 bg-white p-2 text-xs shadow-[0_12px_30px_-18px_rgba(15,61,62,0.6)]">
                 {isLoading ? (
-                  <div className="px-3 py-2 text-black/50">Aranıyor…</div>
+                  <div className="px-3 py-2 text-black/50">AranÄ±yorâ€¦</div>
                 ) : (
                   filtered.map((product, index) => (
                     <button
@@ -185,7 +185,7 @@ export default function OrderItemCreateForm({
         </label>
         <input
           name="name"
-          placeholder="Tedarikci urun adi"
+          placeholder="Tedarikçi urun adi"
           className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm lg:col-span-2"
         />
         <input
@@ -217,9 +217,10 @@ export default function OrderItemCreateForm({
         />
       </div>
       <button className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
-        Urun ekle
+        Ürün ekle
       </button>
     </form>
   );
 }
+
 

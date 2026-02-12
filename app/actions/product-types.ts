@@ -1,4 +1,4 @@
-// FEATURE: product-type-compliance UI actions
+﻿// FEATURE: product-type-compliance UI actions
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -56,8 +56,8 @@ export async function deleteCompliance(formData: FormData) {
 }
 
 /**
- * Tek bir tip değeri (nitelikten okunan) için product_type oluşturur
- * ve bu değere sahip ürünlerin product_type_id alanını doldurur.
+ * Tek bir tip deÄŸeri (nitelikten okunan) iÃ§in product_type oluÅŸturur
+ * ve bu deÄŸere sahip Ã¼rÃ¼nlerin product_type_id alanÄ±nÄ± doldurur.
  */
 export async function upsertTypeFromTipValue(formData: FormData) {
   "use server";
@@ -68,7 +68,7 @@ export async function upsertTypeFromTipValue(formData: FormData) {
     .filter((v) => v.length);
   if (!tipValues.length) return;
 
-  // Tipleri upsert et ve id haritasını oluştur
+  // Tipleri upsert et ve id haritasÄ±nÄ± oluÅŸtur
   const tipIdMap = new Map<string, string>(); // lower -> id
   for (const tipValue of tipValues) {
     const { data: upserted, error: upErr } = await supabase
@@ -83,7 +83,7 @@ export async function upsertTypeFromTipValue(formData: FormData) {
     tipIdMap.set(tipValue.toLowerCase(), upserted.id);
   }
 
-  // İlgili ürünleri bul
+  // Ä°lgili Ã¼rÃ¼nleri bul
   const { data: attrRows, error: attrErr } = await supabase
     .from("product_attribute_values")
     .select(
@@ -114,7 +114,7 @@ export async function upsertTypeFromTipValue(formData: FormData) {
     }
   });
 
-  // Ürünleri tip ID ile güncelle
+  // Ürünleri tip ID ile gÃ¼ncelle
   for (const [normTip, idSet] of Object.entries(targets)) {
     const typeId = tipIdMap.get(normTip);
     if (!typeId) continue;
@@ -137,14 +137,14 @@ export async function upsertTypeFromTipValue(formData: FormData) {
 }
 
 /**
- * Ürün niteliklerindeki "tip" değerlerinden otomatik product_types oluşturur
- * ve product_type_id boş olan ürünleri bu tipe bağlar.
+ * Ürün niteliklerindeki "tip" deÄŸerlerinden otomatik product_types oluÅŸturur
+ * ve product_type_id boÅŸ olan Ã¼rÃ¼nleri bu tipe baÄŸlar.
  */
 export async function syncTypesFromAttributes() {
   "use server";
   const supabase = await createSupabaseServerClient();
 
-  // 1) Tip niteliğini taşıyan kayıtları çek
+  // 1) Tip niteliÄŸini taÅŸÄ±yan kayÄ±tlarÄ± Ã§ek
   const { data: attrRows, error: attrErr } = await supabase
     .from("product_attribute_values")
     .select(
@@ -157,7 +157,7 @@ export async function syncTypesFromAttributes() {
     return;
   }
 
-  // 2) Tip değerlerini normalize et
+  // 2) Tip deÄŸerlerini normalize et
   type AttrRow = {
     product_id: string | null;
     value_text: string | null;
@@ -184,7 +184,7 @@ export async function syncTypesFromAttributes() {
 
   if (!typeMap.size) return;
 
-  // 3) Tipleri upsert et ve ürünleri güncelle
+  // 3) Tipleri upsert et ve Ã¼rÃ¼nleri gÃ¼ncelle
   for (const [typeName, productSet] of typeMap.entries()) {
     const { data: upserted, error: upErr } = await supabase
       .from("product_types")
@@ -216,3 +216,4 @@ export async function syncTypesFromAttributes() {
   revalidatePath("/product-types");
   revalidatePath("/products");
 }
+

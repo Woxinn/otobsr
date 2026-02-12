@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+﻿import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,7 +35,7 @@ export async function createUserWithRole(formData: FormData) {
     email_confirm: true,
   });
   if (error || !data.user) {
-    throw new Error("Kullanici olusturulamadi.");
+    throw new Error("Kullanıcı olusturulamadi.");
   }
 
   await adminClient.from("user_roles").upsert({
@@ -73,3 +73,4 @@ export async function deleteUser(formData: FormData) {
   revalidatePath("/users");
   redirect("/users");
 }
+

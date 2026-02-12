@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupplier } from "@/app/actions/master-data";
 import CountrySelect from "@/components/CountrySelect";
 
@@ -8,7 +8,7 @@ export default function SupplierCreatePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Tedarikci olustur
+            Tedarikçi olustur
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
             Yeni tedarikci
@@ -28,10 +28,10 @@ export default function SupplierCreatePage() {
       >
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="text-sm font-medium">
-            Tedarikci adi
+            Tedarikçi adi
             <input
               name="name"
-              placeholder="Tedarikci adi"
+              placeholder="Tedarikçi adi"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>
@@ -63,7 +63,7 @@ export default function SupplierCreatePage() {
             Ulke
             <CountrySelect
               name="country"
-              placeholder="Ülke seç veya yaz"
+              placeholder="Ãœlke seÃ§ veya yaz"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>
@@ -107,3 +107,4 @@ export default function SupplierCreatePage() {
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import type { CSSProperties } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit, canViewFinance } from "@/lib/roles";
@@ -51,7 +51,7 @@ export default async function OrdersPage({
     .from("order_documents")
     .select("order_id, document_type_id, status");
 
-  // Order -> Shipment eşleşmeleri
+  // Order -> Shipment eÅŸleÅŸmeleri
   const orderIds = (orders ?? []).map((o) => o.id);
   const { data: orderShipments } = orderIds.length
     ? await supabase
@@ -121,12 +121,12 @@ export default async function OrdersPage({
   const normalizeStatus = (value: string | null | undefined) =>
     (value ?? "")
       .toLowerCase()
-      .replaceAll("Ä±", "i")
-      .replaceAll("ÄŸ", "g")
-      .replaceAll("ÅŸ", "s")
-      .replaceAll("Ã¶", "o")
-      .replaceAll("Ã¼", "u")
-      .replaceAll("Ã§", "c")
+      .replaceAll("Ã„Â±", "i")
+      .replaceAll("Ã„Å¸", "g")
+      .replaceAll("Ã…Å¸", "s")
+      .replaceAll("ÃƒÂ¶", "o")
+      .replaceAll("ÃƒÂ¼", "u")
+      .replaceAll("ÃƒÂ§", "c")
       .trim();
   const statusToken = (value: string | null | undefined) =>
     normalizeStatus(value).replaceAll(" ", "-");
@@ -339,7 +339,7 @@ export default async function OrdersPage({
             </label>
 
             <label className="text-sm font-semibold text-slate-800">
-              Tedarikci
+              Tedarikçi
               <select
                 name="supplier"
                 defaultValue={resolvedParams.supplier ?? ""}
@@ -597,7 +597,7 @@ export default async function OrdersPage({
               </div>
             ) : (
               <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Henuz siparis yok.
+                Henüz siparis yok.
               </div>
             )}
           </div>
@@ -627,3 +627,4 @@ export default async function OrdersPage({
     </div>
   );
 }
+

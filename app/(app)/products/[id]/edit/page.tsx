@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateProduct } from "@/app/actions/products";
 import ProductForm from "@/components/ProductForm";
@@ -20,7 +20,7 @@ export default async function EditProductPage({
   if (!product) {
     return (
       <section className="rounded-3xl border border-black/10 bg-white p-8 text-sm text-black/60">
-        Urun bulunamadi.
+        Ürün bulunamadi.
       </section>
     );
   }
@@ -73,7 +73,7 @@ export default async function EditProductPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Urun duzenle
+            Ürün duzenle
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
             {product.name}
@@ -102,3 +102,4 @@ export default async function EditProductPage({
     </section>
   );
 }
+

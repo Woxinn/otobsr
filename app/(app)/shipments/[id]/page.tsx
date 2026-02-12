@@ -263,7 +263,7 @@ export default async function ShipmentDetailPage({
                 href={`/shipments/${shipment.id}/edit`}
                 className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
               >
-                Duzenle
+                Düzenle
               </Link>
             ) : null}
             <Link
@@ -299,7 +299,7 @@ export default async function ShipmentDetailPage({
             Konteyner: {shipment.container_no ?? "-"} | Seal: {shipment.seal_no ?? "-"}
           </span>
           <span>Tip: {shipment.container_type ?? "-"}</span>
-          <span>Cikis: {shipment.origin_port?.name ?? "-"}</span>
+          <span>Çıkış: {shipment.origin_port?.name ?? "-"}</span>
           <span>Varis: {shipment.destination_port?.name ?? "-"}</span>
         </div>
       </div>
@@ -316,7 +316,7 @@ export default async function ShipmentDetailPage({
           <div className="mt-4 grid gap-4 lg:grid-cols-2 text-sm">
             {[
               { label: "Forwarder", value: shipment.forwarders?.name ?? "-" },
-              { label: "Cikis limani", value: shipment.origin_port?.name ?? "-" },
+              { label: "Çıkış limani", value: shipment.origin_port?.name ?? "-" },
               { label: "Varis limani", value: shipment.destination_port?.name ?? "-" },
               { label: "ETD (plan)", value: shipment.etd_planned ?? "-" },
               { label: "ATD (gercek)", value: shipment.atd_actual ?? "-" },
@@ -419,7 +419,7 @@ export default async function ShipmentDetailPage({
             })
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henuz siparis secilmedi.
+              Henüz siparis secilmedi.
             </div>
           )}
         </div>
@@ -467,7 +467,7 @@ export default async function ShipmentDetailPage({
                     ) : null}
                     {quote.is_selected ? (
                       <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-semibold text-black/70">
-                        Secili
+                        Seçili
                       </span>
                     ) : (
                       <form action={selectForwarderQuote}>
@@ -492,7 +492,7 @@ export default async function ShipmentDetailPage({
             ))
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henuz teklif girilmedi. Forwarder detay sayfasindan teklif ekleyin.
+              Henüz teklif girilmedi. Forwarder detay sayfasindan teklif ekleyin.
             </div>
           )}
         </div>
@@ -599,5 +599,6 @@ export default async function ShipmentDetailPage({
     </section>
   );
 }
+
 
 

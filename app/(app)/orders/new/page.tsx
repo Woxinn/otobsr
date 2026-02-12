@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createOrder } from "@/app/actions/orders";
 
@@ -43,7 +43,7 @@ export default async function OrderCreatePage() {
             />
           </label>
           <label className="text-sm font-medium">
-            Konşimento No
+            KonÅŸimento No
             <input
               name="consignment_no"
               placeholder="Orn: BL-2026-001"
@@ -51,7 +51,7 @@ export default async function OrderCreatePage() {
             />
           </label>
           <label className="text-sm font-medium">
-            Tedarikci
+            Tedarikçi
             <select
               name="supplier_id"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
@@ -127,3 +127,4 @@ export default async function OrderCreatePage() {
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -152,9 +152,9 @@ export default function ProductCostCalculatorClient({
     <section className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">Urun maliyet</p>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">Ürün maliyet</p>
           <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            {product.name ?? product.code ?? "Urun"}
+            {product.name ?? product.code ?? "Ürün"}
           </h1>
           <p className="text-sm text-black/60">GTIP baglanti: {gtipBase ? (gtipBase as any).code : "-"}</p>
           <p className="mt-1 inline-flex items-center gap-2 rounded-full border border-black/10 bg-[var(--sky)] px-3 py-1 text-xs font-semibold text-black/70">
@@ -191,7 +191,7 @@ export default function ProductCostCalculatorClient({
             href={`/products/${product.id}`}
             className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
           >
-            Urun detaya don
+            Ürün detaya don
           </Link>
         </div>
       </div>
@@ -375,3 +375,4 @@ export default function ProductCostCalculatorClient({
     </section>
   );
 }
+

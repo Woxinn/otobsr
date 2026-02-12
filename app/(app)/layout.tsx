@@ -7,6 +7,12 @@ import TaskPanel from "@/components/TaskPanel";
 import { ToastProvider } from "@/components/ToastProvider";
 import Logo from "@/components/Logo";
 
+const roleLabel = (role: string) => {
+  if (role === "Yonetim") return "Yönetim";
+  if (role === "Satis") return "Satış";
+  return "Admin";
+};
+
 export default async function AppLayout({
   children,
 }: {
@@ -22,24 +28,21 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen text-[var(--ink)]">
       <div className="mx-auto max-w-7xl px-6 pb-24 pt-10">
-        <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-32 items-center justify-center rounded-2xl border border-black/10 bg-white px-3 py-2 shadow-sm">
-              <Logo className="h-auto w-full object-contain" alt="Oto Basar" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-                Ithalat Takip Sistemi
-              </p>
-              <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">
-                Deniz yolu ithalat operasyonu
-              </h1>
+        <header className="relative mb-10 flex min-h-[56px] items-center">
+          <div className="pr-64">
+            <h1 className="header-cool-title text-2xl font-semibold [font-family:var(--font-display)]">
+              İthalat Takip Sistemi
+            </h1>
+          </div>
+          <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="flex h-20 w-56 items-center justify-center rounded-2xl border border-black/10 bg-white px-4 py-3 shadow-sm">
+              <Logo className="mx-auto block h-full w-auto object-contain" alt="Oto Basar" />
             </div>
           </div>
-          <div className="flex items-center gap-3 text-sm text-black/60">
+          <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-3 text-sm text-black/60">
             <span>{user?.email ?? "Admin"}</span>
             <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
-              {role}
+              {roleLabel(role)}
             </span>
             <SignOutButton />
           </div>
@@ -49,17 +52,17 @@ export default async function AppLayout({
           {[
             { key: "dashboard", href: "/", label: "Dashboard" },
             { key: "shipments", href: "/shipments", label: "Shipments" },
-            { key: "orders", href: "/orders", label: "Siparisler" },
-            { key: "products", href: "/products", label: "Urunler" },
-            { key: "product-groups", href: "/product-groups", label: "Urun Kategorileri" },
+            { key: "orders", href: "/orders", label: "Siparişler" },
+            { key: "products", href: "/products", label: "Ürünler" },
+            { key: "product-groups", href: "/product-groups", label: "Ürün Kategorileri" },
             { key: "gtips", href: "/gtips", label: "GTIP'ler" },
             { key: "product-types", href: "/product-types", label: "TSE Bilgileri" },
             { key: "documents", href: "/documents", label: "Belgeler" },
-            { key: "suppliers", href: "/suppliers", label: "Tedarikciler" },
+            { key: "suppliers", href: "/suppliers", label: "Tedarikçiler" },
             { key: "forwarders", href: "/forwarders", label: "Forwarders" },
             { key: "ports", href: "/ports", label: "Limanlar" },
             { key: "document-types", href: "/document-types", label: "Evrak Tipleri" },
-            { key: "users", href: "/users", label: "Kullanicilar" },
+            { key: "users", href: "/users", label: "Kullanıcılar" },
           ]
             .filter((item) => canViewModule(role, item.key))
             .map((item) => (

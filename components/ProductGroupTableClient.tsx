@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { deleteProductGroup, deleteProductGroupsBulk } from "@/app/actions/products";
@@ -72,7 +72,7 @@ export default function ProductGroupTableClient({
           <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40">
             <th className="py-3">Sec</th>
             <th className="py-3">Kategori</th>
-            <th className="py-3">Urun sayisi</th>
+            <th className="py-3">Ürün sayisi</th>
             <th className="py-3">Nitelik sayisi</th>
             <th className="py-3">Not</th>
             <th className="py-3 text-right">Islem</th>
@@ -127,3 +127,4 @@ export default function ProductGroupTableClient({
     </div>
   );
 }
+

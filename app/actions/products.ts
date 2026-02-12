@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -184,7 +184,7 @@ export async function deleteProductGroupsBulk(formData: FormData) {
   const ids = formData.getAll("group_ids").map(String).filter(Boolean);
   if (!ids.length) return;
 
-  // Topla ürün id'leri
+  // Topla Ã¼rÃ¼n id'leri
   const { data: products } = await supabase
     .from("products")
     .select("id")
@@ -192,7 +192,7 @@ export async function deleteProductGroupsBulk(formData: FormData) {
 
   const productIds = (products ?? []).map((p) => p.id).filter(Boolean);
 
-  // Ürünlere bağlı order_items varsa sil
+  // Ürünlere baÄŸlÄ± order_items varsa sil
   if (productIds.length) {
     await supabase.from("order_items").delete().in("product_id", productIds);
   }
@@ -839,3 +839,4 @@ export async function importProducts(formData: FormData) {
   const addedCount = upsertedProducts?.length ?? 0;
   redirect(`/products/new?toast=imported&added=${addedCount}`);
 }
+

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateDocument, deleteDocument } from "@/app/actions/documents";
@@ -133,7 +133,7 @@ export default async function DocumentDetailPage({
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
-            Guncelle
+            Güncelle
           </button>
         </div>
       </form>
@@ -148,3 +148,4 @@ export default async function DocumentDetailPage({
     </section>
   );
 }
+
