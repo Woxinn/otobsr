@@ -663,11 +663,21 @@ export default async function OrderDetailPage({
               <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
                 Liman varis: {formatDate(orderEta)}
               </span>
-              <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                Shipment:{" "}
-                {linkedShipments.length
-                  ? linkedShipments.map((item) => item.file_no).join(", ")
-                  : "-"}
+              <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
+                <span>Shipment:</span>
+                {linkedShipments.length ? (
+                  linkedShipments.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={`/shipments/${item.id}`}
+                      className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--ocean)] underline-offset-2 hover:underline"
+                    >
+                      {item.file_no ?? "Shipment"}
+                    </Link>
+                  ))
+                ) : (
+                  <span>-</span>
+                )}
               </span>
                 </div>
               </div>

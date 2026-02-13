@@ -129,7 +129,7 @@ export async function GET(request: Request) {
 
   const header = [
     "Dosya No",
-    "KonÅŸimento No",
+    "Konşimento No",
     "Etiketler",
     "Forwarder",
     "Çıkış limani",

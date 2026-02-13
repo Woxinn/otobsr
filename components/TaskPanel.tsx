@@ -61,21 +61,56 @@ export default async function TaskPanel() {
     .select("id, name, expected_ready_date, order_status, suppliers(name)")
     .lt("expected_ready_date", todayIso)
     .order("expected_ready_date", { ascending: true })
-    .limit(20);
+    .limit(200);
 
-  const producedStatuses = ["hazir"];
+  const normalizeStatus = (value: string | null | undefined) =>
+    (value ?? "")
+      .toLowerCase()
+      .replaceAll("ı", "i")
+      .replaceAll("ğ", "g")
+      .replaceAll("ş", "s")
+      .replaceAll("ö", "o")
+      .replaceAll("ü", "u")
+      .replaceAll("ç", "c")
+      .replaceAll("Ä±", "i")
+      .replaceAll("ÄŸ", "g")
+      .replaceAll("ÅŸ", "ş")
+      .replaceAll("Ã¶", "o")
+      .replaceAll("Ã¼", "u")
+      .replaceAll("Ã§", "c")
+      .trim();
+  const producedStatuses = ["hazir", "uretildi"];
   const readyToday = (readyTodayRaw ?? []).filter(
-    (o) => !producedStatuses.includes((o.order_status ?? "").toLowerCase())
+    (o) => !producedStatuses.includes(normalizeStatus(o.order_status))
   );
   const overdueOrders = (overdueRaw ?? []).filter(
-    (o) => !producedStatuses.includes((o.order_status ?? "").toLowerCase())
+    (o) => !producedStatuses.includes(normalizeStatus(o.order_status))
   );
+
+  const { data: shipmentEtaRaw } = await supabase
+    .from("shipments")
+    .select("id, file_no, eta_current, warehouse_delivery_date")
+    .is("archived_at", null)
+    .order("eta_current", { ascending: true })
+    .limit(30);
+
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const threeDays = new Date(todayDate);
+  threeDays.setDate(todayDate.getDate() + 3);
+  const approachingShipments = (shipmentEtaRaw ?? []).filter((shipment) => {
+    if (!shipment.eta_current || shipment.warehouse_delivery_date) return false;
+    const eta = new Date(shipment.eta_current);
+    eta.setHours(0, 0, 0, 0);
+    return eta >= todayDate && eta <= threeDays;
+  });
 
   const hasContent =
     (tasks?.length ?? 0) > 0 ||
     (alerts?.length ?? 0) > 0 ||
     (readyToday?.length ?? 0) > 0 ||
-    (overdueOrders?.length ?? 0) > 0;
+    (overdueOrders?.length ?? 0) > 0 ||
+    (approachingShipments?.length ?? 0) > 0;
 
   return (
     <details className="fixed bottom-6 right-6 z-20 w-80 rounded-2xl border border-black/10 bg-white/90 p-4 shadow-lg backdrop-blur animate-[fade-up_700ms_ease-out]">
@@ -198,6 +233,30 @@ export default async function TaskPanel() {
                 </div>
               );
             })}
+          </div>
+        ) : null}
+
+        {approachingShipments?.length ? (
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">
+              Yaklasan shipmentler
+            </p>
+            {approachingShipments.map((shipment) => (
+              <div
+                key={shipment.id}
+                className="rounded-xl border border-black/10 bg-[var(--sky)]/40 p-3"
+              >
+                <a
+                  href={`/shipments/${shipment.id}`}
+                  className="font-semibold text-black hover:underline"
+                >
+                  {shipment.file_no ?? "Shipment"}
+                </a>
+                <p className="text-[11px] text-black/60">
+                  ETA: {shipment.eta_current ?? "-"}
+                </p>
+              </div>
+            ))}
           </div>
         ) : null}
 

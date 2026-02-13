@@ -237,7 +237,7 @@ export default async function ShipmentEditPage({
                 />
               </label>
               <label className="block text-sm font-medium">
-                KonÅŸimento No
+                Konşimento No
                 <input
                   name="reference"
                   defaultValue={shipment.reference ?? ""}
@@ -282,7 +282,7 @@ export default async function ShipmentEditPage({
 
               <h3 className="pt-2 text-lg font-semibold">Liman & Konteyner</h3>
               <label className="block text-sm font-medium">
-                Çıkış limani
+                Çıkış limanı
                 <select
                   name="origin_port_id"
                   defaultValue={shipment.origin_port?.id ?? ""}
@@ -297,7 +297,7 @@ export default async function ShipmentEditPage({
                 </select>
               </label>
               <label className="block text-sm font-medium">
-                Varis limani
+                Varış limanı
                 <select
                   name="destination_port_id"
                   defaultValue={shipment.destination_port?.id ?? ""}
@@ -378,7 +378,7 @@ export default async function ShipmentEditPage({
               />
             </label>
             <label className="block text-sm font-medium">
-              Gumruk giris tarihi
+              Gümrük giriş tarihi
               <input
                 type="date"
                 name="customs_entry_date"

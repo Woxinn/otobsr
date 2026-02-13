@@ -790,6 +790,7 @@ export default async function ProductsPage({
                 <tbody>
                   {productsList.map((product, index) => {
                     const rowColors = rowColorsFromId(product.id);
+                    const detailHref = `/products/${product.id}`;
                     const groupName =
                       groups?.find((group) => group.id === product.group_id)?.name ?? "-";
                     const productAttributes = mergedAttributesByProduct[product.id] ?? [];
@@ -819,27 +820,36 @@ export default async function ProductsPage({
                           </td>
                         ) : null}
                         <td className="px-4 py-4 text-sm font-semibold text-black">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="h-9 w-1.5 rounded-full"
-                              style={{ backgroundColor: "var(--row-accent)" }}
-                            />
-                            {product.code}
-                          </div>
+                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="h-9 w-1.5 rounded-full"
+                                style={{ backgroundColor: "var(--row-accent)" }}
+                              />
+                              {product.code}
+                            </div>
+                          </Link>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="text-sm font-semibold text-black">
-                            {product.name}
-                          </div>
-                          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-black/50">
-                            {product.brand ?? "Marka yok"}
-                          </div>
-                          <div className="mt-1 text-xs text-black/55">
-                            {product.description ?? product.notes ?? "-"}
-                          </div>
+                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                            <div className="text-sm font-semibold text-black">
+                              {product.name}
+                            </div>
+                            <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-black/50">
+                              {product.brand ?? "Marka yok"}
+                            </div>
+                            <div className="mt-1 text-xs text-black/55">
+                              {product.description ?? product.notes ?? "-"}
+                            </div>
+                          </Link>
                         </td>
-                        <td className="px-4 py-4 text-sm text-black/70">{groupName}</td>
-                          <td className="px-4 py-4 text-sm text-black/70">
+                        <td className="px-4 py-4 text-sm text-black/70">
+                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                            {groupName}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-black/70">
+                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
                             {product.netsis_stok_kodu ? (
                               <div className="text-base font-semibold text-black">
                                 {(() => {
@@ -851,37 +861,46 @@ export default async function ProductsPage({
                             ) : (
                               "-"
                             )}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-black/70">
+                          </Link>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-black/70">
+                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
                             {(Array.isArray(product.gtips)
                               ? product.gtips[0]?.code
                               : (product.gtips as any)?.code) ?? "-"}
-                          </td>
-                          <td className="px-4 py-4 text-xs text-black/60">
+                          </Link>
+                        </td>
+                        <td className="px-4 py-4 text-xs text-black/60">
+                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
                             {productAttributes.length ? productAttributes.join(", ") : "-"}
-                          {weightKg !== null ? (
-                            <div className="mt-1 text-[11px] text-black/50">
-                              Ağırlık:{" "}
-                              {Number(weightKg).toLocaleString("tr-TR", {
-                                maximumFractionDigits: 2,
-                              })}{" "}
-                              kg
-                            </div>
-                          ) : null}
+                            {weightKg !== null ? (
+                              <div className="mt-1 text-[11px] text-black/50">
+                                Ağırlık:{" "}
+                                {Number(weightKg).toLocaleString("tr-TR", {
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                kg
+                              </div>
+                            ) : null}
+                          </Link>
                         </td>
                         {!isSales ? (
                           <td className="px-4 py-4 text-right text-sm font-semibold text-black/80">
-                            {fmtMoney(costInfo?.basePrice ?? null)}
+                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                              {fmtMoney(costInfo?.basePrice ?? null)}
+                            </Link>
                           </td>
                         ) : null}
                         {!isSales ? (
                           <td className="px-4 py-4 text-right text-sm font-semibold text-black">
-                            {fmtMoney(costInfo?.kdvSizMaliyet ?? null)}
+                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                              {fmtMoney(costInfo?.kdvSizMaliyet ?? null)}
+                            </Link>
                           </td>
                         ) : null}
                         <td className="px-4 py-4 text-right">
                           <Link
-                            href={`/products/${product.id}`}
+                            href={detailHref}
                             className="rounded-full border border-black/20 px-3 py-1 text-xs font-semibold text-black/70"
                           >
                             Detay

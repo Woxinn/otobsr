@@ -482,6 +482,7 @@ export default async function OrdersPage({
                     </thead>
                     <tbody>
                       {pageItems.map((order, index) => {
+                        const detailHref = `/orders/${order.id}`;
                         const paid = paidTotals[order.id] ?? 0;
                         const total = Number(order.total_amount ?? 0);
                         const remaining = Math.max(0, total - paid);
@@ -512,77 +513,93 @@ export default async function OrdersPage({
                             }
                           >
                             <td className="px-4 py-4 text-xs font-semibold text-black/80">
-                              <div className="flex items-center gap-3">
-                                <span
-                                  className="h-9 w-1.5 rounded-full"
-                                  style={{ backgroundColor: "var(--row-accent)" }}
-                                />
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-[0.25em] text-black/40">Order</p>
-                                  <p className="text-sm font-semibold">#{order.id.slice(0, 6).toUpperCase()}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
-                              <div className="mt-1 text-xs text-black/55">
-                                {formatNumber(order.packages, 0)} adet | {formatNumber(order.weight_kg, 2)} kg
-                                {role === "Satis" ? "" : ` | ${order.incoterm ?? "-"}`}
-                              </div>
-                              <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>
-                              {missingDocs.length && role !== "Satis" ? (
-                                <div className="group/tooltip mt-2 inline-flex flex-col items-start gap-2">
-                                  <span className="rounded-full border border-red-200/70 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700/80">
-                                    {missingDocs.length} eksik evrak
-                                  </span>
-                                  <div className="max-h-0 w-[220px] overflow-hidden rounded-2xl border border-black/10 bg-white px-3 py-2 text-[10px] text-black/70 shadow-[0_18px_32px_-20px_rgba(12,45,52,0.55)] opacity-0 transition-all duration-200 group-hover/tooltip:max-h-[1000px] group-hover/tooltip:opacity-100">
-                                    <div className="text-[9px] font-semibold text-black/60">Eksik belgeler</div>
-                                    <div className="mt-1 space-y-0.5">
-                                      {missingDocs.map((doc) => (
-                                        <div key={doc}>{doc}</div>
-                                      ))}
-                                    </div>
+                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className="h-9 w-1.5 rounded-full"
+                                    style={{ backgroundColor: "var(--row-accent)" }}
+                                  />
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-[0.25em] text-black/40">Order</p>
+                                    <p className="text-sm font-semibold">#{order.id.slice(0, 6).toUpperCase()}</p>
                                   </div>
                                 </div>
-                              ) : null}
+                              </Link>
                             </td>
-                            <td className="px-4 py-4 text-sm text-black/70">{order.expected_ready_date ?? "-"}</td>
-                            <td className="px-4 py-4 text-sm text-black/70">
-                              {eta ? eta.toISOString().slice(0, 10) : "-"}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-black/70">
-                              {(shipmentsByOrder.get(order.id) ?? []).length ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {(shipmentsByOrder.get(order.id) ?? []).map((s) => (
-                                    <span
-                                      key={s.id}
-                                      className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-[#1f3c88] shadow-sm"
-                                    >
-                                      {s.file_no ?? s.id.slice(0, 6).toUpperCase()}
-                                    </span>
-                                  ))}
+                            <td className="px-4 py-4">
+                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                                <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
+                                <div className="mt-1 text-xs text-black/55">
+                                  {formatNumber(order.packages, 0)} adet | {formatNumber(order.weight_kg, 2)} kg
+                                  {role === "Satis" ? "" : ` | ${order.incoterm ?? "-"}`}
                                 </div>
-                              ) : (
-                                <span className="text-black/40">-</span>
-                              )}
+                                <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>
+                                {missingDocs.length && role !== "Satis" ? (
+                                  <div className="group/tooltip mt-2 inline-flex flex-col items-start gap-2">
+                                    <span className="rounded-full border border-red-200/70 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700/80">
+                                      {missingDocs.length} eksik evrak
+                                    </span>
+                                    <div className="max-h-0 w-[220px] overflow-hidden rounded-2xl border border-black/10 bg-white px-3 py-2 text-[10px] text-black/70 shadow-[0_18px_32px_-20px_rgba(12,45,52,0.55)] opacity-0 transition-all duration-200 group-hover/tooltip:max-h-[1000px] group-hover/tooltip:opacity-100">
+                                      <div className="text-[9px] font-semibold text-black/60">Eksik belgeler</div>
+                                      <div className="mt-1 space-y-0.5">
+                                        {missingDocs.map((doc) => (
+                                          <div key={doc}>{doc}</div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-black/70">
+                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                                {order.expected_ready_date ?? "-"}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-black/70">
+                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                                {eta ? eta.toISOString().slice(0, 10) : "-"}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-black/70">
+                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                                {(shipmentsByOrder.get(order.id) ?? []).length ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {(shipmentsByOrder.get(order.id) ?? []).map((s) => (
+                                      <span
+                                        key={s.id}
+                                        className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-[#1f3c88] shadow-sm"
+                                      >
+                                        {s.file_no ?? s.id.slice(0, 6).toUpperCase()}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-black/40">-</span>
+                                )}
+                              </Link>
                             </td>
                             {canSeeFinance ? (
                               <td className="px-4 py-4 text-sm font-semibold text-black">
-                                <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">
-                                  {formatMoney(total, order.currency)}
-                                </span>
+                                <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">
+                                    {formatMoney(total, order.currency)}
+                                  </span>
+                                </Link>
                               </td>
                             ) : null}
                             {canSeeFinance ? (
                               <td className="px-4 py-4 font-semibold text-black">
-                                <span className="rounded-full border border-black/10 bg-[#edf3ff] px-3 py-1 text-xs font-semibold text-[#2b4f9e]">
-                                  {formatMoney(remaining, order.currency)}
-                                </span>
+                                <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                                  <span className="rounded-full border border-black/10 bg-[#edf3ff] px-3 py-1 text-xs font-semibold text-[#2b4f9e]">
+                                    {formatMoney(remaining, order.currency)}
+                                  </span>
+                                </Link>
                               </td>
                             ) : null}
                             <td className="px-4 py-4 text-right">
                               <Link
-                                href={`/orders/${order.id}`}
+                                href={detailHref}
                                 className="rounded-full border border-black/20 px-4 py-2 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
                               >
                                 Detay

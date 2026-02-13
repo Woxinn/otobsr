@@ -28,23 +28,41 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen text-[var(--ink)]">
       <div className="mx-auto max-w-7xl px-6 pb-24 pt-10">
-        <header className="relative mb-10 flex min-h-[56px] items-center">
-          <div className="pr-64">
-            <h1 className="header-cool-title text-2xl font-semibold [font-family:var(--font-display)]">
-              İthalat Takip Sistemi
-            </h1>
-          </div>
-          <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="flex h-20 w-56 items-center justify-center rounded-2xl border border-black/10 bg-white px-4 py-3 shadow-sm">
+        <header className="mb-10">
+          <div className="md:hidden">
+            <div className="mx-auto mb-3 flex h-16 w-40 items-center justify-center rounded-2xl border border-black/10 bg-white px-3 py-2 shadow-sm">
               <Logo className="mx-auto block h-full w-auto object-contain" alt="Oto Basar" />
             </div>
+            <h1 className="header-cool-title text-center text-lg font-semibold [font-family:var(--font-display)]">
+              İthalat Takip Sistemi
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm text-black/60">
+              <span className="max-w-[70vw] truncate">{user?.email ?? "Admin"}</span>
+              <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
+                {roleLabel(role)}
+              </span>
+              <SignOutButton />
+            </div>
           </div>
-          <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-3 text-sm text-black/60">
-            <span>{user?.email ?? "Admin"}</span>
-            <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
-              {roleLabel(role)}
-            </span>
-            <SignOutButton />
+
+          <div className="relative hidden min-h-[56px] items-center md:flex">
+            <div className="pr-64">
+              <h1 className="header-cool-title text-2xl font-semibold [font-family:var(--font-display)]">
+                İthalat Takip Sistemi
+              </h1>
+            </div>
+            <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+              <div className="flex h-20 w-56 items-center justify-center rounded-2xl border border-black/10 bg-white px-4 py-3 shadow-sm">
+                <Logo className="mx-auto block h-full w-auto object-contain" alt="Oto Basar" />
+              </div>
+            </div>
+            <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-3 text-sm text-black/60">
+              <span>{user?.email ?? "Admin"}</span>
+              <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
+                {roleLabel(role)}
+              </span>
+              <SignOutButton />
+            </div>
           </div>
         </header>
 

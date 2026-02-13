@@ -63,16 +63,24 @@ export default function ProductCostCalculatorClient({
 }: Props) {
   const defaultCountry = initialCountry ?? availableCountries[0] ?? "";
   const [selectedCountry, setSelectedCountry] = useState(defaultCountry);
+  const formatInputNumber = (value: number | null | undefined) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return "";
+    return Number(value).toLocaleString("tr-TR", {
+      useGrouping: false,
+      maximumFractionDigits: 6,
+    });
+  };
+
+  const sanitizeNumericInput = (value: string) => value.replace(/[^0-9,]/g, "");
+
   const [basePriceText, setBasePriceText] = useState(
-    initialBasePrice !== null ? String(initialBasePrice) : ""
+    formatInputNumber(initialBasePrice)
   );
   const [weightText, setWeightText] = useState(
-    initialWeightKg !== null ? String(initialWeightKg) : ""
+    formatInputNumber(initialWeightKg)
   );
   const [domesticCostText, setDomesticCostText] = useState(
-    product.domestic_cost_percent !== null && product.domestic_cost_percent !== undefined
-      ? String(product.domestic_cost_percent)
-      : ""
+    formatInputNumber(product.domestic_cost_percent)
   );
 
   const basePrice = parseInputNumber(basePriceText);
@@ -210,7 +218,9 @@ export default function ProductCostCalculatorClient({
               Birim fiyat
               <input
                 value={basePriceText}
-                onChange={(e) => setBasePriceText(e.target.value)}
+                onChange={(e) => setBasePriceText(sanitizeNumericInput(e.target.value))}
+                inputMode="decimal"
+                pattern="[0-9,]*"
                 className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2"
                 placeholder="Orn: 12,345"
               />
@@ -219,7 +229,9 @@ export default function ProductCostCalculatorClient({
               Agirlik (kg)
               <input
                 value={weightText}
-                onChange={(e) => setWeightText(e.target.value)}
+                onChange={(e) => setWeightText(sanitizeNumericInput(e.target.value))}
+                inputMode="decimal"
+                pattern="[0-9,]*"
                 className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2"
                 placeholder="Orn: 1,250"
               />
@@ -228,7 +240,9 @@ export default function ProductCostCalculatorClient({
               Yurtici masraf (%)
               <input
                 value={domesticCostText}
-                onChange={(e) => setDomesticCostText(e.target.value)}
+                onChange={(e) => setDomesticCostText(sanitizeNumericInput(e.target.value))}
+                inputMode="decimal"
+                pattern="[0-9,]*"
                 className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2"
                 placeholder="Orn: 12,5"
               />

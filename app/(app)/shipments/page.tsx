@@ -125,6 +125,13 @@ export default async function ShipmentsPage({
     })} ${currency ?? "USD"}`;
   };
 
+  const formatDate = (value?: string | null) => {
+    if (!value) return "-";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return value;
+    return dt.toLocaleDateString("tr-TR");
+  };
+
   const filteredShipments = includeArchived
     ? shipments ?? []
     : (shipments ?? []).filter((item) => !item.archived_at);
@@ -159,6 +166,14 @@ export default async function ShipmentsPage({
         .in("order_id", orderIds)
     : { data: [] };
 
+  const { data: orderPackingItems } = orderIds?.length
+    ? await supabase
+        .from("order_packing_list_items")
+        .select("order_id, packages_count")
+        .in("order_id", orderIds)
+        .range(0, 9999)
+    : { data: [] };
+
   const { data: orderDocuments } = orderIds?.length
     ? await supabase
         .from("order_documents")
@@ -176,6 +191,15 @@ export default async function ShipmentsPage({
     if (!row.order_id) return;
     packingPackagesByOrder.set(row.order_id, Number(row.total_packages ?? 0));
   });
+  const packingItemsByOrder = new Map<string, number>();
+  orderPackingItems?.forEach((row) => {
+    if (!row.order_id) return;
+    const current = packingItemsByOrder.get(row.order_id) ?? 0;
+    packingItemsByOrder.set(
+      row.order_id,
+      current + Number(row.packages_count ?? 0)
+    );
+  });
 
   const getOrderPackages = (order: {
     id: string;
@@ -183,6 +207,8 @@ export default async function ShipmentsPage({
   }) =>
     packingPackagesByOrder.has(order.id)
       ? Number(packingPackagesByOrder.get(order.id) ?? 0)
+      : packingItemsByOrder.has(order.id)
+      ? Number(packingItemsByOrder.get(order.id) ?? 0)
       : Number(order.packages ?? 0);
 
   shipmentOrdersRows?.forEach((item) => {
@@ -454,7 +480,7 @@ export default async function ShipmentsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            SÄ±ralama
+            Sıralama
             <select
               name="sort"
               defaultValue={resolvedParams.sort ?? "created"}
@@ -466,7 +492,7 @@ export default async function ShipmentsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            SÄ±ralama yÃ¶nÃ¼
+            Sıralama yönü
             <select
               name="sortDir"
               defaultValue={resolvedParams.sortDir ?? (sortKey === "created" ? "desc" : "asc")}
@@ -492,7 +518,7 @@ export default async function ShipmentsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            Varis limani
+            Varış limanı
             <select
               name="destination"
               defaultValue={resolvedParams.destination ?? ""}
@@ -617,12 +643,12 @@ export default async function ShipmentsPage({
                         {shipment.file_no}
                       </span>
                       <span className="text-sm text-black/60">
-                        KonÅŸimento No: {shipment.reference ?? "-"}
+                        Konşimento No: {shipment.reference ?? "-"}
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                       <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 font-semibold">
-                        ETA: {shipment.eta_current ?? "-"}
+                        ETA: {formatDate(shipment.eta_current)}
                       </span>
                       <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 font-semibold">
                         Durum: {shipment.status ?? "-"}
@@ -651,7 +677,6 @@ export default async function ShipmentsPage({
                         Toplamlar
                       </p>
                       <p className="mt-1 text-xs text-black/70">
-                        {formatNumber(orderTotalsByShipment.get(shipment.id)?.packages ?? 0, 0)} koli |{" "}
                         {formatNumber(orderTotalsByShipment.get(shipment.id)?.weight ?? 0)} kg |{" "}
                         {formatMoney(orderTotalsByShipment.get(shipment.id)?.amount ?? 0, "USD")}
                       </p>
@@ -666,9 +691,8 @@ export default async function ShipmentsPage({
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-black/10 bg-[var(--sky)]/30 px-4 py-3">
-                  <div className="grid grid-cols-[1.8fr_0.6fr_0.8fr_0.9fr] gap-3 text-xs uppercase tracking-[0.2em] text-black/40">
+                  <div className="grid grid-cols-[1.8fr_0.8fr_0.9fr] gap-3 text-xs uppercase tracking-[0.2em] text-black/40">
                     <span>Siparis</span>
-                    <span>Koli</span>
                     <span>Kg</span>
                     <span>Tutar (USD)</span>
                   </div>
@@ -684,12 +708,14 @@ export default async function ShipmentsPage({
                           return orderList.map((order) => (
                             <div
                               key={`${shipment.id}-${order.id}`}
-                              className="grid grid-cols-[1.8fr_0.6fr_0.8fr_0.9fr] gap-3 rounded-xl border border-black/10 bg-white px-3 py-2 text-xs"
+                              className="grid grid-cols-[1.8fr_0.8fr_0.9fr] gap-3 rounded-xl border border-black/10 bg-white px-3 py-2 text-xs"
                             >
-                              <span className="font-semibold">
+                              <Link
+                                href={`/orders/${order.id}`}
+                                className="font-semibold text-[var(--ocean)] hover:underline"
+                              >
                                 {order.name ?? order.reference_name ?? "-"}
-                              </span>
-                              <span>{formatNumber(getOrderPackages(order), 0)}</span>
+                              </Link>
                               <span>{formatNumber(order.weight_kg)}</span>
                               <span>{formatMoney(order.total_amount ?? null, order.currency)}</span>
                             </div>

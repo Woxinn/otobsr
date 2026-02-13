@@ -112,11 +112,11 @@ export default async function ShipmentDetailPage({
 
   let suggestedStatus = shipment.status ?? "Planlandi";
   if (shipment.ata_actual) {
-    suggestedStatus = "Varis Limaninda";
+    suggestedStatus = "Varış Limanında";
   } else if (shipment.atd_actual) {
     suggestedStatus = "Denizde";
   } else if (shipment.etd_planned) {
-    suggestedStatus = "Kalkis Limaninda";
+    suggestedStatus = "Kalkış Limanında";
   }
 
   const selectedOrders =
@@ -224,6 +224,13 @@ export default async function ShipmentDetailPage({
     })} ${currency ?? "USD"}`;
   };
 
+  const formatDate = (value?: string | null) => {
+    if (!value) return "-";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return value;
+    return dt.toLocaleDateString("tr-TR");
+  };
+
   return (
     <section className="space-y-8">
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
@@ -276,11 +283,11 @@ export default async function ShipmentDetailPage({
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-4">
-          {[
-            { label: "ETA", value: shipment.eta_current ?? "-" },
-            { label: "ATD", value: shipment.atd_actual ?? "-" },
-            { label: "ATA", value: shipment.ata_actual ?? "-" },
-            { label: "Depo teslim", value: shipment.warehouse_delivery_date ?? "-" },
+            {[
+            { label: "ETA", value: formatDate(shipment.eta_current) },
+            { label: "ATD", value: formatDate(shipment.atd_actual) },
+            { label: "ATA", value: formatDate(shipment.ata_actual) },
+            { label: "Depo teslim", value: formatDate(shipment.warehouse_delivery_date) },
           ].map((item) => (
             <div
               key={item.label}
@@ -300,7 +307,7 @@ export default async function ShipmentDetailPage({
           </span>
           <span>Tip: {shipment.container_type ?? "-"}</span>
           <span>Çıkış: {shipment.origin_port?.name ?? "-"}</span>
-          <span>Varis: {shipment.destination_port?.name ?? "-"}</span>
+          <span>Varış: {shipment.destination_port?.name ?? "-"}</span>
         </div>
       </div>
 
@@ -316,14 +323,14 @@ export default async function ShipmentDetailPage({
           <div className="mt-4 grid gap-4 lg:grid-cols-2 text-sm">
             {[
               { label: "Forwarder", value: shipment.forwarders?.name ?? "-" },
-              { label: "Çıkış limani", value: shipment.origin_port?.name ?? "-" },
-              { label: "Varis limani", value: shipment.destination_port?.name ?? "-" },
-              { label: "ETD (plan)", value: shipment.etd_planned ?? "-" },
-              { label: "ATD (gercek)", value: shipment.atd_actual ?? "-" },
-              { label: "ETA (guncel)", value: shipment.eta_current ?? "-" },
-              { label: "ATA (gercek)", value: shipment.ata_actual ?? "-" },
-              { label: "Gumruk giris", value: shipment.customs_entry_date ?? "-" },
-              { label: "Depo teslim", value: shipment.warehouse_delivery_date ?? "-" },
+              { label: "Çıkış limanı", value: shipment.origin_port?.name ?? "-" },
+              { label: "Varış limanı", value: shipment.destination_port?.name ?? "-" },
+              { label: "ETD (plan)", value: formatDate(shipment.etd_planned) },
+              { label: "ATD (gercek)", value: formatDate(shipment.atd_actual) },
+              { label: "ETA (guncel)", value: formatDate(shipment.eta_current) },
+              { label: "ATA (gercek)", value: formatDate(shipment.ata_actual) },
+              { label: "Gümrük giriş", value: formatDate(shipment.customs_entry_date) },
+              { label: "Depo teslim", value: formatDate(shipment.warehouse_delivery_date) },
               { label: "Etiketler", value: shipment.tags?.join(", ") ?? "-" },
               { label: "Not", value: shipment.notes ?? "-" },
             ].map((item) => (

@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUserRole, canViewFinance } from "@/lib/roles";
 import { updateSupplier } from "@/app/actions/master-data";
 import CountrySelect from "@/components/CountrySelect";
 
@@ -11,6 +12,9 @@ export default async function SupplierDetailPage({
 }) {
   const resolvedParams = await params;
   const supabase = await createSupabaseServerClient();
+  const { role } = await getCurrentUserRole();
+  const isPriv = role === "Admin" || role === "Yonetim";
+  const canSeeFinance = canViewFinance(role);
 
   const { data: supplier } = await supabase
     .from("suppliers")
@@ -24,9 +28,104 @@ export default async function SupplierDetailPage({
 
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, name, payment_method, total_amount, currency, expected_ready_date, created_at")
+    .select("id, name, payment_method, total_amount, currency, expected_ready_date, created_at, order_status")
     .eq("supplier_id", supplier.id)
     .order("created_at", { ascending: false });
+
+  const orderIds = (orders ?? []).map((o) => o.id);
+
+  const { data: orderPayments } = orderIds.length && canSeeFinance
+    ? await supabase
+        .from("order_payments")
+        .select("order_id, amount, status, currency")
+        .in("order_id", orderIds)
+    : { data: [] };
+
+  const { data: orderItems } = orderIds.length && isPriv
+    ? await supabase
+        .from("order_items")
+        .select("order_id, products(id, name)")
+        .in("order_id", orderIds)
+        .limit(5000)
+    : { data: [] };
+
+  const normalizeStatus = (value: string | null | undefined) =>
+    (value ?? "")
+      .toLowerCase()
+      .replaceAll("ı", "i")
+      .replaceAll("ğ", "g")
+      .replaceAll("ş", "s")
+      .replaceAll("ö", "o")
+      .replaceAll("ü", "u")
+      .replaceAll("ç", "c")
+      .trim();
+
+  const closedStatuses = [
+    "hazir",
+    "depoya teslim edildi",
+    "gumrukte",
+    "varis limaninda",
+    "denizde",
+    "kalkis limaninda",
+  ];
+  const openOrders = (orders ?? []).filter(
+    (o) => !closedStatuses.includes(normalizeStatus(o.order_status))
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdueOpen = (orders ?? []).filter((o) => {
+    const status = normalizeStatus(o.order_status);
+    const ready = o.expected_ready_date ? new Date(o.expected_ready_date) : null;
+    if (!ready) return false;
+    ready.setHours(0, 0, 0, 0);
+    return ready < today && !closedStatuses.includes(status);
+  });
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "-";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return value;
+    return dt.toLocaleDateString("tr-TR");
+  };
+
+  const totalAmount = (orders ?? []).reduce(
+    (sum, o) => sum + Number(o.total_amount ?? 0),
+    0
+  );
+  const paidAmount = (orderPayments ?? []).reduce(
+    (sum, p) => (p.status === "Odendi" ? sum + Number(p.amount ?? 0) : sum),
+    0
+  );
+  const pendingAmount = (orderPayments ?? []).reduce(
+    (sum, p) => (p.status === "Bekleniyor" ? sum + Number(p.amount ?? 0) : sum),
+    0
+  );
+  const distinctProducts = Array.from(
+    new Set(
+      (orderItems ?? [])
+        .map((row) => {
+          const product = Array.isArray(row.products)
+            ? row.products[0]
+            : row.products;
+          return product?.name ?? null;
+        })
+        .filter(Boolean) as string[]
+    )
+  ).slice(0, 50);
+
+  const avgDelayDays = (() => {
+    const delays = overdueOpen
+      .map((o) => {
+        if (!o.expected_ready_date) return null;
+        const ready = new Date(o.expected_ready_date);
+        ready.setHours(0, 0, 0, 0);
+        return Math.floor((today.getTime() - ready.getTime()) / (1000 * 60 * 60 * 24));
+      })
+      .filter((v): v is number => v !== null);
+    if (!delays.length) return 0;
+    return Math.round(delays.reduce((a, b) => a + b, 0) / delays.length);
+  })();
 
   return (
     <section className="space-y-6">
@@ -131,71 +230,152 @@ export default async function SupplierDetailPage({
         </button>
       </form>
 
+      {isPriv ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Açık siparişler</h3>
+              <span className="text-xs text-black/60">Toplam: {openOrders.length}</span>
+            </div>
+            <div className="mt-3 space-y-2 text-sm">
+              {openOrders.length ? (
+                openOrders.slice(0, 6).map((o) => (
+                  <div
+                    key={o.id}
+                    className="rounded-2xl border border-black/10 bg-[var(--sky)]/40 px-3 py-2 flex items-center justify-between"
+                  >
+                    <div>
+                      <Link href={`/orders/${o.id}`} className="font-semibold text-[var(--ocean)] hover:underline">
+                        {o.name ?? "Sipariş"}
+                      </Link>
+                      <p className="text-[11px] text-black/60">
+                        Hazır: {formatDate(o.expected_ready_date)}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-black/70">
+                      {o.order_status ?? "-"}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-black/10 bg-[var(--peach)] px-3 py-2 text-sm text-black/70">
+                  Açık sipariş yok.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-semibold">Geçmiş performans</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3 text-sm">
+              <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-3">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Geciken</p>
+                <p className="mt-1 text-xl font-semibold">{overdueOpen.length}</p>
+              </div>
+              <div className="rounded-2xl border border-black/10 bg-[var(--peach)]/60 p-3">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Ort. gecikme</p>
+                <p className="mt-1 text-xl font-semibold">{avgDelayDays} gün</p>
+              </div>
+              <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/60 p-3">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Toplam sipariş</p>
+                <p className="mt-1 text-xl font-semibold">{orders?.length ?? 0}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isPriv && canSeeFinance ? (
+        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-semibold">Finans özeti</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3 text-sm">
+            <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Toplam</p>
+              <p className="mt-1 text-xl font-semibold">
+                {totalAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
+              </p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Ödenen</p>
+              <p className="mt-1 text-xl font-semibold">
+                {paidAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
+              </p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-[var(--peach)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Bekleyen</p>
+              <p className="mt-1 text-xl font-semibold">
+                {pendingAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-semibold">Gecmis siparisler</h3>
+        <h3 className="text-lg font-semibold">Geçmiş siparişler</h3>
         <div className="mt-4 space-y-3 text-sm">
           {orders?.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-separate border-spacing-y-2">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40">
-                    <th className="px-3 py-2">Siparis</th>
-                    <th className="px-3 py-2">Odeme</th>
-                    <th className="px-3 py-2">Tutar</th>
-                    <th className="px-3 py-2">Hazir olus</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order, index) => (
-                    <tr
-                      key={order.id}
-                      style={{ animationDelay: `${index * 40}ms` }}
-                      className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/15 [&>td]:bg-white [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:shadow-[0_16px_26px_-24px_rgba(15,61,62,0.6)] hover:[&>td]:bg-[var(--mint)] hover:[&>td]:shadow-[0_20px_30px_-24px_rgba(15,61,62,0.7)]"
+            <div className="overflow-hidden rounded-2xl border border-black/10">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr] bg-gradient-to-r from-slate-50 to-white px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-black/45">
+                <span>Sipariş</span>
+                <span>Ödeme</span>
+                <span>Tutar</span>
+                <span>Hazır oluş</span>
+              </div>
+              <div className="divide-y divide-black/5">
+                {orders.map((order, index) => (
+                  <div
+                    key={order.id}
+                    style={{ animationDelay: `${index * 35}ms` }}
+                    className="grid grid-cols-[2fr_1fr_1fr_1fr] items-center px-4 py-3 text-sm animate-[fade-up_0.35s_ease] bg-white hover:bg-[var(--mint)]/50 transition duration-200"
+                  >
+                    <Link
+                      href={`/orders/${order.id}`}
+                      className="font-semibold text-[var(--ocean)] hover:underline"
                     >
-                      <td className="px-3 py-3 font-semibold">
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="block w-full text-[var(--ocean)] transition hover:underline"
-                        >
-                          {order.name ?? "-"}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="block w-full text-black/70"
-                        >
-                          {order.payment_method ?? "-"}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="block w-full text-black/70"
-                        >
-                          {order.total_amount ?? "-"} {order.currency ?? "USD"}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="block w-full text-black/70"
-                        >
-                          {order.expected_ready_date ?? "-"}
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      {order.name ?? "-"}
+                    </Link>
+                    <span className="text-black/70">{order.payment_method ?? "-"}</span>
+                    <span className="text-black/80">
+                      {order.total_amount ?? "-"} {order.currency ?? "USD"}
+                    </span>
+                    <span className="text-black/60">{formatDate(order.expected_ready_date)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Bu tedarikci icin siparis bulunamadi.
+              Bu tedarikçi için sipariş bulunamadı.
             </div>
           )}
         </div>
       </div>
+
+      {isPriv ? (
+        <details className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+          <summary className="cursor-pointer select-none list-none text-lg font-semibold">
+            Ürün portföyü
+            <span className="ml-2 text-xs text-black/60">(Toplam: {distinctProducts.length})</span>
+          </summary>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            {distinctProducts.length ? (
+              distinctProducts.map((name) => (
+                <span
+                  key={name}
+                  className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-[12px] font-semibold text-black/70"
+                >
+                  {name}
+                </span>
+              ))
+            ) : (
+              <div className="rounded-xl border border-black/10 bg-[var(--peach)] px-3 py-2 text-sm text-black/70">
+                Ürün bilgisi bulunamadı.
+              </div>
+            )}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }
