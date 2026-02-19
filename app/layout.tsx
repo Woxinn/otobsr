@@ -3,6 +3,7 @@ import { Fraunces, Space_Grotesk } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import RouteOverlayLoader from "@/components/RouteOverlayLoader";
+import PerfMeasureGuard from "@/components/PerfMeasureGuard";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <RouteOverlayLoader />
         </Suspense>
+        <PerfMeasureGuard />
         {children}
       </body>
     </html>

@@ -12,12 +12,14 @@ type DocumentType = {
 
 type Props = {
   shipmentId?: string;
+  rfqId?: string;
   documentTypes: DocumentType[];
   onUploaded?: () => void;
 };
 
 export default function DocumentUploader({
   shipmentId,
+  rfqId,
   documentTypes,
   onUploaded,
 }: Props) {
@@ -42,8 +44,9 @@ export default function DocumentUploader({
     const supabase = createSupabaseBrowserClient();
 
     const extension = file.name.split(".").pop() ?? "pdf";
-    const uniqueName = `${shipmentId ?? "unlinked"}-${Date.now()}.${extension}`;
-    const filePath = `${shipmentId ?? "unlinked"}/${uniqueName}`;
+    const key = shipmentId ?? rfqId ?? "unlinked";
+    const uniqueName = `${key}-${Date.now()}.${extension}`;
+    const filePath = `${key}/${uniqueName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("documents")
@@ -66,7 +69,7 @@ export default function DocumentUploader({
       document_type_id: documentTypeId,
       status,
       received_at: receivedAt || null,
-      notes: notes || null,
+      notes: rfqId ? `rfq:${rfqId}${notes ? " " + notes : ""}` : notes || null,
       storage_path: filePath,
       file_name: file.name,
     });

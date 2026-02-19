@@ -34,6 +34,34 @@ export default async function SupplierDetailPage({
 
   const orderIds = (orders ?? []).map((o) => o.id);
 
+  const pageSize = 1000;
+  const inChunkSize = 60;
+  const fetchAllByIds = async (
+    table: "order_items" | "proforma_items",
+    idColumn: "order_id" | "proforma_id",
+    ids: string[],
+    select: string
+  ) => {
+    if (!ids.length) return [] as any[];
+    const out: any[] = [];
+    for (let i = 0; i < ids.length; i += inChunkSize) {
+      const idChunk = ids.slice(i, i + inChunkSize);
+      for (let from = 0; ; from += pageSize) {
+        const to = from + pageSize - 1;
+        const { data, error } = await supabase
+          .from(table)
+          .select(select)
+          .in(idColumn, idChunk)
+          .range(from, to);
+        if (error) throw error;
+        const rows = data ?? [];
+        out.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+    }
+    return out;
+  };
+
   const { data: orderPayments } = orderIds.length && canSeeFinance
     ? await supabase
         .from("order_payments")
@@ -41,13 +69,44 @@ export default async function SupplierDetailPage({
         .in("order_id", orderIds)
     : { data: [] };
 
-  const { data: orderItems } = orderIds.length && isPriv
+  let orderItems: any[] = [];
+  if (orderIds.length && isPriv) {
+    try {
+      orderItems = await fetchAllByIds(
+        "order_items",
+        "order_id",
+        orderIds,
+        "order_id, quantity, unit_price, total_amount, product_id, name"
+      );
+    } catch (err) {
+      console.error("[supplier-detail] orderItems read error", err);
+      orderItems = [];
+    }
+  }
+
+  const { data: supplierProformas } = isPriv
     ? await supabase
-        .from("order_items")
-        .select("order_id, products(id, name)")
-        .in("order_id", orderIds)
-        .limit(5000)
+        .from("proformas")
+        .select("id, currency, status")
+        .eq("supplier_id", supplier.id)
+        .neq("status", "iptal")
     : { data: [] };
+
+  const proformaIds = (supplierProformas ?? []).map((p) => p.id);
+  let proformaItems: any[] = [];
+  if (proformaIds.length && isPriv) {
+    try {
+      proformaItems = await fetchAllByIds(
+        "proforma_items",
+        "proforma_id",
+        proformaIds,
+        "proforma_id, quantity, line_total"
+      );
+    } catch (err) {
+      console.error("[supplier-detail] proformaItems read error", err);
+      proformaItems = [];
+    }
+  }
 
   const normalizeStatus = (value: string | null | undefined) =>
     (value ?? "")
@@ -101,14 +160,53 @@ export default async function SupplierDetailPage({
     (sum, p) => (p.status === "Bekleniyor" ? sum + Number(p.amount ?? 0) : sum),
     0
   );
+  const orderQtyTotal = orderItems.reduce(
+    (sum, row) => sum + Number((row as any).quantity ?? 0),
+    0
+  );
+  const orderAmountFromItems = orderItems.reduce((sum, row) => {
+    const total = Number((row as any).total_amount ?? 0);
+    if (Number.isFinite(total) && total > 0) return sum + total;
+    const qty = Number((row as any).quantity ?? 0);
+    const unit = Number((row as any).unit_price ?? 0);
+    return sum + qty * unit;
+  }, 0);
+  const proformaQtyTotal = proformaItems.reduce(
+    (sum, row) => sum + Number((row as any).quantity ?? 0),
+    0
+  );
+  const proformaAmountTotal = proformaItems.reduce(
+    (sum, row) => sum + Number((row as any).line_total ?? 0),
+    0
+  );
+  const qtyDiff = orderQtyTotal - proformaQtyTotal;
+  const amountDiff = orderAmountFromItems - proformaAmountTotal;
+  const proformaCurrencies = Array.from(
+    new Set((supplierProformas ?? []).map((p) => String(p.currency ?? "").trim()).filter(Boolean))
+  );
+  const summaryCurrency = proformaCurrencies.length === 1 ? proformaCurrencies[0] : "KARISIK";
+  const productIdToName = new Map<string, string>();
+  const orderProductIds = Array.from(
+    new Set(orderItems.map((row) => String((row as any).product_id ?? "")).filter(Boolean))
+  );
+  if (orderProductIds.length) {
+    const productChunkSize = 200;
+    for (let i = 0; i < orderProductIds.length; i += productChunkSize) {
+      const idChunk = orderProductIds.slice(i, i + productChunkSize);
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name")
+        .in("id", idChunk);
+      (products ?? []).forEach((p) => productIdToName.set(String(p.id), String(p.name ?? "")));
+    }
+  }
   const distinctProducts = Array.from(
     new Set(
-      (orderItems ?? [])
+      orderItems
         .map((row) => {
-          const product = Array.isArray(row.products)
-            ? row.products[0]
-            : row.products;
-          return product?.name ?? null;
+          const pid = String((row as any).product_id ?? "");
+          const mapped = pid ? productIdToName.get(pid) : null;
+          return mapped || String((row as any).name ?? "").trim() || null;
         })
         .filter(Boolean) as string[]
     )
@@ -229,6 +327,67 @@ export default async function SupplierDetailPage({
           Güncelle
         </button>
       </form>
+
+      {isPriv ? (
+        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Proforma / Sipariş özeti</h3>
+            <div className="text-xs text-black/60">
+              Para birimi: {summaryCurrency}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-3 lg:grid-cols-6 text-sm">
+            <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Proforma adet</p>
+              <p className="mt-1 text-xl font-semibold">{proformaQtyTotal.toLocaleString("tr-TR")}</p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Sipariş adet</p>
+              <p className="mt-1 text-xl font-semibold">{orderQtyTotal.toLocaleString("tr-TR")}</p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-[var(--peach)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Fark adet</p>
+              <p className={`mt-1 text-xl font-semibold ${qtyDiff < 0 ? "text-red-700" : "text-black"}`}>
+                {qtyDiff.toLocaleString("tr-TR")}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Proforma tutar</p>
+              <p className="mt-1 text-xl font-semibold">
+                {proformaAmountTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {summaryCurrency}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Sipariş tutar</p>
+              <p className="mt-1 text-xl font-semibold">
+                {orderAmountFromItems.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {summaryCurrency}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-[var(--peach)]/60 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Fark tutar</p>
+              <p className={`mt-1 text-xl font-semibold ${amountDiff < 0 ? "text-red-700" : "text-black"}`}>
+                {amountDiff.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {summaryCurrency}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href={`/proformalar?supplier=${supplier.id}`}
+                className="text-xs font-semibold text-[var(--ocean)] hover:underline"
+              >
+                Bu tedarikçinin proformalarını görüntüle
+              </Link>
+              <Link
+                href={`/suppliers/${supplier.id}/proforma-rapor`}
+                className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 hover:bg-black/5"
+              >
+                Detaylı rapor
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isPriv ? (
         <div className="grid gap-4 lg:grid-cols-2">

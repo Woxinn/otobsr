@@ -17,6 +17,7 @@ type SearchParams = {
   group?: string | string[];
   supplier?: string;
   gtip?: string;
+  filledOnly?: string;
 };
 
 type SalesAgg = {
@@ -25,6 +26,8 @@ type SalesAgg = {
   salesPrev60: number;
   sales10y: number;
 };
+
+const DELIVERED_STATUS_TOKENS = new Set(["depoya teslim edildi", "depoya teslim", "delivered"]);
 
 const rowColorsFromId = (id: string) => {
   let hash = 0;
@@ -41,6 +44,81 @@ const rowColorsFromId = (id: string) => {
 
 const fmt = (value: number | null | undefined) =>
   Number(value ?? 0).toLocaleString("tr-TR");
+
+const normalizeStatusToken = (value: string | null | undefined) =>
+  String(value ?? "")
+    .toLowerCase()
+    .replaceAll("ı", "i")
+    .replaceAll("İ", "i")
+    .replaceAll("ş", "s")
+    .replaceAll("ğ", "g")
+    .replaceAll("ü", "u")
+    .replaceAll("ö", "o")
+    .replaceAll("ç", "c")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const extractOrderStatus = (ordersField: any) => {
+  if (!ordersField) return "";
+  if (Array.isArray(ordersField)) return String(ordersField[0]?.order_status ?? "");
+  return String(ordersField.order_status ?? "");
+};
+
+const fetchTransitByProduct = async (supabase: any, productIds: string[]) => {
+  const totals: Record<string, number> = {};
+  if (!productIds.length) return totals;
+
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from("order_items")
+      .select("product_id, quantity, orders!inner(order_status)")
+      .in("product_id", productIds)
+      .range(from, to);
+
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[siparis-plani] transit(order_items) query error", error);
+      break;
+    }
+    if (!data?.length) break;
+
+    (data as any[]).forEach((row) => {
+      const pid = row.product_id as string | null;
+      if (!pid) return;
+      const status = normalizeStatusToken(extractOrderStatus(row.orders));
+      if (DELIVERED_STATUS_TOKENS.has(status)) return;
+      const qty = Number(row.quantity ?? 0);
+      totals[pid] = (totals[pid] ?? 0) + qty;
+    });
+
+    if (data.length < pageSize) break;
+  }
+
+  // Fallback: view'den kalan eksikleri tamamla (özellikle eski/null product_id senaryoları için).
+  const unresolved = productIds.filter((id) => totals[id] === undefined);
+  if (!unresolved.length) return totals;
+
+  const { data: viewRows, error: viewError } = await supabase
+    .from("order_transit_totals")
+    .select("product_id, transit_qty")
+    .in("product_id", unresolved);
+
+  if (viewError) {
+    // eslint-disable-next-line no-console
+    console.error("[siparis-plani] transit(order_transit_totals) fallback error", viewError);
+    return totals;
+  }
+
+  (viewRows ?? []).forEach((row: any) => {
+    const pid = row.product_id as string | null;
+    if (!pid) return;
+    totals[pid] = Number(row.transit_qty ?? 0);
+  });
+
+  return totals;
+};
 
 const connectMssql = async (databaseName?: string) => {
   const {
@@ -270,14 +348,23 @@ export default async function OrderPlanPage({
         .map((token) => token.trim())
         .filter(Boolean)
     : [];
-  const perPageOptions = [10, 20, 50, 100];
+  const perPageOptions = [10, 20, 50, 100, 250, 500, 1000];
   const perPageParam = Number(resolvedParams.perPage ?? "");
   const perPage = perPageOptions.includes(perPageParam) ? perPageParam : 100;
   const requestedPage = Math.max(1, Number(resolvedParams.page ?? "1") || 1);
+  const filledOnly = resolvedParams.filledOnly === "1";
   const selectedGroupIds = Array.isArray(resolvedParams.group)
     ? resolvedParams.group
     : resolvedParams.group
     ? resolvedParams.group.split(",").filter(Boolean)
+    : [];
+  const { data: filledEntries } = filledOnly
+    ? await supabase.from("order_plan_entries").select("product_id").gt("value", 0)
+    : { data: null as { product_id: string }[] | null };
+  const filledProductIds = filledOnly
+    ? Array.from(
+        new Set((filledEntries ?? []).map((row) => row.product_id).filter(Boolean))
+      )
     : [];
 
   const buildProductsQuery = (forCount: boolean) => {
@@ -318,21 +405,32 @@ export default async function OrderPlanPage({
         queryBuilder = queryBuilder.eq("gtip_id", resolvedParams.gtip);
       }
     }
+    if (filledOnly && filledProductIds.length > 0) {
+      queryBuilder = queryBuilder.in("id", filledProductIds);
+    }
     return queryBuilder;
   };
+  let totalCount = 0;
+  let totalPages = 1;
+  let currentPage = 1;
+  let startIndexProducts = 0;
+  let productList: any[] = [];
 
-  const { count: totalCountRaw } = await buildProductsQuery(true);
-  const totalCount = totalCountRaw ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
-  const currentPage = Math.min(requestedPage, totalPages);
-  const startIndexProducts = totalCount ? (currentPage - 1) * perPage : 0;
+  if (!(filledOnly && filledProductIds.length === 0)) {
+    const { count: totalCountRaw } = await buildProductsQuery(true);
+    totalCount = totalCountRaw ?? 0;
+    totalPages = Math.max(1, Math.ceil(totalCount / perPage));
+    currentPage = Math.min(requestedPage, totalPages);
+    startIndexProducts = totalCount ? (currentPage - 1) * perPage : 0;
 
-  const { data: products } = await buildProductsQuery(false).range(
-    startIndexProducts,
-    Math.max(startIndexProducts, startIndexProducts + perPage - 1)
-  );
+    const { data: products } = await buildProductsQuery(false).range(
+      startIndexProducts,
+      Math.max(startIndexProducts, startIndexProducts + perPage - 1)
+    );
+    productList = (products ?? []) as any[];
+  }
 
-  const productList = (products ?? []) as any[];
+  const productIds = Array.from(new Set(productList.map((p: any) => p.id).filter(Boolean)));
   const codes = Array.from(
     new Set(
       (productList as any[])
@@ -355,23 +453,13 @@ export default async function OrderPlanPage({
     if (row.product_id) sales10yByProduct.set(row.product_id, Number(row.total_10y ?? 0));
   });
 
-  const { data: inTransitRows } = await supabase
-    .from("order_transit_totals")
-    .select("product_id, transit_qty");
+  const inTransitByProduct = await fetchTransitByProduct(supabase, productIds);
 
-  const inTransitByProduct = (inTransitRows ?? []).reduce<Record<string, number>>((acc, row) => {
-    const pid = (row as { product_id?: string }).product_id;
-    const qty = Number((row as { transit_qty?: number }).transit_qty ?? 0);
-    if (!pid) return acc;
-    acc[pid] = qty;
-    return acc;
-  }, {});
-
-  // RFQ'da bekleyen miktarlar (closed harici)
+  // RFQ'da bekleyen miktarlar (kapatildi/closed hariç)
   const { data: rfqItems } = await supabase
     .from("rfq_items")
-    .select("product_id, quantity, rfqs(status)")
-    .neq("rfqs.status", "closed");
+    .select("product_id, quantity, rfqs!inner(status)")
+    .not("rfqs.status", "in", "(kapatildi,closed)");
   const rfqByProduct = new Map<string, number>();
   (rfqItems ?? []).forEach((row) => {
     const pid = row.product_id as string | null;
@@ -400,12 +488,14 @@ export default async function OrderPlanPage({
       : [];
     const supplier = overrides.supplier ?? resolvedParams.supplier;
     const gtip = overrides.gtip ?? resolvedParams.gtip;
+    const filledOnlyValue = overrides.filledOnly ?? resolvedParams.filledOnly;
     const perPageValue = overrides.perPage ?? String(perPage);
     const pageValue = overrides.page ?? String(currentPage);
     if (q) params.set("q", q);
     if (normalizedGroups.length) params.set("group", normalizedGroups.join(","));
     if (supplier) params.set("supplier", supplier);
     if (gtip) params.set("gtip", gtip);
+    if (filledOnlyValue === "1") params.set("filledOnly", "1");
     if (perPageValue) params.set("perPage", String(perPageValue));
     if (pageValue && Number(pageValue) > 1) params.set("page", String(pageValue));
     const qs = params.toString();
@@ -515,7 +605,7 @@ export default async function OrderPlanPage({
 
       <form className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
         <input type="hidden" name="page" value="1" />
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <label className="text-sm font-medium text-black/70">
             Arama
             <input
@@ -569,6 +659,17 @@ export default async function OrderPlanPage({
                   {g.code}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-black/70">
+            Miktar filtresi
+            <select
+              name="filledOnly"
+              defaultValue={filledOnly ? "1" : ""}
+              className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
+            >
+              <option value="">Hepsi</option>
+              <option value="1">Sadece inputu dolu olanlar</option>
             </select>
           </label>
           <label className="text-sm font-medium text-black/70">

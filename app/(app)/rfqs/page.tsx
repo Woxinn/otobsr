@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canViewModule, getCurrentUserRole } from "@/lib/roles";
+import RfqDeleteButton from "@/components/RfqDeleteButton";
 
 export default async function RfqListPage() {
   const supabase = await createSupabaseServerClient();
@@ -43,6 +44,7 @@ export default async function RfqListPage() {
               <th className="px-3 py-2">Para/Incoterm</th>
               <th className="px-3 py-2">Son Yanıt</th>
               <th className="px-3 py-2">Oluşturma</th>
+              {role !== "Satis" ? <th className="px-3 py-2 text-right">Aksiyon</th> : null}
             </tr>
           </thead>
           <tbody className="align-top">
@@ -64,6 +66,11 @@ export default async function RfqListPage() {
                 <td className="px-3 py-3 text-black/70">
                   {new Date(rfq.created_at).toLocaleString("tr-TR")}
                 </td>
+                {role !== "Satis" ? (
+                  <td className="px-3 py-3 text-right">
+                    <RfqDeleteButton rfqId={rfq.id} />
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

@@ -9,9 +9,10 @@ type Props = {
   rfqId: string;
   rfqItems: RfqItem[];
   suppliers: Supplier[];
+  allowDelete?: boolean;
 };
 
-export default function QuoteModal({ rfqId, rfqItems, suppliers }: Props) {
+export default function QuoteModal({ rfqId, rfqItems, suppliers, allowDelete = true }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [supplier, setSupplier] = useState<string>("");
@@ -63,6 +64,26 @@ export default function QuoteModal({ rfqId, rfqItems, suppliers }: Props) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!allowDelete || !supplier) return;
+    const ok = window.confirm("Bu tedarikçinin tüm tekliflerini silmek istiyor musun?");
+    if (!ok) return;
+    setLoading(true);
+    setMessage(null);
+    try {
+      await fetch("/api/rfq/quote", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rfq_id: rfqId, supplier_id: supplier }),
+      });
+      window.location.reload();
+    } catch {
+      setMessage("Silme hatası");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <button
@@ -72,6 +93,20 @@ export default function QuoteModal({ rfqId, rfqItems, suppliers }: Props) {
       >
         Teklif ekle
       </button>
+      {allowDelete ? (
+        <button
+          type="button"
+          disabled={!supplier}
+          onClick={handleDelete}
+          className={`ml-2 rounded-full px-3 py-1 text-xs font-semibold ${
+            supplier
+              ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+              : "border border-black/10 bg-black/5 text-black/40 cursor-not-allowed"
+          }`}
+        >
+          Tedarikçi teklifini sil
+        </button>
+      ) : null}
 
       {open ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm">
@@ -103,12 +138,12 @@ export default function QuoteModal({ rfqId, rfqItems, suppliers }: Props) {
                 </select>
               </label>
               <label className="text-sm text-black/70">
-                Transit time
+                Hazır olma süresi (gün)
                 <input
                   className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
                   value={transit}
                   onChange={(e) => setTransit(e.target.value)}
-                  placeholder="örn. 25 gün"
+                  placeholder="örn. 25"
                 />
               </label>
               <label className="text-sm text-black/70">
@@ -160,9 +195,7 @@ export default function QuoteModal({ rfqId, rfqItems, suppliers }: Props) {
                 type="button"
                 onClick={handleSave}
                 disabled={loading}
-                className={`rounded-2xl px-5 py-2 text-sm font-semibold text-white transition ${
-                  loading ? "cursor-not-allowed bg-black/30" : "bg-[var(--ocean)] hover:-translate-y-0.5 shadow-sm"
-                }`}
+                className="rounded-2xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
               >
                 Kaydet
               </button>

@@ -4,6 +4,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canViewModule, getCurrentUserRole } from "@/lib/roles";
 import RfqActionBar from "@/components/RfqActionBar";
 import QuoteModal from "@/components/QuoteModal";
+import RfqImportModal from "@/components/RfqImportModal";
+import RfqQuoteGrid from "@/components/RfqQuoteGrid";
+import DocumentUploader from "@/components/DocumentUploader";
+import SupplierQuoteList from "@/components/SupplierQuoteList";
+import RfqConvertModal from "@/components/RfqConvertModal";
 
 export default async function RfqDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,15 +18,146 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
     return <div className="p-6 text-sm text-red-600">Erişim yok.</div>;
   }
 
-  const { data: rfq } = await supabase
-    .from("rfqs")
-    .select(
-      "id, code, title, notes, status, response_due_date, currency, incoterm, target_suppliers, created_at, rfq_items(id, quantity, product_code, product_name, products(code, name, brand)), rfq_suppliers(supplier_id, suppliers(name)), rfq_quotes(id, supplier_id, transit_time, currency, total_amount, rfq_quote_items(rfq_item_id, unit_price), suppliers(name))"
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const pageSize = 1000;
+  const fetchAll = async <T,>(queryFactory: (from: number, to: number) => any) => {
+    const all: T[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const to = from + pageSize - 1;
+      const { data, error } = await queryFactory(from, to);
+      if (error) return { data: null as T[] | null, error };
+      const rows = data ?? [];
+      all.push(...rows);
+      if (rows.length < pageSize) break;
+    }
+    return { data: all, error: null };
+  };
 
-  if (!rfq) return notFound();
+  let rfqBase: any = null;
+  {
+    const { data, error } = await supabase
+      .from("rfqs")
+      .select(
+        "id, code, title, notes, status, response_due_date, currency, incoterm, target_suppliers, created_at, selected_supplier_id, selected_quote_id"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (error && error.code === "42703") {
+      const { data: fallback, error: fallbackErr } = await supabase
+        .from("rfqs")
+        .select("id, code, title, notes, status, response_due_date, currency, incoterm, target_suppliers, created_at")
+        .eq("id", id)
+        .maybeSingle();
+      if (fallbackErr) {
+        return (
+          <div className="p-6 text-sm text-red-600">
+            RFQ yüklenemedi: {fallbackErr.message ?? "bilinmeyen hata"}
+          </div>
+        );
+      }
+      rfqBase = { ...fallback, selected_supplier_id: null, selected_quote_id: null };
+    } else if (error) {
+      return (
+        <div className="p-6 text-sm text-red-600">
+          RFQ yüklenemedi: {error.message ?? "bilinmeyen hata"}
+        </div>
+      );
+    } else {
+      rfqBase = data;
+    }
+  }
+  if (!rfqBase) return notFound();
+
+  const { data: rawItems, error: itemsErr } = await fetchAll<any>((from, to) =>
+    supabase
+      .from("rfq_items")
+      .select("id, rfq_id, product_id, quantity, product_code, product_name")
+      .eq("rfq_id", id)
+      .range(from, to)
+  );
+  if (itemsErr) {
+    return <div className="p-6 text-sm text-red-600">RFQ kalemleri okunamadi: {itemsErr.message}</div>;
+  }
+
+  const productIds = Array.from(new Set((rawItems ?? []).map((i: any) => i.product_id).filter(Boolean)));
+  const productById = new Map<string, { code: string | null; name: string | null; brand: string | null }>();
+  for (let i = 0; i < productIds.length; i += 500) {
+    const chunk = productIds.slice(i, i + 500);
+    const { data: products, error: prodErr } = await supabase
+      .from("products")
+      .select("id, code, name, brand")
+      .in("id", chunk);
+    if (prodErr) {
+      return <div className="p-6 text-sm text-red-600">Urunler okunamadi: {prodErr.message}</div>;
+    }
+    (products ?? []).forEach((p: any) =>
+      productById.set(String(p.id), { code: p.code ?? null, name: p.name ?? null, brand: p.brand ?? null })
+    );
+  }
+
+  const rfqItems = (rawItems ?? []).map((item: any) => {
+    const prod = item.product_id ? productById.get(String(item.product_id)) : null;
+    return {
+      ...item,
+      products: prod ?? null,
+    };
+  });
+
+  const { data: rfqSuppliers, error: rfqSuppliersErr } = await supabase
+    .from("rfq_suppliers")
+    .select("supplier_id, suppliers(name)")
+    .eq("rfq_id", id);
+  if (rfqSuppliersErr) {
+    return <div className="p-6 text-sm text-red-600">Tedarikciler okunamadi: {rfqSuppliersErr.message}</div>;
+  }
+
+  const { data: rawQuotes, error: quotesErr } = await fetchAll<any>((from, to) =>
+    supabase
+      .from("rfq_quotes")
+      .select("id, rfq_id, supplier_id, transit_time, currency, total_amount, suppliers(name)")
+      .eq("rfq_id", id)
+      .range(from, to)
+  );
+  if (quotesErr) {
+    return <div className="p-6 text-sm text-red-600">Teklifler okunamadi: {quotesErr.message}</div>;
+  }
+
+  const quoteIds = (rawQuotes ?? []).map((q: any) => String(q.id));
+  const quoteItemByQuoteId = new Map<string, any[]>();
+  for (let i = 0; i < quoteIds.length; i += 200) {
+    const quoteChunk = quoteIds.slice(i, i + 200);
+    const { data: quoteItems, error: quoteItemsErr } = await fetchAll<any>((from, to) =>
+      supabase
+        .from("rfq_quote_items")
+        .select("id, rfq_quote_id, rfq_item_id, unit_price")
+        .in("rfq_quote_id", quoteChunk)
+        .range(from, to)
+    );
+    if (quoteItemsErr) {
+      return <div className="p-6 text-sm text-red-600">Teklif kalemleri okunamadi: {quoteItemsErr.message}</div>;
+    }
+    (quoteItems ?? []).forEach((qi: any) => {
+      const key = String(qi.rfq_quote_id);
+      const arr = quoteItemByQuoteId.get(key) ?? [];
+      arr.push(qi);
+      quoteItemByQuoteId.set(key, arr);
+    });
+  }
+
+  const rfq = {
+    ...rfqBase,
+    rfq_items: rfqItems,
+    rfq_suppliers: rfqSuppliers ?? [],
+    rfq_quotes: (rawQuotes ?? []).map((q: any) => ({
+      ...q,
+      rfq_quote_items: quoteItemByQuoteId.get(String(q.id)) ?? [],
+    })),
+  };
+
+  const { data: documents } = await supabase
+    .from("documents")
+    .select("id, file_name, storage_path, uploaded_at, notes")
+    .ilike("notes", `%rfq:${id}%`)
+    .order("uploaded_at", { ascending: false });
 
   return (
     <section className="space-y-6">
@@ -41,6 +177,23 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         >
           Listeye dön
         </Link>
+        <RfqImportModal rfqId={rfq.id} />
+        <RfqConvertModal
+          rfqId={rfq.id}
+          supplierId={(rfq as any).selected_supplier_id ?? null}
+          currency={rfq.currency ?? null}
+          items={(rfq.rfq_items ?? []).map((it: any) => {
+            const quote = (rfq.rfq_quotes ?? []).find((q: any) => q.supplier_id === (rfq as any).selected_supplier_id);
+            const qi = quote?.rfq_quote_items?.find((x: any) => x.rfq_item_id === it.id);
+            return {
+              id: it.id,
+              product_code: it.product_code,
+              product_name: it.product_name,
+              quantity: it.quantity,
+              price: qi?.unit_price ?? null,
+            };
+          })}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -95,14 +248,16 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           </div>
           <div>
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-black/50">Tedarikçiler</h3>
-            <ul className="space-y-1 text-sm text-black/70">
-              {(rfq.rfq_suppliers ?? []).map((row: any, idx: number) => (
-                <li key={idx} className="rounded-lg border border-black/5 bg-black/5 px-3 py-2">
-                  {row.suppliers?.name ?? row.supplier_id ?? "-"}
-                </li>
-              ))}
-              {!rfq.rfq_suppliers?.length ? <li className="text-black/40">Tanımlı tedarikçi yok</li> : null}
-            </ul>
+            <SupplierQuoteList
+              rfqId={rfq.id}
+              suppliers={(rfq.rfq_suppliers ?? []).map((row: any) => ({
+                id: row.supplier_id,
+                name: row.suppliers?.name ?? row.supplier_id ?? "-",
+                hasQuote: (rfq.rfq_quotes ?? []).some((q: any) => q.supplier_id === row.supplier_id),
+                isSelected: (rfq as any).selected_supplier_id === row.supplier_id,
+                quoteId: (rfq as any).selected_quote_id,
+              }))}
+            />
           </div>
           {rfq.notes ? <p className="mt-3 text-sm text-black/70">{rfq.notes}</p> : null}
         </div>
@@ -112,87 +267,42 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-black/70">Teklif karşılaştırma</h2>
         </div>
-        {rfq.rfq_quotes?.length ? (
-          (() => {
-            const quoteSuppliers: any[] = Array.from(
-              new Map(
-                (rfq.rfq_quotes ?? []).map((q: any) => [
-                  q.supplier_id,
-                  {
-                    id: q.supplier_id,
-                    name: q.suppliers?.name ?? q.supplier_id,
-                    transit: q.transit_time,
-                    currency: q.currency,
-                    quote: q,
-                  },
-                ])
-              ).values()
-            );
-            return (
-              <div className="overflow-x-auto rounded-2xl border border-black/10">
-                <table className="w-full text-sm">
-                  <thead className="bg-black/5 text-left text-[11px] uppercase tracking-[0.22em] text-black/50">
-                    <tr>
-                      <th className="px-4 py-3 border-r border-black/10">Ürün</th>
-                      {quoteSuppliers.map((s) => (
-                        <th key={s.id} className="px-4 py-3 text-right border-l border-black/10">
-                          <div className="flex justify-end">
-                            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--ocean)]/10 px-3 py-1 text-[12px] font-semibold text-[var(--ocean)]">
-                              <span className="h-2 w-2 rounded-full bg-[var(--ocean)]" />
-                              {s.name}
-                            </span>
-                          </div>
-                          <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-black/50">
-                            <span className="rounded-full bg-black/5 px-2 py-[2px]">
-                              {s.currency ?? "-"}
-                            </span>
-                            <span className="rounded-full bg-black/5 px-2 py-[2px]">
-                              {s.transit ? `${s.transit} gün` : "-"}
-                            </span>
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(rfq.rfq_items ?? []).map((it: any, idx: number) => (
-                      <tr
-                        key={it.id}
-                        className={`border-t border-black/10 ${
-                          idx % 2 === 0 ? "bg-white" : "bg-black/2.5"
-                        }`}
-                      >
-                        <td className="px-4 py-3 border-r border-black/10">
-                          <div className="font-semibold text-black">{it.product_code ?? "-"}</div>
-                          <div className="text-xs text-black/60">{it.product_name ?? "-"}</div>
-                        </td>
-                        {quoteSuppliers.map((s) => {
-                          const price = s.quote?.rfq_quote_items?.find(
-                            (qi: any) => qi.rfq_item_id === it.id
-                          )?.unit_price;
-                          const display = price ?? "-";
-                          return (
-                            <td key={s.id} className="px-4 py-3 text-right border-l border-black/10">
-                              <span
-                                className={`inline-block rounded-lg px-2 py-1 ${
-                                  price ? "bg-[var(--mint)]/40 text-black" : "text-black/40"
-                                }`}
-                              >
-                                {display} {s.currency ?? ""}
-                              </span>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })()
-        ) : (
-          <p className="text-sm text-black/60">Henüz teklif yok.</p>
-        )}
+        <RfqQuoteGrid
+          rfqId={rfq.id}
+          items={rfq.rfq_items ?? []}
+          suppliers={Array.from(
+            new Map(
+              (rfq.rfq_quotes ?? []).map((q: any) => [
+                q.supplier_id,
+                {
+                  id: q.supplier_id,
+                  name: q.suppliers?.name ?? q.supplier_id,
+                  transit: q.transit_time,
+                  currency: q.currency,
+                  quote_items: q.rfq_quote_items ?? [],
+                },
+              ])
+            ).values()
+          ) as any[]}
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-black/70 mb-3">Belgeler</h2>
+          <ul className="space-y-2 text-sm text-black/70">
+            {(documents ?? []).map((doc: any) => (
+              <li key={doc.id} className="flex items-center justify-between rounded-xl border border-black/10 bg-black/5 px-3 py-2">
+                <span className="truncate">{doc.file_name}</span>
+                <span className="text-[11px] text-black/50">{doc.uploaded_at?.slice(0, 10) ?? ""}</span>
+              </li>
+            ))}
+            {!documents?.length ? <li className="text-black/40">Henüz belge yok</li> : null}
+          </ul>
+        </div>
+        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm md:col-span-2">
+          <DocumentUploader rfqId={rfq.id} documentTypes={[{ id: "proforma", name: "Proforma" }]} />
+        </div>
       </div>
     </section>
   );
