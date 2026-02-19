@@ -96,8 +96,12 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
 
   const rfqItems = (rawItems ?? []).map((item: any) => {
     const prod = item.product_id ? productById.get(String(item.product_id)) : null;
+    const resolvedCode = prod?.code ?? item.product_code ?? null;
+    const resolvedName = prod?.name ?? item.product_name ?? null;
     return {
       ...item,
+      product_code: resolvedCode,
+      product_name: resolvedName,
       products: prod ?? null,
     };
   });
@@ -219,11 +223,10 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
             </thead>
             <tbody>
               {(rfq.rfq_items ?? []).map((item: any) => {
-                const prod = Array.isArray(item.products) ? item.products[0] : item.products;
                 return (
                   <tr key={item.id} className="border-b border-black/5 last:border-none">
-                    <td className="px-3 py-3 font-semibold">{item.product_code ?? prod?.code ?? "-"}</td>
-                    <td className="px-3 py-3">{item.product_name ?? prod?.name ?? "-"}</td>
+                    <td className="px-3 py-3 font-semibold">{item.product_code ?? "-"}</td>
+                    <td className="px-3 py-3">{item.product_name ?? "-"}</td>
                     <td className="px-3 py-3 text-right">{item.quantity}</td>
                   </tr>
                 );
