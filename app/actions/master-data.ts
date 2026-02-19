@@ -78,6 +78,7 @@ export async function updateForwarder(formData: FormData) {
     })
     .eq("id", id);
   revalidatePath("/forwarders");
+  revalidatePath(`/forwarders/${id}`);
 }
 
 export async function createPort(formData: FormData) {

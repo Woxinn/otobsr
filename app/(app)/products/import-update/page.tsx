@@ -13,6 +13,11 @@ type Row = {
   gtip?: string;
 };
 
+type CodeUpdateRow = {
+  old_code: string;
+  new_code: string;
+};
+
 const parseNumber = (raw: string | undefined): number | null => {
   if (!raw) return null;
   const n = Number(raw.replace(",", "."));
@@ -25,6 +30,9 @@ export default function ProductsImportUpdatePage() {
   const [groupId, setGroupId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [codeText, setCodeText] = useState("");
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const rows: Row[] = useMemo(() => {
     const lines = text
@@ -51,7 +59,25 @@ export default function ProductsImportUpdatePage() {
       .filter(Boolean) as Row[];
   }, [text]);
 
+  const codeRows: CodeUpdateRow[] = useMemo(() => {
+    const lines = codeText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    return lines
+      .map((line) => {
+        const parts = line.includes(";") ? line.split(";") : line.split("\t");
+        const oldCode = parts[0]?.trim() ?? "";
+        const newCode = parts[1]?.trim() ?? "";
+        if (!oldCode || !newCode) return null;
+        return { old_code: oldCode, new_code: newCode } as CodeUpdateRow;
+      })
+      .filter(Boolean) as CodeUpdateRow[];
+  }, [codeText]);
+
   const validCount = rows.length;
+  const validCodeCount = codeRows.length;
 
   const handleImport = async () => {
     setError(null);
@@ -87,6 +113,37 @@ export default function ProductsImportUpdatePage() {
     }
   };
 
+  const handleCodeUpdate = async () => {
+    setCodeError(null);
+    setCodeBusy(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
+    try {
+      const res = await fetch("/api/products-code-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: codeRows }),
+        signal: controller.signal,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kod guncelleme hatasi");
+      }
+      router.push(
+        `/products?toast=products-import-ok&updated=${data.updated ?? 0}&missing=${(data.not_found ?? []).length ?? 0}`
+      );
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        setCodeError("İşlem çok uzun sürdü, tekrar deneyin.");
+      } else {
+        setCodeError(e.message ?? String(e));
+      }
+    } finally {
+      clearTimeout(timeout);
+      setCodeBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
@@ -103,6 +160,47 @@ export default function ProductsImportUpdatePage() {
           Örnek satır: <br />
           <code>RXB-BCVB-2RXPB-2280-Lw-m;Ürün adi;12,50;STK-001;0,85;18RHB;8414</code>
         </div>
+      </div>
+
+      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm space-y-4">
+        <h2 className="text-lg font-semibold">Toplu ürün kodu güncelleme</h2>
+        <p className="text-sm text-black/60">
+          Format: <code>old_code;new_code</code>. Sadece ürün kodları güncellenir.
+        </p>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <a
+            href="/api/products-code-update/template"
+            className="rounded-full border border-black/20 bg-white px-4 py-2 text-xs font-semibold text-black/70 hover:border-black/40"
+          >
+            Kod güncelleme şablonu indir (CSV)
+          </a>
+          <span className="text-xs text-black/50">
+            Geçerli satır: <span className="font-semibold text-emerald-700">{validCodeCount}</span>
+          </span>
+          <button
+            onClick={handleCodeUpdate}
+            disabled={codeBusy || !validCodeCount}
+            className={`rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
+              codeBusy || !validCodeCount
+                ? "bg-slate-400 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700"
+            }`}
+          >
+            {codeBusy ? "Kodlar güncelleniyor..." : "Kodları toplu güncelle"}
+          </button>
+        </div>
+        <textarea
+          value={codeText}
+          onChange={(e) => setCodeText(e.target.value)}
+          rows={8}
+          className="w-full rounded-2xl border border-black/10 bg-slate-50 px-3 py-2 font-mono text-sm"
+          placeholder="old_code;new_code"
+        />
+        {codeError ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {codeError}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm space-y-4">
