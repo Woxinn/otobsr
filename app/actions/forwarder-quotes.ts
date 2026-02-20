@@ -99,6 +99,7 @@ export async function updateForwarderQuote(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const quoteId = String(formData.get("quote_id") ?? "");
   const forwarderId = String(formData.get("forwarder_id") ?? "");
+  const shipmentId = String(formData.get("shipment_id") ?? "");
 
   if (!quoteId) return;
 
@@ -115,22 +116,21 @@ export async function updateForwarderQuote(formData: FormData) {
     })
     .eq("id", quoteId);
 
-  if (forwarderId) {
-    revalidatePath(`/forwarders/${forwarderId}`);
-  }
+  if (forwarderId) revalidatePath(`/forwarders/${forwarderId}`);
+  if (shipmentId) revalidatePath(`/shipments/${shipmentId}`);
 }
 
 export async function deleteForwarderQuote(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const quoteId = String(formData.get("quote_id") ?? "");
   const forwarderId = String(formData.get("forwarder_id") ?? "");
+  const shipmentId = String(formData.get("shipment_id") ?? "");
 
   if (!quoteId) return;
 
   await supabase.from("forwarder_quotes").delete().eq("id", quoteId);
-  if (forwarderId) {
-    revalidatePath(`/forwarders/${forwarderId}`);
-  }
+  if (forwarderId) revalidatePath(`/forwarders/${forwarderId}`);
+  if (shipmentId) revalidatePath(`/shipments/${shipmentId}`);
 }
 
 export async function selectForwarderQuote(formData: FormData) {

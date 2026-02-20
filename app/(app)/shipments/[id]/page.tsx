@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
 import { getCurrentUserRole, canEdit } from "@/lib/roles";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
-import { createForwarderQuoteForShipment, selectForwarderQuote } from "@/app/actions/forwarder-quotes";
+import { selectForwarderQuote, updateForwarderQuote, deleteForwarderQuote, createForwarderQuoteForShipment } from "@/app/actions/forwarder-quotes";
 import { deleteShipment } from "@/app/actions/shipments";
 import AlertSummaryCard from "@/components/AlertSummaryCard";
 
@@ -66,7 +66,7 @@ export default async function ShipmentDetailPage({
   const { data: forwarderQuotes } = await supabase
     .from("forwarder_quotes")
     .select(
-      "id, amount, currency, container_size, free_time_days, route_option, transit_days, valid_until, notes, is_selected, forwarder_id"
+      "id, amount, currency, container_size, free_time_days, route_option, transit_days, valid_until, notes, is_selected, forwarder_id, forwarders(name)"
     )
     .eq("shipment_id", shipment.id)
     .order("created_at", { ascending: false });
@@ -439,70 +439,162 @@ export default async function ShipmentDetailPage({
         </p>
         <div className="mt-4 space-y-3 text-sm">
           {forwarderQuotes?.length ? (
-            forwarderQuotes.map((quote) => (
-              <div
-                key={quote.id}
-                className={`rounded-2xl border border-black/10 p-4 ${
-                  quote.is_selected ? "text-white" : ""
-                }`}
-                style={{
-                  backgroundColor: quote.is_selected ? "#0f3d3e" : colorFromId(quote.id),
-                }}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-semibold">
-                      {forwarderById.get(quote.forwarder_id) ?? "Forwarder"} - {" "}
-                      {formatMoney(
-                        quote.amount ? Number(quote.amount) : null,
-                        quote.currency ?? "USD"
-                      )}
-                    </p>
-                    <p
-                      className={`text-xs ${
-                        quote.is_selected ? "text-white/80" : "text-black/60"
-                      }`}
-                    >
-                      Konteyner: {quote.container_size ?? "-"} | Free time: {" "}
-                      {quote.free_time_days ?? "-"} gun | Rota: {quote.route_option ?? "-"} | Transit: {" "}
-                      {quote.transit_days ?? "-"} gun
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {cheapestAmount !== null && Number(quote.amount ?? 0) === cheapestAmount ? (
-                      <span className="rounded-full bg-[var(--ocean)] px-3 py-1 text-xs text-white">En ucuz</span>
-                    ) : null}
-                    {quote.is_selected ? (
-                      <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-semibold text-black/70">
-                        Seçili
-                      </span>
-                    ) : (
-                      <form action={selectForwarderQuote}>
-                        <input type="hidden" name="quote_id" value={quote.id} />
-                        <input type="hidden" name="shipment_id" value={shipment.id} />
-                        <input type="hidden" name="forwarder_id" value={quote.forwarder_id} />
-                        <button className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-semibold text-black/70">
-                          Sec
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                </div>
+            forwarderQuotes.map((quote) => {
+              const forwarderName = forwarderById.get(quote.forwarder_id) ?? (quote as any).forwarders?.name ?? "-";
+              return (
                 <div
-                  className={`mt-2 text-xs ${
-                    quote.is_selected ? "text-white/80" : "text-black/60"
+                  key={quote.id}
+                  className={`rounded-2xl border border-black/10 p-4 ${
+                    quote.is_selected ? "text-white" : ""
                   }`}
+                  style={{
+                    backgroundColor: quote.is_selected ? "#0f3d3e" : colorFromId(quote.id),
+                  }}
                 >
-                  Gecerlilik: {quote.valid_until ?? "-"} | Not: {quote.notes ?? "-"}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">
+                        {forwarderName} - {formatMoney(quote.amount ? Number(quote.amount) : null, quote.currency ?? "USD")}
+                      </p>
+                      <p
+                        className={`text-xs ${
+                          quote.is_selected ? "text-white/80" : "text-black/60"
+                        }`}
+                      >
+                        Konteyner: {quote.container_size ?? "-"} | Free time: {quote.free_time_days ?? "-"} gun | Rota:{" "}
+                        {quote.route_option ?? "-"} | Transit: {quote.transit_days ?? "-"} gun
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {cheapestAmount !== null && Number(quote.amount ?? 0) === cheapestAmount ? (
+                        <span className="rounded-full bg-[var(--ocean)] px-3 py-1 text-xs text-white">En ucuz</span>
+                      ) : null}
+                      {quote.is_selected ? (
+                        <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-semibold text-black/70">
+                          Seçili
+                        </span>
+                      ) : (
+                        <form action={selectForwarderQuote}>
+                          <input type="hidden" name="quote_id" value={quote.id} />
+                          <input type="hidden" name="shipment_id" value={shipment.id} />
+                          <input type="hidden" name="forwarder_id" value={quote.forwarder_id} />
+                          <button className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-semibold text-black/70">
+                            Sec
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    className={`mt-2 text-xs ${
+                      quote.is_selected ? "text-white/80" : "text-black/60"
+                    }`}
+                  >
+                    Gecerlilik: {quote.valid_until ?? "-"} | Not: {quote.notes ?? "-"}
+                  </div>
+
+                  <details className="mt-3 rounded-2xl border border-black/10 bg-white/80 p-3 text-black" open={false}>
+                    <summary className="cursor-pointer select-none text-xs font-semibold text-black/70">
+                      Düzenle / Sil
+                    </summary>
+                    <form action={updateForwarderQuote} className="mt-3 grid gap-2 text-sm lg:grid-cols-3">
+                      <input type="hidden" name="quote_id" value={quote.id} />
+                      <input type="hidden" name="forwarder_id" value={quote.forwarder_id} />
+                      <input type="hidden" name="shipment_id" value={shipment.id} />
+                      <label className="flex flex-col gap-1">
+                        Tutar
+                        <input
+                          name="amount"
+                          defaultValue={quote.amount ?? ""}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        Para birimi
+                        <input
+                          name="currency"
+                          defaultValue={quote.currency ?? "USD"}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        Konteyner
+                        <input
+                          name="container_size"
+                          defaultValue={quote.container_size ?? ""}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        Free time (gün)
+                        <input
+                          name="free_time_days"
+                          defaultValue={quote.free_time_days ?? ""}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        Rota
+                        <select
+                          name="route_option"
+                          defaultValue={quote.route_option ?? ""}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        >
+                          <option value="">Seçiniz</option>
+                          <option value="Suveys">Suveys</option>
+                          <option value="Umit Burnu">Umit Burnu</option>
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        Transit (gün)
+                        <input
+                          name="transit_days"
+                          defaultValue={quote.transit_days ?? ""}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        Geçerlilik
+                        <input
+                          type="date"
+                          name="valid_until"
+                          defaultValue={quote.valid_until ?? ""}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 lg:col-span-3">
+                        Not
+                        <input
+                          name="notes"
+                          defaultValue={quote.notes ?? ""}
+                          className="rounded-xl border border-black/10 px-3 py-2"
+                        />
+                      </label>
+                      <div className="lg:col-span-3 flex flex-wrap gap-2">
+                        <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
+                          Kaydet
+                        </button>
+                      </div>
+                    </form>
+                    <form action={deleteForwarderQuote} className="mt-2 flex gap-2">
+                      <input type="hidden" name="quote_id" value={quote.id} />
+                      <input type="hidden" name="forwarder_id" value={quote.forwarder_id} />
+                      <input type="hidden" name="shipment_id" value={shipment.id} />
+                      <button className="rounded-full border border-black/20 px-4 py-2 text-xs font-semibold">
+                        Sil
+                      </button>
+                    </form>
+                  </details>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
               Henüz teklif girilmedi. Forwarder detay sayfasindan teklif ekleyin.
             </div>
           )}
         </div>
+
         <details className="mt-6 rounded-2xl border border-black/10 bg-white/70">
           <summary className="cursor-pointer select-none list-none rounded-2xl px-4 py-3 text-sm font-semibold text-black/80 transition hover:bg-[var(--sky)]/40">
             Yeni teklif ekle
