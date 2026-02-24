@@ -35,7 +35,7 @@ export default async function ProformaDetailPage({
 
   const { data: proforma, error: proformaErr } = await supabase
     .from("proformas")
-    .select("*, suppliers(name)")
+    .select("id, proforma_no, name, proforma_date, currency, total_amount, supplier_id, suppliers(name), notes")
     .eq("id", id)
     .maybeSingle();
   if (proformaErr) return <div className="p-6 text-sm text-red-600">Proforma okunamadi: {proformaErr.message}</div>;
@@ -96,10 +96,6 @@ export default async function ProformaDetailPage({
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-[0.2em] text-black/40">Durum</div>
-          <div className="mt-2 text-xl font-semibold text-black">{proforma.status}</div>
-        </div>
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
           <div className="text-xs uppercase tracking-[0.2em] text-black/40">Toplam Kalem</div>
           <div className="mt-2 text-xl font-semibold text-black">{items.length}</div>

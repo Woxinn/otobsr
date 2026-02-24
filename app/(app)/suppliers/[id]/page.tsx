@@ -4,6 +4,19 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canViewFinance } from "@/lib/roles";
 import { updateSupplier } from "@/app/actions/master-data";
 import CountrySelect from "@/components/CountrySelect";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data: supplier } = await supabase
+    .from("suppliers")
+    .select("name")
+    .eq("id", id)
+    .maybeSingle();
+  const title = supplier?.name || "Tedarikçi";
+  return { title: `Tedarikçi | ${title}` };
+}
 
 export default async function SupplierDetailPage({
   params,

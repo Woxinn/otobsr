@@ -78,6 +78,22 @@ export default async function ProductGroupDetailPage({
             placeholder="Not"
             className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm lg:col-span-2"
           />
+          <input
+            name="lead_time_days"
+            type="number"
+            min="0"
+            placeholder="Lead time (gün)"
+            defaultValue={group.lead_time_days ?? ""}
+            className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+          />
+          <input
+            name="safety_days"
+            type="number"
+            min="0"
+            placeholder="Safety (gün)"
+            defaultValue={group.safety_days ?? ""}
+            className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+          />
         </div>
         <button className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
           Güncelle

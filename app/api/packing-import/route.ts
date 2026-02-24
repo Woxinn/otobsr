@@ -9,6 +9,14 @@ type ImportRow = {
   grossWeight?: number | string | null;
 };
 
+const normalizeCode = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+
 const toNumber = (value: unknown) => {
   if (value === null || value === undefined) return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -60,7 +68,7 @@ export async function POST(request: Request) {
   const cleanedRows = rows
     .map((row) => ({
       boxCount: toNumber(row.boxCount) ?? null,
-      productCode: String(row.productCode ?? "").trim(),
+      productCode: normalizeCode(row.productCode),
       qtyPerBox: toNumber(row.qtyPerBox) ?? 0,
       netWeight: toNumber(row.netWeight),
       grossWeight: toNumber(row.grossWeight),

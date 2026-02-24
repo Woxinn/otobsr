@@ -70,6 +70,14 @@ export async function GET(req: NextRequest) {
     );
   };
 
+  const normalizeCode = (value: unknown) =>
+    String(value ?? "")
+      .normalize("NFKC")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toUpperCase();
+
   // Generic pagination helper to bypass PostgREST default limits
   const fetchAll = async <T,>(
     fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error: any }>
@@ -316,28 +324,78 @@ export async function GET(req: NextRequest) {
     return null;
   };
 
-  // Packing lines grouped
-  const packingByKey = new Map<
-    string,
-    { qty: number; net: number; gross: number; boxes: number }
-  >();
+  // Packing lines grouped (tek kayıt, alias desteği)
+  type PackEntry = { qty: number; net: number; gross: number; boxes: number };
+  const packingMain = new Map<string, PackEntry>(); // primary key -> entry
+  const codeAlias = new Map<string, string>(); // code key -> primary key
+
   for (const line of packingLines) {
-    const key = line.product_id ?? line.product_name_raw ?? "";
-    if (!key) continue;
-    const qty = Number(line.quantity ?? 0);
-    const boxes = Number(line.packages_count ?? 0);
+    const normalizedCode = normalizeCode(line.product_name_raw);
+    const hasPid = Boolean(line.product_id);
+    if (!hasPid && !normalizedCode) continue;
+
+    const key = hasPid ? `pid:${line.product_id}` : `code:${normalizedCode}`;
+    const qty = Number(line.quantity ?? 0) || 0;
+    const boxes = Number(line.packages_count ?? 0) || 0;
     const netVal = Number(line.net_weight ?? 0) || 0;
     const grossVal = Number(line.gross_weight ?? 0) || 0;
 
-    const entry =
-      packingByKey.get(key) ??
-      { qty: 0, net: 0, gross: 0, boxes: 0 };
+    const entry = packingMain.get(key) ?? { qty: 0, net: 0, gross: 0, boxes: 0 };
     entry.qty += qty;
     entry.net += netVal;
     entry.gross += grossVal;
     entry.boxes += boxes;
-    packingByKey.set(key, entry);
+    packingMain.set(key, entry);
+
+    if (normalizedCode) codeAlias.set(normalizedCode, key);
   }
+
+  const resolvePackKey = (pid: string | null | undefined, codeKey: string) => {
+    const pidKey = pid ? `pid:${pid}` : null;
+    if (pidKey && packingMain.has(pidKey)) return pidKey;
+    const aliasKey = codeAlias.get(codeKey);
+    if (aliasKey && packingMain.has(aliasKey)) return aliasKey;
+    const codeOnlyKey = `code:${codeKey}`;
+    if (packingMain.has(codeOnlyKey)) return codeOnlyKey;
+    return null;
+  };
+
+  const consumePacking = (
+    pid: string | null | undefined,
+    codeKey: string,
+    needQty: number
+  ): PackEntry | null => {
+    const key = resolvePackKey(pid, codeKey);
+    if (!key) return null;
+    const entry = packingMain.get(key)!;
+    if (!entry.qty || entry.qty <= 0) return null;
+
+    const useQty = needQty > 0 ? Math.min(entry.qty, needQty) : entry.qty;
+    const ratio = entry.qty > 0 ? useQty / entry.qty : 0;
+    const used: PackEntry = {
+      qty: useQty,
+      net: entry.net * ratio,
+      gross: entry.gross * ratio,
+      boxes: entry.boxes * ratio,
+    };
+
+    entry.qty -= useQty;
+    entry.net -= used.net;
+    entry.gross -= used.gross;
+    entry.boxes -= used.boxes;
+
+    if (entry.qty <= 0.0001) {
+      packingMain.delete(key);
+      // ilgili aliasları da sil
+      for (const [aliasCode, target] of Array.from(codeAlias.entries())) {
+        if (target === key) codeAlias.delete(aliasCode);
+      }
+    } else {
+      packingMain.set(key, entry);
+    }
+
+    return used;
+  };
 
   // Excel hazırlığı
   const wb = new ExcelJS.Workbook();
@@ -367,7 +425,26 @@ export async function GET(req: NextRequest) {
     { header: "TAREKS No", key: "tareks", width: 14 },
     { header: "RAPOR No", key: "rapor", width: 14 },
   ];
-  const rows: any[] = [];
+  const rowMap = new Map<
+    string,
+    {
+      urun_kodu: string;
+      urun_adi: string;
+      uzunluk: string | number | null;
+      adet: number;
+      birim_fiyat: number | string | null;
+      net: number;
+      brut: number;
+      koli: number;
+      gtip: string;
+      tip: string;
+      tse: string;
+      analiz: string;
+      tareks: string;
+      rapor: string;
+      _gtipKey: string;
+    }
+  >();
   const gtipSummary = new Map<
     string,
     Map<string, { qty: number; amount: number; net: number; gross: number; koli: number }>
@@ -378,29 +455,28 @@ export async function GET(req: NextRequest) {
       : (oi as any).products;
     if (!product) return;
     const code = product.code ?? "";
-    const packingKey = oi.product_id ?? code;
-    const packing =
-      packingByKey.get(packingKey) ??
-      { qty: 0, net: 0, gross: 0, boxes: 0 };
-    const qty = packing.qty || Number(oi.quantity ?? 0) || 0;
-    const netExport = packing.net || "";
-    const grossExport = packing.gross || "";
+    const codeKey = normalizeCode(code);
+    const orderQty = Number(oi.quantity ?? 0) || 0;
+    const packing = consumePacking(product.id, codeKey, orderQty);
+    const qty = packing ? packing.qty : orderQty;
+    const netExport = packing ? packing.net : "";
+    const grossExport = packing ? packing.gross : "";
+    const boxesExport = packing ? packing.boxes : 0;
     const tipKey = typeByProduct.get(product.id) ?? product.product_type?.name ?? "Belirtilecek";
     const comp = pickCompliance(product.product_type_id, product.product_type?.name ?? tipKey);
 
     const amount = qty * (Number(oi.unit_price ?? 0) || 0);
     const gtipCode = (product as any).gtip?.code ?? "Belirlenmedi";
-    rows.push({
-      sira: idx + 1,
-      fatura_sira: idx + 1,
+    const key = `${product.id ?? code}::${tipKey}::${lengthByProduct.get(product.id) ?? ""}::${gtipCode}`;
+    const existing = rowMap.get(key) ?? {
       urun_kodu: code,
       urun_adi: product.name ?? "",
       uzunluk: lengthByProduct.get(product.id) ?? "",
-      adet: fmt2(qty),
-      birim_fiyat: fmt2(oi.unit_price ?? ""),
-      net: fmt2(netExport),
-      brut: fmt2(grossExport),
-      koli: fmt2(packing.boxes || ""),
+      adet: 0,
+      birim_fiyat: oi.unit_price ?? "",
+      net: 0,
+      brut: 0,
+      koli: 0,
       gtip: gtipCode,
       tip: tipKey,
       tse: comp?.tse_status ?? "",
@@ -408,7 +484,12 @@ export async function GET(req: NextRequest) {
       tareks: comp?.tareks_no ?? "",
       rapor: comp?.rapor_no ?? "",
       _gtipKey: gtipCode,
-    });
+    };
+    existing.adet += qty;
+    existing.net += Number(netExport || 0);
+    existing.brut += Number(grossExport || 0);
+    existing.koli += Number(boxesExport || 0);
+    rowMap.set(key, existing);
 
     const typeKey = tipKey ?? "Belirtilmedi";
     if (!gtipSummary.has(gtipCode)) gtipSummary.set(gtipCode, new Map());
@@ -420,8 +501,17 @@ export async function GET(req: NextRequest) {
     agg.amount += amount;
     agg.net += Number(netExport || 0);
     agg.gross += Number(grossExport || 0);
-    agg.koli += Number(packing.boxes || 0);
+    agg.koli += Number(boxesExport || 0);
   });
+
+  const rows = Array.from(rowMap.values()).map((row) => ({
+    ...row,
+    adet: fmt2(row.adet),
+    birim_fiyat: fmt2(row.birim_fiyat),
+    net: fmt2(row.net),
+    brut: fmt2(row.brut),
+    koli: fmt2(row.koli),
+  }));
 
   // GTIP alanına göre gruplayıp sırala; her GTIP içinde önce tip, sonra uzunluk
   const sorted = rows.sort((a, b) => {
@@ -459,10 +549,14 @@ export async function GET(req: NextRequest) {
       const nextColor = palette[colorByGtip.size % palette.length];
       colorByGtip.set(gtipKey, nextColor);
     }
-    const { _gtipKey, ...rest } = r;
-    rest.sira = rowIndex;
+    const { _gtipKey, ...rest } = r as any;
+    const out = {
+      ...rest,
+      sira: rowIndex,
+      fatura_sira: rowIndex,
+    };
     rowIndex += 1;
-    const row = ws.addRow(rest);
+    const row = ws.addRow(out);
     row.eachCell((cell) => {
       cell.fill = {
         type: "pattern",

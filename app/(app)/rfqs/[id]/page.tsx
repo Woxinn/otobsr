@@ -5,6 +5,19 @@ import { canViewModule, getCurrentUserRole } from "@/lib/roles";
 import RfqActionBar from "@/components/RfqActionBar";
 import QuoteModal from "@/components/QuoteModal";
 import RfqImportModal from "@/components/RfqImportModal";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data: rfq } = await supabase
+    .from("rfqs")
+    .select("code, title")
+    .eq("id", id)
+    .maybeSingle();
+  const title = rfq?.title || rfq?.code || "RFQ";
+  return { title: `RFQ | ${title}` };
+}
 import RfqQuoteGrid from "@/components/RfqQuoteGrid";
 import DocumentUploader from "@/components/DocumentUploader";
 import SupplierQuoteList from "@/components/SupplierQuoteList";
@@ -66,6 +79,15 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
     }
   }
   if (!rfqBase) return notFound();
+
+  const fmtNum = (value: number | string | null | undefined, maxFraction = 2) => {
+    const num = Number(value ?? 0);
+    if (!Number.isFinite(num)) return String(value ?? "-");
+    return num.toLocaleString("tr-TR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: maxFraction,
+    });
+  };
 
   const { data: rawItems, error: itemsErr } = await fetchAll<any>((from, to) =>
     supabase
@@ -227,7 +249,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                   <tr key={item.id} className="border-b border-black/5 last:border-none">
                     <td className="px-3 py-3 font-semibold">{item.product_code ?? "-"}</td>
                     <td className="px-3 py-3">{item.product_name ?? "-"}</td>
-                    <td className="px-3 py-3 text-right">{item.quantity}</td>
+                  <td className="px-3 py-3 text-right">{fmtNum(item.quantity, 2)}</td>
                   </tr>
                 );
               })}

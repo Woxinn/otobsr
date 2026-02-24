@@ -6,7 +6,6 @@ import ProformaDeleteButton from "@/components/ProformaDeleteButton";
 type SearchParams = {
   q?: string;
   supplier?: string;
-  status?: string;
 };
 
 const fmtMoney = (value: number | null | undefined) =>
@@ -38,15 +37,13 @@ export default async function ProformasPage({
   const { data: suppliers } = await supabase.from("suppliers").select("id, name").order("name");
   const { data: proformas, error } = await supabase
     .from("proformas")
-    .select("id, proforma_no, name, proforma_date, currency, status, total_amount, supplier_id, suppliers(name), created_at")
+    .select("id, proforma_no, name, proforma_date, currency, total_amount, supplier_id, suppliers(name), created_at")
     .order("created_at", { ascending: false });
   if (error) return <div className="p-6 text-sm text-red-600">Liste okunamadi: {error.message}</div>;
 
   const query = (resolved.q ?? "").trim().toLowerCase();
-  const status = (resolved.status ?? "").trim();
   const supplier = (resolved.supplier ?? "").trim();
   const filtered = (proformas ?? []).filter((p) => {
-    if (status && p.status !== status) return false;
     if (supplier && p.supplier_id !== supplier) return false;
     if (!query) return true;
     const supplierName = Array.isArray(p.suppliers) ? p.suppliers[0]?.name : (p.suppliers as any)?.name;
@@ -95,19 +92,6 @@ export default async function ProformasPage({
               ))}
             </select>
           </label>
-          <label className="text-sm font-medium text-black/70">
-            Durum
-            <select
-              name="status"
-              defaultValue={resolved.status ?? ""}
-              className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              <option value="taslak">Taslak</option>
-              <option value="onayli">Onayli</option>
-              <option value="iptal">Iptal</option>
-            </select>
-          </label>
           <div className="flex items-end gap-2">
             <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
               Filtrele
@@ -132,9 +116,8 @@ export default async function ProformasPage({
                 <th className="w-[20%] px-3 py-3">Tedarikci</th>
                 <th className="w-[10%] px-3 py-3">Tarih</th>
                 <th className="w-[12%] px-3 py-3 text-right">Toplam</th>
-                <th className="w-[8%] px-3 py-3">Para Birimi</th>
-                <th className="w-[8%] px-3 py-3">Durum</th>
-                {allowDelete ? <th className="w-[8%] px-3 py-3 text-right">Islem</th> : null}
+                <th className="w-[10%] px-3 py-3">Para Birimi</th>
+                {allowDelete ? <th className="w-[10%] px-3 py-3 text-right">Islem</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -152,19 +135,6 @@ export default async function ProformasPage({
                     <td className="px-3 py-3 whitespace-nowrap">{fmtDate(p.proforma_date)}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">{fmtMoney(p.total_amount)}</td>
                     <td className="px-3 py-3 whitespace-nowrap">{p.currency ?? "-"}</td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                          p.status === "onayli"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : p.status === "iptal"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-black/10 text-black/70"
-                        }`}
-                      >
-                        {p.status}
-                      </span>
-                    </td>
                     {allowDelete ? (
                       <td className="px-3 py-3 text-right">
                         <ProformaDeleteButton proformaId={p.id} compact />

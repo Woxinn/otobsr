@@ -6,9 +6,10 @@ import OrderPlanInput from "@/components/OrderPlanInput";
 import Sales10ySyncButton from "@/components/Sales10ySyncButton";
 import RfqCreateModal from "@/components/RfqCreateModal";
 import PlanRowClickBinder from "@/components/PlanRowClickBinder";
+import { updateOrderPlanDefaults } from "@/app/actions/order-plan";
 
-const LEAD_TIME_DAYS = 105;
-const SAFETY_DAYS = 15;
+const FALLBACK_LEAD_TIME_DAYS = 105;
+const FALLBACK_SAFETY_DAYS = 15;
 
 type SearchParams = {
   q?: string;
@@ -18,6 +19,8 @@ type SearchParams = {
   supplier?: string;
   gtip?: string;
   filledOnly?: string;
+  needOnly?: string;
+  quantityFilter?: string;
 };
 
 type SalesAgg = {
@@ -272,17 +275,24 @@ const computePlan = ({
   sales_last_4_months,
   sales_last_60_days,
   sales_previous_60_days,
+  lead_time_days,
+  safety_days,
 }: {
   available_stock: number;
   sales_last_4_months: number;
   sales_last_60_days: number;
   sales_previous_60_days: number;
+  lead_time_days: number;
+  safety_days: number;
 }) => {
   let base_order_quantity = 0;
   // Level 1
   if (available_stock < sales_last_4_months) {
     base_order_quantity = sales_last_4_months;
-  } else if (available_stock >= sales_last_4_months && LEAD_TIME_DAYS + SAFETY_DAYS >= 120) {
+  } else if (
+    available_stock >= sales_last_4_months &&
+    lead_time_days + safety_days >= 120
+  ) {
     const target_stock = sales_last_4_months * 2;
     base_order_quantity = target_stock - available_stock;
   } else {
@@ -316,8 +326,14 @@ export default async function OrderPlanPage({
 
   const { data: groups } = await supabase
     .from("product_groups")
-    .select("id, name")
+    .select("id, name, lead_time_days, safety_days")
     .order("name");
+
+  const { data: planDefaults } = await supabase
+    .from("order_plan_defaults")
+    .select("lead_time_days, safety_days")
+    .eq("id", 1)
+    .maybeSingle();
 
   const { data: suppliers } = await supabase
     .from("suppliers")
@@ -352,12 +368,30 @@ export default async function OrderPlanPage({
   const perPageParam = Number(resolvedParams.perPage ?? "");
   const perPage = perPageOptions.includes(perPageParam) ? perPageParam : 100;
   const requestedPage = Math.max(1, Number(resolvedParams.page ?? "1") || 1);
-  const filledOnly = resolvedParams.filledOnly === "1";
+  const quantityFilter = resolvedParams.quantityFilter ?? "";
+  const filledOnly =
+    quantityFilter === "filled" || quantityFilter === "both"
+      ? true
+      : (resolvedParams.filledOnly ?? "") === "1";
+  const needOnly =
+    quantityFilter === "need" || quantityFilter === "both"
+      ? true
+      : (resolvedParams.needOnly ?? "") === "1";
+  const quantityFilterDefault =
+    resolvedParams.quantityFilter ??
+    (filledOnly && needOnly ? "both" : filledOnly ? "filled" : needOnly ? "need" : "");
   const selectedGroupIds = Array.isArray(resolvedParams.group)
     ? resolvedParams.group
     : resolvedParams.group
     ? resolvedParams.group.split(",").filter(Boolean)
     : [];
+
+  const resolveLeadSafety = (groupId?: string | null) => {
+    const group = groups?.find((g) => g.id === groupId);
+    const lead = group?.lead_time_days ?? planDefaults?.lead_time_days ?? FALLBACK_LEAD_TIME_DAYS;
+    const safety = group?.safety_days ?? planDefaults?.safety_days ?? FALLBACK_SAFETY_DAYS;
+    return { lead, safety };
+  };
   const { data: filledEntries } = filledOnly
     ? await supabase.from("order_plan_entries").select("product_id").gt("value", 0)
     : { data: null as { product_id: string }[] | null };
@@ -488,14 +522,28 @@ export default async function OrderPlanPage({
       : [];
     const supplier = overrides.supplier ?? resolvedParams.supplier;
     const gtip = overrides.gtip ?? resolvedParams.gtip;
-    const filledOnlyValue = overrides.filledOnly ?? resolvedParams.filledOnly;
+    const quantityFilterValue = overrides.quantityFilter ?? resolvedParams.quantityFilter ?? "";
+    let filledOnlyValue = overrides.filledOnly ?? resolvedParams.filledOnly;
+    let needOnlyValue = overrides.needOnly ?? resolvedParams.needOnly;
+    if (quantityFilterValue === "filled") {
+      filledOnlyValue = "1";
+      needOnlyValue = "";
+    } else if (quantityFilterValue === "need") {
+      needOnlyValue = "1";
+      filledOnlyValue = "";
+    } else if (quantityFilterValue === "both") {
+      filledOnlyValue = "1";
+      needOnlyValue = "1";
+    }
     const perPageValue = overrides.perPage ?? String(perPage);
     const pageValue = overrides.page ?? String(currentPage);
     if (q) params.set("q", q);
     if (normalizedGroups.length) params.set("group", normalizedGroups.join(","));
     if (supplier) params.set("supplier", supplier);
     if (gtip) params.set("gtip", gtip);
+    if (quantityFilterValue) params.set("quantityFilter", quantityFilterValue);
     if (filledOnlyValue === "1") params.set("filledOnly", "1");
+    if (needOnlyValue === "1") params.set("needOnly", "1");
     if (perPageValue) params.set("perPage", String(perPageValue));
     if (pageValue && Number(pageValue) > 1) params.set("page", String(pageValue));
     const qs = params.toString();
@@ -533,6 +581,12 @@ export default async function OrderPlanPage({
         <div className="flex items-center gap-3">
           <RfqCreateModal suppliers={suppliers ?? []} />
           <Link
+            href={`/api/order-plan-export${buildQuery({})}`}
+            className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70"
+          >
+            Excel Dışa Aktar
+          </Link>
+          <Link
             href="/products"
             className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70"
           >
@@ -542,6 +596,46 @@ export default async function OrderPlanPage({
       </div>
 
       <Sales10ySyncButton />
+
+      {(role === "Admin" || role === "Yonetim") && (
+        <div className="grid gap-3 rounded-3xl border border-black/10 bg-white p-5 shadow-sm md:grid-cols-3">
+          <div className="md:col-span-2">
+            <p className="text-xs uppercase tracking-[0.25em] text-black/45">Lead / Safety</p>
+            <p className="text-sm text-black/70">
+              Varsayılan değerleri buradan güncelle. Kategori bazlı override için{" "}
+              <Link href="/product-groups" className="font-semibold text-[var(--ocean)] underline">
+                Ürün kategorileri
+              </Link>{" "}
+              sayfasında ilgili satırı düzenle.
+            </p>
+          </div>
+          <form action={updateOrderPlanDefaults} className="flex items-end gap-3 md:justify-end">
+            <div>
+              <label className="text-xs text-black/60">Lead time (gün)</label>
+              <input
+                type="number"
+                name="lead_time_days"
+                min={0}
+                defaultValue={planDefaults?.lead_time_days ?? FALLBACK_LEAD_TIME_DAYS}
+                className="w-28 rounded-xl border border-black/10 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-black/60">Safety (gün)</label>
+              <input
+                type="number"
+                name="safety_days"
+                min={0}
+                defaultValue={planDefaults?.safety_days ?? FALLBACK_SAFETY_DAYS}
+                className="w-28 rounded-xl border border-black/10 px-3 py-2 text-sm"
+              />
+            </div>
+            <button className="h-10 rounded-full bg-[var(--ocean)] px-4 text-xs font-semibold text-white">
+              Kaydet
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -664,12 +758,14 @@ export default async function OrderPlanPage({
           <label className="text-sm font-medium text-black/70">
             Miktar filtresi
             <select
-              name="filledOnly"
-              defaultValue={filledOnly ? "1" : ""}
+              name="quantityFilter"
+              defaultValue={quantityFilterDefault}
               className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
-              <option value="1">Sadece inputu dolu olanlar</option>
+              <option value="filled">Sadece inputu dolu olanlar</option>
+              <option value="need">Sadece ihtiyac &gt; 0 olanlar</option>
+              <option value="both">Inputu dolu VE ihtiyacı &gt; 0 olanlar</option>
             </select>
           </label>
           <label className="text-sm font-medium text-black/70">
@@ -735,13 +831,17 @@ export default async function OrderPlanPage({
                 };
                 const sales10y = sales10yByProduct.get(p.id) ?? salesSafe.sales10y;
                 const available_stock = stock + inTransit;
+                const { lead, safety } = resolveLeadSafety((p as { group_id?: string | null })?.group_id);
                 const plan = computePlan({
                   available_stock,
                   sales_last_4_months: salesSafe.sales120,
                   sales_last_60_days: salesSafe.sales60,
                   sales_previous_60_days: salesSafe.salesPrev60,
+                  lead_time_days: lead,
+                  safety_days: safety,
                 });
                 const existing = planByProduct.get(p.id);
+                if (needOnly && plan.base_order_quantity <= 0) return null;
 
                 return (
                   <tr
@@ -812,6 +912,9 @@ export default async function OrderPlanPage({
                           ? "satış azalıyor"
                           : "stabil"}
                         )
+                      </div>
+                      <div className="text-[11px] text-black/50">
+                        Lead/Safety: {lead}g / {safety}g
                       </div>
                       <OrderPlanInput
                         productId={p.id}

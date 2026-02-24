@@ -211,11 +211,15 @@ export async function updateProductGroup(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
+  const lead = toNumber(formData.get("lead_time_days"));
+  const safety = toNumber(formData.get("safety_days"));
   await supabase
     .from("product_groups")
     .update({
       name: nullIfEmpty(formData.get("name")),
       notes: nullIfEmpty(formData.get("notes")),
+      lead_time_days: lead ?? null,
+      safety_days: safety ?? null,
     })
     .eq("id", id);
   revalidatePath("/product-groups");

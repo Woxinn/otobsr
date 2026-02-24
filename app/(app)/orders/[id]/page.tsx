@@ -18,6 +18,19 @@ import { createOrderPayment, deleteOrderPayment } from "@/app/actions/order-paym
 import { deleteOrderDocument } from "@/app/actions/order-documents";
 import OrderDocumentUploader from "@/components/OrderDocumentUploader";
 import DocumentDownloadButton from "@/components/DocumentDownloadButton";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("name, code")
+    .eq("id", id)
+    .maybeSingle();
+  const title = order?.name || order?.code || "Sipariş";
+  return { title: `Sipariş | ${title}` };
+}
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import OrderItemCreateForm from "@/components/OrderItemCreateForm";
 import DocumentInlineViewer from "@/components/DocumentInlineViewer";

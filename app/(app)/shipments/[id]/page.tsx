@@ -6,6 +6,19 @@ import { getCurrentUserRole, canEdit } from "@/lib/roles";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import { selectForwarderQuote, updateForwarderQuote, deleteForwarderQuote, createForwarderQuoteForShipment } from "@/app/actions/forwarder-quotes";
 import { deleteShipment } from "@/app/actions/shipments";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data: shipment } = await supabase
+    .from("shipments")
+    .select("name, code")
+    .eq("id", id)
+    .maybeSingle();
+  const title = shipment?.name || shipment?.code || "Shipment";
+  return { title: `Shipment | ${title}` };
+}
 import AlertSummaryCard from "@/components/AlertSummaryCard";
 
 export default async function ShipmentDetailPage({

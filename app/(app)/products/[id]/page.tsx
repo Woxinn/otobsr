@@ -5,6 +5,20 @@ import { deleteProduct } from "@/app/actions/products";
 import { computeCosts, pickWeightKg, GtipRow } from "@/lib/gtipCost";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data: product } = await supabase
+    .from("products")
+    .select("name, code")
+    .eq("id", id)
+    .single();
+  const title = product?.name || product?.code || "Ürün";
+  return { title: `Ürün | ${title}` };
+}
+import HeadTitle from "@/components/HeadTitle";
 
 const fmt = (value: number | string | null | undefined) => {
   if (value === null || value === undefined) return "-";
