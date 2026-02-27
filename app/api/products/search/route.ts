@@ -18,7 +18,7 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from("products")
-    .select("id, code, name", { count: "exact", head: false })
+    .select("id, code, name, supplier_product_aliases!left(supplier_id)", { count: "exact", head: false })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -41,10 +41,7 @@ export async function GET(req: Request) {
   }
 
   if (supplier) {
-    query = query.eq("supplier_product_aliases.supplier_id", supplier).select(
-      "id, code, name, supplier_product_aliases!inner(supplier_id)",
-      { count: "exact", head: false }
-    );
+    query = query.eq("supplier_product_aliases.supplier_id", supplier);
   }
 
   const { data, error, count } = await query;

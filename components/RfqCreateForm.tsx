@@ -98,6 +98,11 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
     });
   };
 
+  const updateQty = (id: string, raw: string) => {
+    const num = Number(raw);
+    setQuantityById((prev) => ({ ...prev, [id]: Number.isFinite(num) && num > 0 ? num : 1 }));
+  };
+
   const toggleSupplier = (id: string) => {
     setForm((prev) => {
       const exists = prev.supplierIds.includes(id);
@@ -570,8 +575,3 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
     </div>
   );
 }
-
-  const updateQty = (id: string, raw: string) => {
-    const num = Number(raw);
-    setQuantityById((prev) => ({ ...prev, [id]: Number.isFinite(num) && num > 0 ? num : 1 }));
-  };

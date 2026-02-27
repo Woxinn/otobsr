@@ -80,7 +80,7 @@ export async function GET(request: Request) {
     ).values()
   );
 
-  const columns: ExcelJS.Column[] = [
+  const columns: Partial<ExcelJS.Column>[] = [
     { header: "Product code", key: "code", width: 18 },
     { header: "Product name", key: "name", width: 32 },
     { header: "RFQ quantity", key: "qty", width: 14 },
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
       leadCell.alignment = { horizontal: "center" };
 
       if (minPrice !== null && Number(priceCell.value) === minPrice) {
-        const green = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC6EFCE" } };
+        const green = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFC6EFCE" } };
         priceCell.fill = green;
         costCell.fill = green;
       }
