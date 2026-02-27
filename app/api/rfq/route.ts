@@ -23,36 +23,62 @@ export async function POST(req: Request) {
       ? (body.product_ids as unknown[]).map(String).filter(Boolean)
       : [];
 
-    if (!productIds.length) {
-      return NextResponse.json({ error: "Ürün seçilmedi" }, { status: 400 });
+    const itemsFromBody = Array.isArray(body?.items)
+      ? (body.items as any[]).map((it) => ({
+          product_id: String(it?.product_id ?? "").trim(),
+          quantity: Number(it?.quantity ?? 0),
+        }))
+      : [];
+
+    let items:
+      | { product_id: string; plan_entry_id?: string | null; quantity: number }[]
+      | null = null;
+    let planUsed = false;
+
+    if (itemsFromBody.length) {
+      const filtered = itemsFromBody.filter((it) => it.product_id && Number(it.quantity) > 0);
+      if (!filtered.length) {
+        return NextResponse.json({ error: "Geçerli miktar yok" }, { status: 400 });
+      }
+      items = filtered.map((it) => ({
+        product_id: it.product_id,
+        plan_entry_id: null,
+        quantity: Number(it.quantity),
+      }));
+    } else {
+      if (!productIds.length) {
+        return NextResponse.json({ error: "Ürün seçilmedi" }, { status: 400 });
+      }
+
+      const { data: planEntries, error: planErr } = await supabase
+        .from("order_plan_entries")
+        .select("id, product_id, value")
+        .in("product_id", productIds);
+
+      if (planErr) {
+        console.error("[rfq] planErr", planErr);
+        return NextResponse.json({ error: planErr.message ?? "Plan okunamadı" }, { status: 500 });
+      }
+
+      items = (planEntries ?? [])
+        .map((row) => ({
+          product_id: row.product_id,
+          plan_entry_id: row.id,
+          quantity: Number(row.value ?? 0),
+        }))
+        .filter((row) => row.quantity > 0);
+
+      if (!items.length) {
+        return NextResponse.json({ error: "Seçilen ürünlerde miktar yok" }, { status: 400 });
+      }
+      planUsed = true;
     }
 
-    const { data: planEntries, error: planErr } = await supabase
-      .from("order_plan_entries")
-      .select("id, product_id, value")
-      .in("product_id", productIds);
-
-    if (planErr) {
-      console.error("[rfq] planErr", planErr);
-      return NextResponse.json({ error: planErr.message ?? "Plan okunamadı" }, { status: 500 });
-    }
-
-    const items = (planEntries ?? [])
-      .map((row) => ({
-        product_id: row.product_id,
-        plan_entry_id: row.id,
-        quantity: Number(row.value ?? 0),
-      }))
-      .filter((row) => row.quantity > 0);
-
-    if (!items.length) {
-      return NextResponse.json({ error: "Seçilen ürünlerde miktar yok" }, { status: 400 });
-    }
-
+    const lookupIds = items.map((it) => it.product_id);
     const { data: products, error: prodErr } = await supabase
       .from("products")
       .select("id, code, name")
-      .in("id", productIds);
+      .in("id", lookupIds);
     if (prodErr) {
       console.error("[rfq] products error", prodErr);
       return NextResponse.json({ error: prodErr.message ?? "Ürün okunamadı" }, { status: 500 });
@@ -117,10 +143,15 @@ export async function POST(req: Request) {
       }
     }
 
-    const { error: clearErr } = await supabase.from("order_plan_entries").update({ value: 0 }).in("product_id", productIds);
-    if (clearErr) {
-      console.error("[rfq] clearErr", clearErr);
-      return NextResponse.json({ error: clearErr.message ?? "Plan güncellenemedi" }, { status: 500 });
+    if (planUsed) {
+      const { error: clearErr } = await supabase
+        .from("order_plan_entries")
+        .update({ value: 0 })
+        .in("product_id", productIds);
+      if (clearErr) {
+        console.error("[rfq] clearErr", clearErr);
+        return NextResponse.json({ error: clearErr.message ?? "Plan güncellenemedi" }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ id: rfqInsert.id });

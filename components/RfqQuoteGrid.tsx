@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "./ToastProvider";
+import { computeCosts } from "@/lib/gtipCost";
 
 type QuoteSupplier = {
   id: string;
@@ -15,6 +16,9 @@ type QuoteItem = {
   id: string;
   product_code?: string | null;
   product_name?: string | null;
+  domestic_cost_percent?: number | null;
+  gtip?: any | null;
+  weight_kg?: number | null;
 };
 
 export default function RfqQuoteGrid({
@@ -82,6 +86,17 @@ export default function RfqQuoteGrid({
     const current = qi?.unit_price ?? null;
     const key = `${sup.id}-${item.id}`;
     const isEditing = editingKey === key;
+    const gtip = Array.isArray((item as any).gtip) ? (item as any).gtip?.[0] ?? null : (item as any).gtip ?? null;
+    const costResult =
+      current != null
+        ? computeCosts({
+            basePrice: current,
+            domesticCostPercent: item.domestic_cost_percent ?? null,
+            weightKg: item.weight_kg ?? null,
+            gtip,
+          })
+        : null;
+    const kdvsiz = costResult?.gozetimsizMatrah ?? costResult?.gozetimliMatrah ?? null;
 
     if (isEditing) {
       return (
@@ -102,15 +117,31 @@ export default function RfqQuoteGrid({
     }
 
     return (
-      <button
-        type="button"
-        className={`w-full rounded-lg px-2 py-1 text-right text-sm transition ${
-          current != null ? "bg-[var(--mint)]/40 text-black hover:bg-[var(--mint)]/60" : "text-black/50 hover:bg-black/5"
-        }`}
-        onDoubleClick={() => startEdit(sup.id, item.id, current)}
-      >
-        {current != null ? current : "-"} {sup.currency ?? ""}
-      </button>
+      <div className="space-y-1">
+        <button
+          type="button"
+          className={`w-full rounded-lg px-2 py-1 text-right text-sm transition ${
+            current != null
+              ? "bg-[var(--mint)]/40 text-black hover:bg-[var(--mint)]/60"
+              : "text-black/50 hover:bg-black/5"
+          }`}
+          onDoubleClick={() => startEdit(sup.id, item.id, current)}
+        >
+          {current != null ? current : "-"} {sup.currency ?? ""}
+        </button>
+        <div className="text-[11px] text-black/60 text-right">
+          {kdvsiz != null ? (
+            <span>
+              KDV'siz maliyet: <strong>{kdvsiz.toFixed(3)}</strong>
+            </span>
+          ) : (
+            <span>
+              KDV'siz maliyet: -{" "}
+              {!gtip ? <span className="text-red-500 font-semibold">(GTIP yok)</span> : null}
+            </span>
+          )}
+        </div>
+      </div>
     );
   };
 

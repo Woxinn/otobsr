@@ -844,3 +844,13 @@ export async function importProducts(formData: FormData) {
   redirect(`/products/new?toast=imported&added=${addedCount}`);
 }
 
+export async function updateGroupDomesticCost(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const groupId = String(formData.get("group_id") ?? "");
+  if (!groupId) return;
+  const pct = toNumber(formData.get("domestic_cost_percent"));
+  await supabase.from("products").update({ domestic_cost_percent: pct }).eq("group_id", groupId);
+  revalidatePath("/product-groups");
+  revalidatePath("/products");
+}
+

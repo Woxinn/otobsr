@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
-import { deleteProductGroup, deleteProductGroupsBulk } from "@/app/actions/products";
+import { deleteProductGroup, deleteProductGroupsBulk, updateGroupDomesticCost } from "@/app/actions/products";
 import Link from "next/link";
 
 type Group = {
@@ -75,6 +75,7 @@ export default function ProductGroupTableClient({
             <th className="py-3">Ürün sayisi</th>
             <th className="py-3">Nitelik sayisi</th>
             <th className="py-3">Not</th>
+            <th className="py-3 text-right">Maliyet %</th>
             <th className="py-3 text-right">Islem</th>
           </tr>
         </thead>
@@ -98,6 +99,24 @@ export default function ProductGroupTableClient({
                 <td className="py-4">{count}</td>
                 <td className="py-4">{attributeCount[group.id] ?? 0}</td>
                 <td className="py-4 text-black/60">{group.notes ?? "-"}</td>
+                <td className="py-4 text-right">
+                  <form action={updateGroupDomesticCost} className="inline-flex items-center gap-2 justify-end">
+                    <input type="hidden" name="group_id" value={group.id} />
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="domestic_cost_percent"
+                      placeholder="%"
+                      className="w-20 rounded-lg border border-black/20 px-2 py-1 text-right text-sm"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-black/20 px-3 py-1 text-[11px] font-semibold text-black/70 transition hover:bg-black/5"
+                    >
+                      Güncelle
+                    </button>
+                  </form>
+                </td>
                 <td className="py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Link

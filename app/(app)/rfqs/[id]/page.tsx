@@ -101,18 +101,42 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
   }
 
   const productIds = Array.from(new Set((rawItems ?? []).map((i: any) => i.product_id).filter(Boolean)));
-  const productById = new Map<string, { code: string | null; name: string | null; brand: string | null }>();
+  const productById = new Map<
+    string,
+    {
+      code: string | null;
+      name: string | null;
+      brand: string | null;
+      domestic_cost_percent: number | null;
+      gtip: any | null;
+    }
+  >();
   for (let i = 0; i < productIds.length; i += 500) {
     const chunk = productIds.slice(i, i + 500);
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("id, code, name, brand")
+      .select(
+        `
+        id, code, name, brand, domestic_cost_percent,
+        gtip:gtips(
+          id, code, customs_duty_rate, additional_duty_rate,
+          anti_dumping_applicable, anti_dumping_rate,
+          surveillance_applicable, surveillance_unit_value
+        )
+      `
+      )
       .in("id", chunk);
     if (prodErr) {
       return <div className="p-6 text-sm text-red-600">Urunler okunamadi: {prodErr.message}</div>;
     }
     (products ?? []).forEach((p: any) =>
-      productById.set(String(p.id), { code: p.code ?? null, name: p.name ?? null, brand: p.brand ?? null })
+      productById.set(String(p.id), {
+        code: p.code ?? null,
+        name: p.name ?? null,
+        brand: p.brand ?? null,
+        domestic_cost_percent: p.domestic_cost_percent ?? null,
+        gtip: p.gtip ?? null,
+      })
     );
   }
 
@@ -125,6 +149,9 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
       product_code: resolvedCode,
       product_name: resolvedName,
       products: prod ?? null,
+      domestic_cost_percent: prod?.domestic_cost_percent ?? null,
+      gtip: prod?.gtip ?? null,
+      weight_kg: null,
     };
   });
 
@@ -204,6 +231,12 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           Listeye dön
         </Link>
         <RfqImportModal rfqId={rfq.id} />
+        <Link
+          href={`/api/rfq/export?rfq_id=${rfq.id}`}
+          className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70 hover:bg-black/5"
+        >
+          Excel export
+        </Link>
         <RfqConvertModal
           rfqId={rfq.id}
           supplierId={(rfq as any).selected_supplier_id ?? null}
