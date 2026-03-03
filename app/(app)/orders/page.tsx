@@ -3,6 +3,20 @@ import type { CSSProperties } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit, canViewFinance } from "@/lib/roles";
 import OrdersToast from "@/components/OrdersToast";
+import { ArchiveButton } from "@/components/ArchiveButton";
+import { bulkUpdateOrders } from "@/app/actions/orders";
+
+const orderStatusOptions = [
+  "Siparis Verildi",
+  "Proforma Geldi",
+  "Uretimde",
+  "Hazir",
+  "Kalkis Limaninda",
+  "Denizde",
+  "Varis Limaninda",
+  "Gumrukte",
+  "Depoya Teslim Edildi",
+];
 
 type SearchParams = {
   q?: string;
@@ -15,6 +29,7 @@ type SearchParams = {
   readyTo?: string;
   page?: string;
   perPage?: string;
+  archived?: string;
   toast?: string;
 };
 
@@ -167,6 +182,16 @@ export default async function OrdersPage({
     );
   }
 
+  // Arşiv filtresi: varsayılan sadece aktifler
+  const archivedMode = (resolvedParams.archived ?? "").toLowerCase();
+  if (archivedMode === "only") {
+    filtered = filtered.filter((order) => order.archived === true);
+  } else if (archivedMode === "all") {
+    // hepsi
+  } else {
+    filtered = filtered.filter((order) => order.archived !== true);
+  }
+
   if (resolvedParams.shipmentStatus) {
     const selectedStatus = resolvedParams.shipmentStatus.toLowerCase();
     filtered = filtered.filter((order) => {
@@ -214,6 +239,24 @@ export default async function OrdersPage({
         new Date(order.expected_ready_date) <= to
     );
   }
+
+  // Default sıralama: ETA (en yakın -> en uzak), fallback expected_ready_date, sonra created_at
+  const etaMs = (order: any) => {
+    const shipments = shipmentsByOrder.get(order.id) ?? [];
+    const etaDates = shipments
+      .map((s) => s.eta_current)
+      .filter((v): v is string => Boolean(v))
+      .map((v) => new Date(v).getTime())
+      .filter((t) => Number.isFinite(t));
+    if (etaDates.length) return Math.min(...etaDates);
+    if (order.expected_ready_date) {
+      const t = new Date(order.expected_ready_date).getTime();
+      if (Number.isFinite(t)) return t + 1_000; // küçük offset
+    }
+    const created = new Date(order.created_at ?? 0).getTime();
+    return Number.isFinite(created) ? created + 2_000_000_000 : Number.MAX_SAFE_INTEGER;
+  };
+  filtered = filtered.sort((a, b) => etaMs(a) - etaMs(b));
 
   const totalCount = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
@@ -379,6 +422,19 @@ export default async function OrdersPage({
             </label>
 
             <label className="text-sm font-semibold text-slate-800">
+              Arşiv
+              <select
+                name="archived"
+                defaultValue={resolvedParams.archived ?? ""}
+                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+              >
+                <option value="">Aktif</option>
+                <option value="only">Sadece arşiv</option>
+                <option value="all">Tümü</option>
+              </select>
+            </label>
+
+            <label className="text-sm font-semibold text-slate-800">
               Shipment durumu
               <select
                 name="shipmentStatus"
@@ -454,27 +510,68 @@ export default async function OrdersPage({
 
         {/* TABLE */}
         <div className="rounded-[36px] border border-black/10 bg-[radial-gradient(circle_at_top_left,#ffffff,#f6f7fb)] p-6 shadow-[0_40px_80px_-50px_rgba(12,45,52,0.7)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">Siparis panosu</p>
-              <h3 className="text-lg font-semibold">Mevcut siparisler</h3>
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">Siparis panosu</p>
+            <h3 className="text-lg font-semibold">Mevcut siparisler</h3>
+          </div>
+          <div className="flex items-center gap-2">
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/70 shadow-sm">
               {totalCount} kayit
             </span>
+            <Link
+              href={archivedMode === "only" ? "/orders" : "/orders?archived=only"}
+              className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/70 hover:border-black/30"
+            >
+              {archivedMode === "only" ? "Aktifleri göster" : "Arşivi göster"}
+            </Link>
           </div>
-          <div className="mt-4 space-y-3 text-sm">
-            {pageItems.length ? (
-              <div className="overflow-x-auto">
-                <div className="min-w-[1120px] rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
-                  <table className="w-full border-separate border-spacing-y-4">
-                    <thead>
-                      <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
-                        <th className="px-4 pt-2">Order ID</th>
-                        <th className="px-4 pt-2">Siparis</th>
-                        <th className="px-4 pt-2">Tarih</th>
-                        <th className="px-4 pt-2">ETA</th>
-                        <th className="px-4 pt-2">Shipment</th>
+        </div>
+        <div className="mt-4 space-y-3 text-sm">
+          {pageItems.length ? (
+            <form action={bulkUpdateOrders} className="overflow-x-auto">
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-black/70">
+                <span>Toplu işlem:</span>
+                <select
+                  name="bulk_action"
+                  className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs"
+                  defaultValue="archive"
+                >
+                  <option value="archive">Arşivle</option>
+                  <option value="unarchive">Arşivden çıkar</option>
+                  <option value="status">Durum değiştir</option>
+                  <option value="delete">Sil</option>
+                </select>
+                <select
+                  name="bulk_status"
+                  className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs"
+                  defaultValue=""
+                >
+                  <option value="">Durum seçin</option>
+                  {orderStatusOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className="rounded-full border border-black/20 bg-[var(--peach)] px-4 py-1.5 text-xs font-semibold text-black/70 hover:border-black/40"
+                >
+                  Uygula
+                </button>
+                <span className="text-[11px] text-black/45">Seç ve uygula (sil işlemi geri alınamaz)</span>
+              </div>
+              <div className="min-w-[1120px] rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
+                <table className="w-full border-separate border-spacing-y-4">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
+                      <th className="px-4 pt-2"></th>
+                      <th className="px-4 pt-2">Order ID</th>
+                      <th className="px-4 pt-2">Siparis</th>
+                      <th className="px-4 pt-2">Tarih</th>
+                      <th className="px-4 pt-2">ETA</th>
+                      <th className="px-4 pt-2">Shipment</th>
                         {canSeeFinance ? <th className="px-4 pt-2">Toplam</th> : null}
                         {canSeeFinance ? <th className="px-4 pt-2">Kalan</th> : null}
                         <th className="px-4 pt-2 text-right">Aksiyon</th>
@@ -500,6 +597,7 @@ export default async function OrdersPage({
                           if (!dates.length) return null;
                           return new Date(Math.min(...dates.map((d) => d.getTime())));
                         })();
+                        const isArchived = Boolean(order.archived);
                         return (
                           <tr
                             key={order.id}
@@ -512,6 +610,9 @@ export default async function OrdersPage({
                               } as CSSProperties
                             }
                           >
+                            <td className="px-4 py-4 text-center">
+                              <input type="checkbox" name="selected" value={order.id} />
+                            </td>
                             <td className="px-4 py-4 text-xs font-semibold text-black/80">
                               <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
                                 <div className="flex items-center gap-3">
@@ -529,6 +630,11 @@ export default async function OrdersPage({
                             <td className="px-4 py-4">
                               <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
                                 <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
+                                {isArchived ? (
+                                  <span className="mt-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                                    Arşivde
+                                  </span>
+                                ) : null}
                                 <div className="mt-1 text-xs text-black/55">
                                   {formatNumber(order.packages, 0)} adet | {formatNumber(order.weight_kg, 2)} kg
                                   {role === "Satis" ? "" : ` | ${order.incoterm ?? "-"}`}
@@ -582,7 +688,7 @@ export default async function OrdersPage({
                             {canSeeFinance ? (
                               <td className="px-4 py-4 text-sm font-semibold text-black">
                                 <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">
+                                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">
                                     {formatMoney(total, order.currency)}
                                   </span>
                                 </Link>
@@ -591,32 +697,37 @@ export default async function OrdersPage({
                             {canSeeFinance ? (
                               <td className="px-4 py-4 font-semibold text-black">
                                 <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                  <span className="rounded-full border border-black/10 bg-[#edf3ff] px-3 py-1 text-xs font-semibold text-[#2b4f9e]">
+                                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-[#edf3ff] px-3 py-1 text-xs font-semibold text-[#2b4f9e]">
                                     {formatMoney(remaining, order.currency)}
                                   </span>
                                 </Link>
                               </td>
                             ) : null}
                             <td className="px-4 py-4 text-right">
-                              <Link
-                                href={detailHref}
-                                className="rounded-full border border-black/20 px-4 py-2 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
-                              >
-                                Detay
-                              </Link>
+                              <div className="flex justify-end gap-2">
+                                <Link
+                                  href={detailHref}
+                                  className="rounded-full border border-black/20 px-4 py-2 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
+                                >
+                                  Detay
+                                </Link>
+                                {canEditPage ? (
+                                  <ArchiveButton orderId={order.id} archived={isArchived} />
+                                ) : null}
+                              </div>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                </div>
               </div>
-            ) : (
-              <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Henüz siparis yok.
-              </div>
-            )}
+            </form>
+          ) : (
+            <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+              Henüz siparis yok.
+            </div>
+          )}
           </div>
           {totalPages > 1 ? (
             <div className="mt-6 flex flex-wrap items-center gap-2 text-xs font-semibold text-black/70">

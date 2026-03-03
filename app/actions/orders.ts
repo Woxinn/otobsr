@@ -125,11 +125,16 @@ export async function updateOrderStatus(formData: FormData) {
   if (!orderId) return;
 
   const status = nullIfEmpty(formData.get("order_status"));
+  const normalized = (status ?? "").toLowerCase().trim();
+  const deliveredTokens = ["depoya teslim edildi", "depoya teslim", "delivered"];
+  const shouldArchive = deliveredTokens.includes(normalized);
 
   const { error } = await supabase
     .from("orders")
     .update({
       order_status: status,
+      archived: shouldArchive,
+      archived_at: shouldArchive ? new Date().toISOString() : null,
     })
     .eq("id", orderId);
 
@@ -140,4 +145,65 @@ export async function updateOrderStatus(formData: FormData) {
 
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
+}
+
+export async function archiveOrder(orderId: string) {
+  const supabase = await createSupabaseServerClient();
+  if (!orderId) return;
+  await supabase
+    .from("orders")
+    .update({ archived: true, archived_at: new Date().toISOString() })
+    .eq("id", orderId);
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
+}
+
+export async function unarchiveOrder(orderId: string) {
+  const supabase = await createSupabaseServerClient();
+  if (!orderId) return;
+  await supabase
+    .from("orders")
+    .update({ archived: false, archived_at: null })
+    .eq("id", orderId);
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
+}
+
+export async function bulkUpdateOrders(formData: FormData) {
+  "use server";
+  const supabase = await createSupabaseServerClient();
+  const ids = formData.getAll("selected").map(String).filter(Boolean);
+  if (!ids.length) return;
+  const action = String(formData.get("bulk_action") ?? "");
+  const now = new Date().toISOString();
+
+  const deliveredTokens = ["depoya teslim edildi", "depoya teslim", "delivered"];
+
+  if (action === "archive") {
+    await supabase
+      .from("orders")
+      .update({ archived: true, archived_at: now })
+      .in("id", ids);
+  } else if (action === "unarchive") {
+    await supabase
+      .from("orders")
+      .update({ archived: false, archived_at: null })
+      .in("id", ids);
+  } else if (action === "delete") {
+    await supabase.from("orders").delete().in("id", ids);
+  } else if (action === "status") {
+    const status = nullIfEmpty(formData.get("bulk_status"));
+    const normalized = (status ?? "").toLowerCase().trim();
+    const shouldArchive = deliveredTokens.includes(normalized);
+    await supabase
+      .from("orders")
+      .update({
+        order_status: status,
+        archived: shouldArchive,
+        archived_at: shouldArchive ? now : null,
+      })
+      .in("id", ids);
+  }
+
+  revalidatePath("/orders");
 }
