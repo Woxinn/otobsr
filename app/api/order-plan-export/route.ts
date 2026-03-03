@@ -247,15 +247,15 @@ export async function GET(req: NextRequest) {
   };
 
   const buildProductsQuery = (forCount: boolean) => {
-  const baseSelect =
-    "id, code, name, brand, description, netsis_stok_kodu, group_id, gtip_id, product_groups!left(name)";
-  const select = supplier
-    ? `${baseSelect}, supplier_product_aliases!inner(supplier_id)`
-    : baseSelect;
-  let queryBuilder = supabase
-    .from("products")
-    .select(select, { count: "exact", head: forCount })
-    .order("id", { ascending: true });
+    const baseSelect =
+      "id,code,name,brand,description,netsis_stok_kodu,group_id,gtip_id,product_groups!left(name)";
+    const select = supplier
+      ? "id,code,name,brand,description,netsis_stok_kodu,group_id,gtip_id,product_groups!left(name),supplier_product_aliases!inner(supplier_id)"
+      : baseSelect;
+    let queryBuilder = supabase
+      .from("products")
+      .select(select as any, { count: "exact", head: forCount })
+      .order("id", { ascending: true });
 
   if (q) {
     const safeQuery = q.replace(/,/g, " ").trim();
@@ -303,11 +303,12 @@ export async function GET(req: NextRequest) {
   for (;;) {
     let qb = buildProductsQuery(false).limit(pageSize);
     if (lastId) qb = qb.gt("id", lastId);
-    const { data: pageRows } = await qb;
-    if (!pageRows?.length) break;
-    productList.push(...pageRows);
+    const { data: pageRows, error: pageErr } = await qb;
+    if (pageErr) throw pageErr;
+    if (!pageRows || pageRows.length === 0) break;
+    productList.push(...(pageRows as any[]));
     if (pageRows.length < pageSize) break;
-    lastId = pageRows[pageRows.length - 1].id as string;
+    lastId = (pageRows[pageRows.length - 1] as any)?.id as string;
   }
 
   const productIds = Array.from(new Set(productList.map((p) => p.id).filter(Boolean)));

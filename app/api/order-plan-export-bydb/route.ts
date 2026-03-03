@@ -124,12 +124,15 @@ export async function GET(req: NextRequest) {
 
   const baseSelect =
     "id, code, name, netsis_stok_kodu, group_id, product_groups!left(name), unit_price";
-  const select = supplier ? `${baseSelect}, supplier_product_aliases!inner(supplier_id)` : baseSelect;
+  // type parser bazen embed string'i hatalı parse ediyor; spaces'ı kaldırıp any olarak cast ediyoruz
+  const select = supplier
+    ? ("id,code,name,netsis_stok_kodu,group_id,product_groups!left(name),unit_price,supplier_product_aliases!inner(supplier_id)" as const)
+    : ("id,code,name,netsis_stok_kodu,group_id,product_groups!left(name),unit_price" as const);
 
   const buildQuery = () => {
     let qb = supabase
       .from("products")
-      .select(select, { count: "exact", head: false })
+      .select(select as any, { count: "exact", head: false })
       .order("id", { ascending: true });
 
     if (q) {
@@ -169,9 +172,10 @@ export async function GET(req: NextRequest) {
   for (;;) {
     let qb = buildQuery().limit(pageSize);
     if (lastId) qb = qb.gt("id", lastId);
-    const { data: pageRows } = await qb;
-    if (!pageRows?.length) break;
-    for (const row of pageRows) {
+    const { data: pageRows, error: pageErr } = await qb;
+    if (pageErr) throw pageErr;
+    if (!pageRows || pageRows.length === 0) break;
+    for (const row of pageRows as any[]) {
       if (seen < offset) {
         seen += 1;
         continue;
@@ -186,7 +190,7 @@ export async function GET(req: NextRequest) {
     }
     if (productList.length >= batchSize) break;
     if (pageRows.length < pageSize) break;
-    lastId = pageRows[pageRows.length - 1].id as string;
+    lastId = (pageRows[pageRows.length - 1] as any)?.id as string;
   }
 
   const productIds = Array.from(new Set(productList.map((p) => p.id).filter(Boolean)));
