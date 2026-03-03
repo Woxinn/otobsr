@@ -15,10 +15,40 @@ export async function GET(req: Request) {
   const offset = Math.max(Number(searchParams.get("offset") ?? 0) || 0, 0);
   const gtip = searchParams.get("gtip") ?? "";
   const supplier = searchParams.get("supplier") ?? "";
+  const codesParam = (searchParams.get("codes") ?? "").trim();
+  const codes = codesParam
+    ? codesParam
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
+    : [];
 
+  // Exact code search path (only products.code)
+  if (codes.length) {
+    const normalized = Array.from(new Set(codes.map((c) => c.trim()).filter(Boolean)));
+    if (!normalized.length) return NextResponse.json({ items: [], count: 0 });
+
+    // build OR eq clauses for exact match (case-sensitive), Supabase lacks lower() in IN
+    const orClause = normalized.map((c) => `code.eq.${c}`).join(",");
+    let query = supabase
+      .from("products")
+      .select("id, code, name, gtip_id", { count: "exact", head: false })
+      .or(orClause);
+
+    // apply gtip filter if requested
+    if (gtip) {
+      query = gtip === "none" ? query.is("gtip_id", null) : query.eq("gtip_id", gtip);
+    }
+
+    const { data, error, count } = await query;
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ items: data ?? [], count: count ?? data?.length ?? 0 });
+  }
+
+  // Fuzzy search path
   let query = supabase
     .from("products")
-    .select("id, code, name, supplier_product_aliases!left(supplier_id)", { count: "exact", head: false })
+    .select("id, code, name", { count: "exact", head: false })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

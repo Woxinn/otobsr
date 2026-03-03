@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 
 type Product = { id: string; code: string; name: string | null };
 type Supplier = { id: string; name: string };
@@ -117,15 +118,20 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
     term: string,
     nextPage = page,
     nextPerPage = perPage,
-    nextGtip = gtipFilter
+    nextGtip = gtipFilter,
+    codes: string[] = []
   ): Promise<Product[]> => {
     setIsSearching(true);
     try {
       const params = new URLSearchParams();
-      params.set("limit", String(nextPerPage));
-      params.set("offset", String((nextPage - 1) * nextPerPage));
+      if (codes.length) {
+        params.set("codes", codes.join(","));
+      } else {
+        params.set("limit", String(nextPerPage));
+        params.set("offset", String((nextPage - 1) * nextPerPage));
+        if (term.trim().length >= 2) params.set("q", term.trim());
+      }
       if (nextGtip) params.set("gtip", nextGtip);
-      if (term.trim().length >= 2) params.set("q", term.trim());
       const res = await fetch(`/api/products/search?${params.toString()}`);
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as SearchResponse;
@@ -157,40 +163,106 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, perPage, gtipFilter]);
 
-  const handleCsvAdd = async () => {
-    const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    const parsed: { code: string; qty: number }[] = [];
+  const parseCodeQtyText = (text: string) => {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const bucket = new Map<string, { code: string; qty: number }>();
     lines.forEach((line) => {
       const [codeRaw, qtyRaw] = line.split(/[;,\t ]+/);
       const code = (codeRaw ?? "").trim();
       const qty = Number(qtyRaw ?? "1");
-      if (code) parsed.push({ code, qty: Number.isFinite(qty) && qty > 0 ? qty : 1 });
+      if (!code) return;
+      const val = Number.isFinite(qty) && qty > 0 ? qty : 1;
+      const key = code.toLowerCase();
+      const current = bucket.get(key);
+      if (current) {
+        current.qty += val;
+        bucket.set(key, current);
+      } else {
+        bucket.set(key, { code, qty: val });
+      }
     });
+    return Array.from(bucket.values());
+  };
+
+  const applyParsed = async (parsed: { code: string; qty: number }[]) => {
     if (!parsed.length) {
-      setMessage("CSV boş");
+      setMessage("Liste boş");
       return;
     }
-    const codesJoined = parsed.map((p) => p.code).join(" ");
-    const csvLimit = Math.min(200, Math.max(perPage, parsed.length));
-    const results = await runSearch(codesJoined, 1, csvLimit, gtipFilter);
+    const codeList = parsed.map((p) => p.code);
+    const results = await runSearch("", 1, parsed.length, gtipFilter, codeList);
     const codeMap = new Map<string, Product>();
     results.forEach((p) => codeMap.set((p.code ?? "").toLowerCase(), p));
 
     const newIds: string[] = [];
     const newQty: Record<string, number> = {};
+    const missing: string[] = [];
     parsed.forEach(({ code, qty }) => {
       const match = codeMap.get(code.toLowerCase());
       if (match) {
         newIds.push(match.id);
         newQty[match.id] = qty;
+      } else {
+        missing.push(code);
       }
     });
     if (!newIds.length) {
-      setMessage("CSV kodları bulunamadı");
+      setMessage("Kodlar bulunamadı");
       return;
     }
     setSelectedIds((prev) => Array.from(new Set([...prev, ...newIds])));
-    setQuantityById((prev) => ({ ...prev, ...newQty }));
+    setQuantityById((prev) => {
+      const merged = { ...prev };
+      Object.entries(newQty).forEach(([id, qty]) => {
+        merged[id] = (merged[id] ?? 0) + qty;
+      });
+      return merged;
+    });
+    if (missing.length) {
+      console.warn("[rfq-import] bulunamayan kodlar", missing);
+    }
+    setMessage(
+      `Eklendi: ${newIds.length} ürün` + (missing.length ? ` • Eşleşmeyen: ${missing.length}` : "")
+    );
+  };
+
+  const handleCsvAdd = async () => {
+    const parsed = parseCodeQtyText(csvText);
+    await applyParsed(parsed);
+  };
+
+  const handleFileUpload = async (file?: File | null) => {
+    if (!file) return;
+    try {
+      const name = file.name.toLowerCase();
+      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        if (!sheet) throw new Error("Sheet bulunamadı");
+        const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, defval: "" });
+        if (!rows.length) throw new Error("Dosya boş");
+        const headers = rows[0].map((h) => String(h ?? "").trim().toLowerCase());
+        const codeIdx = headers.findIndex((h) => h === "code" || h === "kod" || h === "product_code");
+        const qtyIdx = headers.findIndex((h) => h === "qty" || h === "quantity" || h === "adet");
+        if (codeIdx === -1) throw new Error("İlk satırda 'code' başlığı gerekli");
+        const parsed: { code: string; qty: number }[] = [];
+        rows.slice(1).forEach((r) => {
+          const code = String(r[codeIdx] ?? "").trim();
+          const qtyRaw = qtyIdx >= 0 ? r[qtyIdx] : 1;
+          const qty = Number(qtyRaw ?? 1);
+          if (code) parsed.push({ code, qty: Number.isFinite(qty) && qty > 0 ? qty : 1 });
+        });
+        await applyParsed(parsed);
+      } else {
+        const text = await file.text();
+        const parsed = parseCodeQtyText(text);
+        await applyParsed(parsed);
+      }
+    } catch (err: any) {
+      console.error("[rfq-import-upload]", err);
+      setMessage(err?.message ?? "Dosya okunamadı");
+    }
   };
 
   const totalPages = Math.max(1, Math.ceil(remoteCount / perPage));
@@ -459,6 +531,18 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
             >
               Kodları ara ve seç
             </button>
+            <div className="pt-2 border-t border-black/10 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/50">Excel / CSV yükle</p>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="block w-full text-sm text-black file:mr-3 file:rounded-full file:border file:border-black/15 file:bg-white file:px-3 file:py-1 file:text-xs file:font-semibold hover:file:bg-black/5"
+                onChange={(e) => handleFileUpload(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-[11px] text-black/50">
+                İlk satır başlık olmalı: <code>code</code>, <code>qty</code>
+              </p>
+            </div>
           </div>
         </div>
 

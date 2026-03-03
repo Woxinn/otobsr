@@ -2,6 +2,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
 import { getCurrentUserRole, canViewFinance } from "@/lib/roles";
+import MonthlyOrdersChart from "@/components/MonthlyOrdersChart";
+import SupplierDonutChart from "@/components/SupplierDonutChart";
 
 function getWeekRange() {
   const today = new Date();
@@ -49,28 +51,28 @@ export default async function DashboardPage() {
 
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, name, expected_ready_date, order_status, total_amount, currency, suppliers(name)")
+    .select("id, name, expected_ready_date, order_status, total_amount, currency, created_at, suppliers(name)")
     .order("created_at", { ascending: false });
 
   const { data: orderPayments } = canSeeFinance
     ? await supabase
-        .from("order_payments")
-        .select("order_id, amount, status, payment_date, currency")
+      .from("order_payments")
+      .select("order_id, amount, status, payment_date, currency")
     : { data: [] };
 
   const shipmentIds = shipments?.map((item) => item.id) ?? [];
   const { data: documents } = shipmentIds.length
     ? await supabase
-        .from("documents")
-        .select("shipment_id, document_type_id, status")
-        .in("shipment_id", shipmentIds)
+      .from("documents")
+      .select("shipment_id, document_type_id, status")
+      .in("shipment_id", shipmentIds)
     : { data: [] };
 
   const { data: shipmentOrders } = shipmentIds.length
     ? await supabase
-        .from("shipment_orders")
-        .select("shipment_id, orders(id)")
-        .in("shipment_id", shipmentIds)
+      .from("shipment_orders")
+      .select("shipment_id, orders(id)")
+      .in("shipment_id", shipmentIds)
     : { data: [] };
 
   const orderIds = shipmentOrders
@@ -87,9 +89,9 @@ export default async function DashboardPage() {
   const allOrderIds = orders?.map((order) => order.id) ?? [];
   const { data: orderDocuments } = allOrderIds.length
     ? await supabase
-        .from("order_documents")
-        .select("order_id, document_type_id, status")
-        .in("order_id", allOrderIds)
+      .from("order_documents")
+      .select("order_id, document_type_id, status")
+      .in("order_id", allOrderIds)
     : { data: [] };
 
   const documentsByShipment = new Map<string, typeof documents>();
@@ -361,18 +363,18 @@ export default async function DashboardPage() {
 
   const monthlyPaid = canSeeFinance
     ? (orderPayments ?? []).reduce((acc, payment) => {
-        if (payment.status !== "Odendi" || !payment.payment_date) return acc;
-        const paymentDate = new Date(payment.payment_date);
-        if (paymentDate < monthStart || paymentDate > monthEnd) return acc;
-        return acc + paymentAmount(payment.amount);
-      }, 0)
+      if (payment.status !== "Odendi" || !payment.payment_date) return acc;
+      const paymentDate = new Date(payment.payment_date);
+      if (paymentDate < monthStart || paymentDate > monthEnd) return acc;
+      return acc + paymentAmount(payment.amount);
+    }, 0)
     : 0;
 
   const pendingPayments = canSeeFinance
     ? (orderPayments ?? []).reduce((acc, payment) => {
-        if (payment.status !== "Bekleniyor") return acc;
-        return acc + paymentAmount(payment.amount);
-      }, 0)
+      if (payment.status !== "Bekleniyor") return acc;
+      return acc + paymentAmount(payment.amount);
+    }, 0)
     : 0;
 
   const remainingPayments = (orders ?? []).reduce((acc, order) => {
@@ -434,124 +436,122 @@ export default async function DashboardPage() {
       {/* Uretim odakli kartlar - tek satir */}
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-black/10 bg-[var(--peach)]/50 p-4">
-              <p className="text-xs uppercase tracking-widest text-black/50">
-                Hazir tarihi girilmemis
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {missingReadyOrders.length}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
-                {missingReadyOrders.slice(0, 6).map((o) => (
-                  <div key={o.id} className="rounded-xl bg-white/70 px-3 py-2">
-                    <Link
-                      href={`/orders/${o.id}`}
-                      className="font-semibold text-black hover:underline"
-                    >
-                      {o.name ?? "Siparis"}
-                    </Link>
-                    {!isSales ? (
-                      <p className="text-[11px] text-black/60">
-                        {(Array.isArray((o as any).suppliers)
-                          ? (o as any).suppliers[0]?.name
-                          : (o as any).suppliers?.name) ?? "Tedarikçi yok"}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-                {missingReadyOrders.length === 0 ? (
-                  <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
-                    Hepsi girilmis.
-                  </div>
-                ) : null}
-              </div>
+          <div className="rounded-2xl border border-black/10 bg-[var(--peach)]/50 p-4">
+            <p className="text-xs uppercase tracking-widest text-black/50">
+              Hazir tarihi girilmemis
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {missingReadyOrders.length}
+            </p>
+            <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
+              {missingReadyOrders.slice(0, 6).map((o) => (
+                <div key={o.id} className="rounded-xl bg-white/70 px-3 py-2">
+                  <Link
+                    href={`/orders/${o.id}`}
+                    className="font-semibold text-black hover:underline"
+                  >
+                    {o.name ?? "Siparis"}
+                  </Link>
+                  {!isSales ? (
+                    <p className="text-[11px] text-black/60">
+                      {(Array.isArray((o as any).suppliers)
+                        ? (o as any).suppliers[0]?.name
+                        : (o as any).suppliers?.name) ?? "Tedarikçi yok"}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+              {missingReadyOrders.length === 0 ? (
+                <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
+                  Hepsi girilmis.
+                </div>
+              ) : null}
             </div>
+          </div>
 
-            <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-4">
-              <p className="text-xs uppercase tracking-widest text-black/50">
-                Uretimde (tarih girildi)
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {inProductionOrders.length}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
-                {withCountdown
-                  .sort((a, b) => (a.diffDays ?? 999) - (b.diffDays ?? 999))
-                  .slice(0, 6)
-                  .map(({ order, diffDays }) => (
-                    <div key={order.id} className="rounded-xl bg-white/70 px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="font-semibold text-black hover:underline"
-                        >
-                          {order.name ?? "Siparis"}
-                        </Link>
-                        <span className="text-[11px] text-black/60">
-                          {diffDays === null
-                            ? "-"
-                            : diffDays > 0
-                              ? `${diffDays} gun`
-                              : diffDays === 0
-                                ? "Bugun"
-                                : `${Math.abs(diffDays)} gun gecikti`}
-                        </span>
-                      </div>
+          <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-4">
+            <p className="text-xs uppercase tracking-widest text-black/50">
+              Uretimde (tarih girildi)
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {inProductionOrders.length}
+            </p>
+            <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
+              {withCountdown
+                .sort((a, b) => (a.diffDays ?? 999) - (b.diffDays ?? 999))
+                .slice(0, 6)
+                .map(({ order, diffDays }) => (
+                  <div key={order.id} className="rounded-xl bg-white/70 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Link
+                        href={`/orders/${order.id}`}
+                        className="font-semibold text-black hover:underline"
+                      >
+                        {order.name ?? "Siparis"}
+                      </Link>
+                      <span className="text-[11px] text-black/60">
+                        {diffDays === null
+                          ? "-"
+                          : diffDays > 0
+                            ? `${diffDays} gun`
+                            : diffDays === 0
+                              ? "Bugun"
+                              : `${Math.abs(diffDays)} gun gecikti`}
+                      </span>
+                    </div>
                     <p className="text-[11px] text-black/60">
                       {order.expected_ready_date ?? "-"}
                       {!isSales
-                        ? ` | ${
-                            (Array.isArray((order as any).suppliers)
-                              ? (order as any).suppliers[0]?.name
-                              : (order as any).suppliers?.name) ?? "Tedarikçi yok"
-                          }`
-                        : ""}
-                    </p>
-                    </div>
-                  ))}
-                {inProductionOrders.length === 0 ? (
-                  <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
-                    Liste bos.
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/60 p-4">
-              <p className="text-xs uppercase tracking-widest text-black/50">
-                Uretim tamamlanmis
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {producedOrders.length}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
-                {producedOrders.slice(0, 6).map((o) => (
-                  <div key={o.id} className="rounded-xl bg-white/70 px-3 py-2">
-                    <Link
-                      href={`/orders/${o.id}`}
-                      className="font-semibold text-black hover:underline"
-                    >
-                      {o.name ?? "Siparis"}
-                    </Link>
-                    <p className="text-[11px] text-black/60">
-                      {o.expected_ready_date ?? "-"}
-                      {!isSales
-                        ? ` | ${
-                            (Array.isArray((o as any).suppliers)
-                              ? (o as any).suppliers[0]?.name
-                              : (o as any).suppliers?.name) ?? "Tedarikçi yok"
-                          }`
+                        ? ` | ${(Array.isArray((order as any).suppliers)
+                          ? (order as any).suppliers[0]?.name
+                          : (order as any).suppliers?.name) ?? "Tedarikçi yok"
+                        }`
                         : ""}
                     </p>
                   </div>
                 ))}
-                {producedOrders.length === 0 ? (
-                  <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
-                    Hicbiri tamamlanmamis.
-                  </div>
-                ) : null}
-              </div>
+              {inProductionOrders.length === 0 ? (
+                <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
+                  Liste bos.
+                </div>
+              ) : null}
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/60 p-4">
+            <p className="text-xs uppercase tracking-widest text-black/50">
+              Uretim tamamlanmis
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {producedOrders.length}
+            </p>
+            <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
+              {producedOrders.slice(0, 6).map((o) => (
+                <div key={o.id} className="rounded-xl bg-white/70 px-3 py-2">
+                  <Link
+                    href={`/orders/${o.id}`}
+                    className="font-semibold text-black hover:underline"
+                  >
+                    {o.name ?? "Siparis"}
+                  </Link>
+                  <p className="text-[11px] text-black/60">
+                    {o.expected_ready_date ?? "-"}
+                    {!isSales
+                      ? ` | ${(Array.isArray((o as any).suppliers)
+                        ? (o as any).suppliers[0]?.name
+                        : (o as any).suppliers?.name) ?? "Tedarikçi yok"
+                      }`
+                      : ""}
+                  </p>
+                </div>
+              ))}
+              {producedOrders.length === 0 ? (
+                <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
+                  Hicbiri tamamlanmamis.
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -612,6 +612,53 @@ export default async function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* ---- Grafikler ---- */}
+      {!isSales ? (() => {
+        const TR_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+        const nowChart = new Date();
+        const monthlyMap = new Map<string, number>();
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(nowChart.getFullYear(), nowChart.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+          monthlyMap.set(key, 0);
+        }
+        (orders ?? []).forEach((o) => {
+          if (!o.created_at) return;
+          const d = new Date(o.created_at);
+          const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+          if (monthlyMap.has(key)) monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + 1);
+        });
+        const monthlyData = Array.from(monthlyMap.entries()).map(([key, count]) => {
+          const [, m] = key.split("-");
+          return { month: TR_MONTHS[parseInt(m, 10)], count };
+        });
+
+        const supplierMap = new Map<string, number>();
+        (orders ?? []).forEach((o) => {
+          const supName = (Array.isArray((o as any).suppliers)
+            ? (o as any).suppliers[0]?.name
+            : (o as any).suppliers?.name) ?? "Bilinmiyor";
+          supplierMap.set(supName, (supplierMap.get(supName) ?? 0) + 1);
+        });
+        const sorted = Array.from(supplierMap.entries()).sort((a, b) => b[1] - a[1]);
+        const top5 = sorted.slice(0, 5).map(([name, count]) => ({ name, count }));
+        const otherCount = sorted.slice(5).reduce((s, [, c]) => s + c, 0);
+        if (otherCount > 0) top5.push({ name: "Diğer", count: otherCount });
+
+        return (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm animate-[fade-up_700ms_ease-out]">
+              <p className="text-xs uppercase tracking-[0.28em] text-black/45 mb-4">Aylık Sipariş Trendi</p>
+              <MonthlyOrdersChart data={monthlyData} />
+            </div>
+            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm animate-[fade-up_700ms_ease-out]">
+              <p className="text-xs uppercase tracking-[0.28em] text-black/45 mb-4">Tedarikçi Bazlı Dağılım</p>
+              <SupplierDonutChart data={top5} />
+            </div>
+          </div>
+        );
+      })() : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         {!isSales ? (

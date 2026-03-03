@@ -14,6 +14,12 @@ const DELIVERED_STATUS_TOKENS = new Set([
 
 const fmt0 = (n: number) => Number(n ?? 0);
 
+const chunk = <T,>(arr: T[], size = 200) => {
+  const res: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) res.push(arr.slice(i, i + size));
+  return res;
+};
+
 const normalizeStatusToken = (value: string | null | undefined) =>
   String(value ?? "")
     .toLowerCase()
@@ -241,57 +247,68 @@ export async function GET(req: NextRequest) {
   };
 
   const buildProductsQuery = (forCount: boolean) => {
-    const baseSelect =
-      "id, code, name, brand, description, netsis_stok_kodu, group_id, gtip_id, product_groups!left(name)";
-    const select = supplier
-      ? `${baseSelect}, supplier_product_aliases!inner(supplier_id)`
-      : baseSelect;
-    let queryBuilder = supabase
-      .from("products")
-      .select(select, { count: "exact", head: forCount })
-      .order("created_at", { ascending: false });
+  const baseSelect =
+    "id, code, name, brand, description, netsis_stok_kodu, group_id, gtip_id, product_groups!left(name)";
+  const select = supplier
+    ? `${baseSelect}, supplier_product_aliases!inner(supplier_id)`
+    : baseSelect;
+  let queryBuilder = supabase
+    .from("products")
+    .select(select, { count: "exact", head: forCount })
+    .order("id", { ascending: true });
 
-    if (q) {
-      const safeQuery = q.replace(/,/g, " ").trim();
-      const tokens = safeQuery
-        .split(/\s+/)
-        .map((t) => t.trim())
-        .filter(Boolean);
-      if (tokens.length === 1) {
-        const term = tokens[0];
+  if (q) {
+    const safeQuery = q.replace(/,/g, " ").trim();
+    const tokens = safeQuery
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (tokens.length === 1) {
+      const term = tokens[0];
+      queryBuilder = queryBuilder.or(
+        `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
+      );
+    } else {
+      tokens.forEach((term) => {
         queryBuilder = queryBuilder.or(
           `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
         );
-      } else {
-        tokens.forEach((term) => {
-          queryBuilder = queryBuilder.or(
-            `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
-          );
-        });
-      }
+      });
     }
-    if (selectedGroupIds.length > 0) queryBuilder = queryBuilder.in("group_id", selectedGroupIds);
-    if (supplier) queryBuilder = queryBuilder.eq("supplier_product_aliases.supplier_id", supplier);
-    if (gtip) {
-      if (gtip === "none") queryBuilder = queryBuilder.is("gtip_id", null);
-      else queryBuilder = queryBuilder.eq("gtip_id", gtip);
-    }
-    if (filledOnly) {
-      queryBuilder = queryBuilder.in(
-        "id",
-        supabase
-          .from("order_plan_entries")
-          .select("product_id", { count: "exact", head: false })
-          .gt("value", 0) as any
-      );
-    }
-    return queryBuilder;
+  }
+  if (selectedGroupIds.length > 0) queryBuilder = queryBuilder.in("group_id", selectedGroupIds);
+  if (supplier) queryBuilder = queryBuilder.eq("supplier_product_aliases.supplier_id", supplier);
+  if (gtip) {
+    if (gtip === "none") queryBuilder = queryBuilder.is("gtip_id", null);
+    else queryBuilder = queryBuilder.eq("gtip_id", gtip);
+  }
+  if (filledOnly) {
+    queryBuilder = queryBuilder.in(
+      "id",
+      supabase
+        .from("order_plan_entries")
+        .select("product_id", { count: "exact", head: false })
+        .gt("value", 0) as any
+    );
+  }
+  return queryBuilder;
   };
 
   // Fetch products
   const { count: totalCount } = await buildProductsQuery(true);
-  const { data: products } = await buildProductsQuery(false).range(0, 9999);
-  const productList = (products ?? []) as any[];
+  // Cursor-based sayfalama (id > lastId), her seferde 1000
+  const pageSize = 1000;
+  const productList: any[] = [];
+  let lastId: string | null = null;
+  for (;;) {
+    let qb = buildProductsQuery(false).limit(pageSize);
+    if (lastId) qb = qb.gt("id", lastId);
+    const { data: pageRows } = await qb;
+    if (!pageRows?.length) break;
+    productList.push(...pageRows);
+    if (pageRows.length < pageSize) break;
+    lastId = pageRows[pageRows.length - 1].id as string;
+  }
 
   const productIds = Array.from(new Set(productList.map((p) => p.id).filter(Boolean)));
   const codes = Array.from(
@@ -413,4 +430,3 @@ export async function GET(req: NextRequest) {
     },
   });
 }
-

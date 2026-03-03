@@ -23,6 +23,7 @@ type SearchParams = {
   gtip?: string;
   page?: string;
   perPage?: string;
+  netsis?: string;
 };
 
 type OrderItemRow = {
@@ -210,6 +211,11 @@ export default async function ProductsPage({
         "supplier_product_aliases.supplier_id",
         resolvedParams.supplier
       );
+    }
+    if (resolvedParams.netsis === "none") {
+      queryBuilder = queryBuilder.is("netsis_stok_kodu", null);
+    } else if (resolvedParams.netsis === "exists") {
+      queryBuilder = queryBuilder.not("netsis_stok_kodu", "is", null);
     }
     if (queryTokens.length) {
       if (queryTokens.length === 1) {
@@ -532,6 +538,7 @@ export default async function ProductsPage({
       : [];
     const supplier = overrides.supplier ?? resolvedParams.supplier;
     const gtip = overrides.gtip ?? resolvedParams.gtip;
+    const netsis = overrides.netsis ?? resolvedParams.netsis;
     const perPageValue = overrides.perPage ?? String(perPage);
     const pageValue = overrides.page ?? String(currentPage);
 
@@ -539,6 +546,7 @@ export default async function ProductsPage({
     if (normalizedGroups.length) params.set("group", normalizedGroups.join(","));
     if (supplier) params.set("supplier", supplier);
     if (gtip) params.set("gtip", gtip);
+    if (netsis) params.set("netsis", netsis);
     if (perPageValue) params.set("perPage", String(perPageValue));
     if (pageValue && Number(pageValue) > 1) params.set("page", String(pageValue));
 
@@ -589,6 +597,12 @@ export default async function ProductsPage({
               className="rounded-full border border-black/20 bg-white px-4 py-2 text-xs font-semibold text-black/70"
             >
               Ürün güncelle (import)
+            </Link>
+            <Link
+              href="/products/attributes-export"
+              className="rounded-full border border-[var(--ocean)] bg-white px-4 py-2 text-xs font-semibold text-[var(--ocean)] hover:bg-[var(--ocean)]/10"
+            >
+              Nitelik Export
             </Link>
             <Link
               href="/product-groups"
@@ -668,6 +682,18 @@ export default async function ProductsPage({
                   {gtip.code}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Netsis kodu
+            <select
+              name="netsis"
+              defaultValue={resolvedParams.netsis ?? ""}
+              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Hepsi</option>
+              <option value="none">Netsis kodu yok</option>
+              <option value="exists">Netsis kodu var</option>
             </select>
           </label>
           <label className="text-sm font-medium">

@@ -587,6 +587,12 @@ export default async function OrderPlanPage({
             Excel Dışa Aktar
           </Link>
           <Link
+            href={`/api/order-plan-export-bydb${buildQuery({})}`}
+            className="rounded-full border border-[var(--ocean)] px-4 py-2 text-sm font-semibold text-[var(--ocean)] hover:bg-[var(--ocean)]/10"
+          >
+            DB Bazlı Satış Excel
+          </Link>
+          <Link
             href="/products"
             className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70"
           >
