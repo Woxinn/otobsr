@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
   const { data: orderItems, error: oiError } = await supabase
     .from("order_items")
     .select(
-      "id, order_id, product_id, quantity, unit_price, orders(name), products(id, code, name, gtip_id, domestic_cost_percent, product_type_id, gtip:gtips(code), product_type:product_types(name))"
+      "id, order_id, product_id, quantity, unit_price, total_amount, orders(name), products(id, code, name, gtip_id, domestic_cost_percent, product_type_id, gtip:gtips(code), product_type:product_types(name))"
     )
     .eq("order_id", orderId)
     .order("created_at", { ascending: true });
@@ -405,7 +405,7 @@ export async function GET(req: NextRequest) {
     if (value === null || value === undefined || value === "") return value;
     const n = Number(value);
     if (!Number.isFinite(n)) return value;
-    return Number(n.toFixed(2));
+    return Number(n.toFixed(4));
   };
   ws.columns = [
     { header: "Sira No", key: "sira", width: 8 },
@@ -445,9 +445,23 @@ export async function GET(req: NextRequest) {
       _gtipKey: string;
     }
   >();
+  // Helpers for money: work in cents to avoid float drift; when a value has more than 2 decimals we truncate to 2
+  const toCents = (val: any) => {
+    if (val === null || val === undefined || val === "") return null;
+    const text = String(val).replace(",", ".").trim();
+    if (!text) return null;
+    const sign = text.startsWith("-") ? -1 : 1;
+    const t = text.replace(/^\+|-/, "");
+    const [whole, frac = ""] = t.split(".");
+    const fracPadded = (frac + "00").slice(0, 2); // truncate beyond 2 decimals
+    const wholeInt = Number(whole) || 0;
+    const cents = wholeInt * 100 + Number(fracPadded);
+    return sign * cents;
+  };
+
   const gtipSummary = new Map<
     string,
-    Map<string, { qty: number; amount: number; net: number; gross: number; koli: number }>
+    Map<string, { qty: number; amountCents: number; net: number; gross: number; koli: number }>
   >();
   (orderItems ?? []).forEach((oi, idx) => {
     const product = Array.isArray((oi as any).products)
@@ -458,14 +472,17 @@ export async function GET(req: NextRequest) {
     const codeKey = normalizeCode(code);
     const orderQty = Number(oi.quantity ?? 0) || 0;
     const packing = consumePacking(product.id, codeKey, orderQty);
-    const qty = packing ? packing.qty : orderQty;
+    const qtyPacked = packing ? packing.qty : orderQty;
+    const amountQty = orderQty; // tutarlar sipariş adedi üzerinden
     const netExport = packing ? packing.net : "";
     const grossExport = packing ? packing.gross : "";
     const boxesExport = packing ? packing.boxes : 0;
     const tipKey = typeByProduct.get(product.id) ?? product.product_type?.name ?? "Belirtilecek";
     const comp = pickCompliance(product.product_type_id, product.product_type?.name ?? tipKey);
 
-    const amount = qty * (Number(oi.unit_price ?? 0) || 0);
+    const unitPrice = Number(oi.unit_price ?? 0) || 0;
+    const amountDbCents = toCents(oi.total_amount);
+    const amountCents = amountDbCents !== null ? amountDbCents : 0; // sadece kaydedilmiş satır toplamını kullan
     const gtipCode = (product as any).gtip?.code ?? "Belirlenmedi";
     const key = `${product.id ?? code}::${tipKey}::${lengthByProduct.get(product.id) ?? ""}::${gtipCode}`;
     const existing = rowMap.get(key) ?? {
@@ -485,7 +502,7 @@ export async function GET(req: NextRequest) {
       rapor: comp?.rapor_no ?? "",
       _gtipKey: gtipCode,
     };
-    existing.adet += qty;
+    existing.adet += amountQty;
     existing.net += Number(netExport || 0);
     existing.brut += Number(grossExport || 0);
     existing.koli += Number(boxesExport || 0);
@@ -495,10 +512,10 @@ export async function GET(req: NextRequest) {
     if (!gtipSummary.has(gtipCode)) gtipSummary.set(gtipCode, new Map());
     const typeMap = gtipSummary.get(gtipCode)!;
     if (!typeMap.has(typeKey))
-      typeMap.set(typeKey, { qty: 0, amount: 0, net: 0, gross: 0, koli: 0 });
+      typeMap.set(typeKey, { qty: 0, amountCents: 0, net: 0, gross: 0, koli: 0 });
     const agg = typeMap.get(typeKey)!;
-    agg.qty += qty;
-    agg.amount += amount;
+    agg.qty += amountQty;
+    agg.amountCents += amountCents;
     agg.net += Number(netExport || 0);
     agg.gross += Number(grossExport || 0);
     agg.koli += Number(boxesExport || 0);
@@ -626,7 +643,7 @@ export async function GET(req: NextRequest) {
     });
 
     let sumQty = 0;
-    let sumAmount = 0;
+    let sumAmountCents = 0;
     let sumNet = 0;
     let sumGross = 0;
     let sumKoli = 0;
@@ -641,7 +658,7 @@ export async function GET(req: NextRequest) {
         "",
         t,
         fmt2(agg.qty),
-        fmt2(agg.amount),
+        fmt2(agg.amountCents / 100),
         fmt2(agg.net),
         fmt2(agg.gross),
         fmt2(agg.koli),
@@ -657,14 +674,14 @@ export async function GET(req: NextRequest) {
         };
       });
       sumQty += agg.qty;
-      sumAmount += agg.amount;
+      sumAmountCents += agg.amountCents;
       sumNet += agg.net;
       sumGross += agg.gross;
       sumKoli += agg.koli;
     });
 
     grandQty += sumQty;
-    grandAmount += sumAmount;
+    grandAmount += sumAmountCents;
     grandNet += sumNet;
     grandGross += sumGross;
     grandKoli += sumKoli;
@@ -676,7 +693,7 @@ export async function GET(req: NextRequest) {
       "",
       "TOPLAM",
       fmt2(sumQty),
-      fmt2(sumAmount),
+      fmt2(sumAmountCents / 100),
       fmt2(sumNet),
       fmt2(sumGross),
       fmt2(sumKoli),
@@ -730,7 +747,7 @@ export async function GET(req: NextRequest) {
     "",
     "",
     fmt2(grandQty),
-    fmt2(grandAmount),
+    fmt2(grandAmount / 100),
     fmt2(grandNet),
     fmt2(grandGross),
     fmt2(grandKoli),

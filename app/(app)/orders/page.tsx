@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import type { CSSProperties } from "react";
+import { Download } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit, canViewFinance } from "@/lib/roles";
 import OrdersToast from "@/components/OrdersToast";
@@ -338,6 +339,12 @@ export default async function OrdersPage({
                 <p className="text-2xl font-bold">{orders?.length ?? 0}</p>
                 <div className="absolute inset-0 rounded-full border border-white/30" />
               </div>
+              <Link
+                href="/api/orders/items-export"
+                className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-semibold text-[var(--ocean)] shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:shadow-xl"
+              >
+                <Download size={16} /> Tüm sipariş kalemleri (Excel)
+              </Link>
               {canEditPage ? (
                 <Link
                   href="/orders/new"
@@ -562,19 +569,18 @@ export default async function OrdersPage({
                 </button>
                 <span className="text-[11px] text-black/45">Seç ve uygula (sil işlemi geri alınamaz)</span>
               </div>
-              <div className="min-w-[1120px] rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
-                <table className="w-full border-separate border-spacing-y-4">
+              <div className="w-full rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
+                <table className="w-full table-fixed border-separate border-spacing-y-3 text-[13px]">
                   <thead>
                     <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
-                      <th className="px-4 pt-2"></th>
-                      <th className="px-4 pt-2">Order ID</th>
-                      <th className="px-4 pt-2">Siparis</th>
-                      <th className="px-4 pt-2">Tarih</th>
-                      <th className="px-4 pt-2">ETA</th>
-                      <th className="px-4 pt-2">Shipment</th>
-                        {canSeeFinance ? <th className="px-4 pt-2">Toplam</th> : null}
-                        {canSeeFinance ? <th className="px-4 pt-2">Kalan</th> : null}
-                        <th className="px-4 pt-2 text-right">Aksiyon</th>
+                      <th className="w-[40px] px-2 pt-2"></th>
+                      <th className="w-[110px] px-3 pt-2">Order ID</th>
+                      <th className="w-[220px] px-3 pt-2">Siparis</th>
+                      <th className="w-[110px] px-3 pt-2">ETA</th>
+                      <th className="w-[130px] px-3 pt-2">Shipment</th>
+                        {canSeeFinance ? <th className="w-[150px] px-3 pt-2">Toplam</th> : null}
+                        {canSeeFinance ? <th className="w-[140px] px-3 pt-2">Kalan</th> : null}
+                      <th className="w-[170px] px-2 pt-2 text-right">Aksiyon</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -659,11 +665,6 @@ export default async function OrdersPage({
                             </td>
                             <td className="px-4 py-4 text-sm text-black/70">
                               <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                {order.expected_ready_date ?? "-"}
-                              </Link>
-                            </td>
-                            <td className="px-4 py-4 text-sm text-black/70">
-                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
                                 {eta ? eta.toISOString().slice(0, 10) : "-"}
                               </Link>
                             </td>
@@ -703,11 +704,11 @@ export default async function OrdersPage({
                                 </Link>
                               </td>
                             ) : null}
-                            <td className="px-4 py-4 text-right">
+                            <td className="px-2 py-4 text-right">
                               <div className="flex justify-end gap-2">
                                 <Link
                                   href={detailHref}
-                                  className="rounded-full border border-black/20 px-4 py-2 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
+                                  className="rounded-full border border-black/20 px-3 py-1.5 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
                                 >
                                   Detay
                                 </Link>

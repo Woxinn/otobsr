@@ -49,23 +49,28 @@ export async function updateOrder(formData: FormData) {
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
 
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      name: nullIfEmpty(formData.get("name")),
-      consignment_no: nullIfEmpty(formData.get("consignment_no")),
-      supplier_id: nullIfEmpty(formData.get("supplier_id")),
-      packages: normalizeNumber(formData.get("packages")),
-      weight_kg: normalizeNumber(formData.get("weight_kg")),
-      payment_method: nullIfEmpty(formData.get("payment_method")),
-      incoterm: nullIfEmpty(formData.get("incoterm")),
-      total_amount: normalizeNumber(formData.get("total_amount")),
-      extra_cost_percent: normalizeNumber(formData.get("extra_cost_percent")),
-      currency: nullIfEmpty(formData.get("currency")) ?? "USD",
-      expected_ready_date: nullIfEmpty(formData.get("expected_ready_date")),
-      notes: nullIfEmpty(formData.get("notes")),
-    })
-    .eq("id", orderId);
+  const totalAmountInput = normalizeNumber(formData.get("total_amount"));
+
+  const updateData: Record<string, any> = {
+    name: nullIfEmpty(formData.get("name")),
+    consignment_no: nullIfEmpty(formData.get("consignment_no")),
+    supplier_id: nullIfEmpty(formData.get("supplier_id")),
+    packages: normalizeNumber(formData.get("packages")),
+    weight_kg: normalizeNumber(formData.get("weight_kg")),
+    payment_method: nullIfEmpty(formData.get("payment_method")),
+    incoterm: nullIfEmpty(formData.get("incoterm")),
+    extra_cost_percent: normalizeNumber(formData.get("extra_cost_percent")),
+    currency: nullIfEmpty(formData.get("currency")) ?? "USD",
+    expected_ready_date: nullIfEmpty(formData.get("expected_ready_date")),
+    notes: nullIfEmpty(formData.get("notes")),
+  };
+
+  // total_amount alanı boş bırakıldıysa mevcut değeri koru
+  if (totalAmountInput !== null) {
+    updateData.total_amount = totalAmountInput;
+  }
+
+  const { error } = await supabase.from("orders").update(updateData).eq("id", orderId);
 
   if (error) {
     console.error("Order update failed", error);
@@ -73,6 +78,7 @@ export async function updateOrder(formData: FormData) {
   }
 
   revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
   const returnTo = String(formData.get("return_to") ?? "/orders");
   const separator = returnTo.includes("?") ? "&" : "?";
   redirect(`${returnTo}${separator}toast=updated`);

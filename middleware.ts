@@ -3,6 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
+  // MSSQL bridge agent authenticates via bearer token in the route handler,
+  // so it must bypass the browser-session redirect middleware.
+  if (pathname.startsWith("/api/mssql-bridge/agent/")) {
+    return NextResponse.next();
+  }
+
   // Supabase auth çerezleri project ref'e göre isimlenir (örn. sb-<ref>-auth-token).
   const hasAccessToken = request.cookies
     .getAll()
@@ -29,5 +35,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|templates).*)"],
+  matcher: ["/((?!api/mssql-bridge/agent|_next/static|_next/image|favicon.ico|templates).*)"],
 };

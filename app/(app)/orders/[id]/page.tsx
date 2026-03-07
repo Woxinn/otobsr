@@ -8,6 +8,7 @@ import {
   deleteOrderItem,
   importOrderItems,
   deleteAllOrderItems,
+  completeSingleMissingProduct,
 } from "@/app/actions/order-items";
 import {
   saveOrderPackingListSummary,
@@ -17,6 +18,8 @@ import { deleteOrder, updateOrderStatus } from "@/app/actions/orders";
 import { createOrderPayment, deleteOrderPayment } from "@/app/actions/order-payments";
 import { deleteOrderDocument } from "@/app/actions/order-documents";
 import OrderDocumentUploader from "@/components/OrderDocumentUploader";
+import PaymentDocLink from "@/components/PaymentDocLink";
+import { Download } from "lucide-react";
 import DocumentDownloadButton from "@/components/DocumentDownloadButton";
 import type { Metadata } from "next";
 
@@ -32,8 +35,112 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: `Sipariş | ${title}` };
 }
 import ConfirmActionForm from "@/components/ConfirmActionForm";
+import MissingProductRow from "@/components/MissingProductRow";
 import OrderItemCreateForm from "@/components/OrderItemCreateForm";
 import DocumentInlineViewer from "@/components/DocumentInlineViewer";
+
+type PackingSummaryInput = {
+  total_packages?: number | null;
+  total_net_weight_kg?: number | null;
+  total_gross_weight_kg?: number | null;
+  total_cbm?: number | null;
+  notes?: string | null;
+  updated_at?: string | null;
+};
+
+const sumPackingLines = (
+  lines: { packages_count?: number | null; net_weight?: number | null; gross_weight?: number | null }[]
+) =>
+  lines.reduce(
+    (acc, line) => {
+      acc.packages += Number(line.packages_count ?? 0);
+      acc.netWeight += Number(line.net_weight ?? 0);
+      acc.grossWeight += Number(line.gross_weight ?? 0);
+      return acc;
+    },
+    { packages: 0, netWeight: 0, grossWeight: 0 }
+  );
+
+const sumOrderItemsForPacking = (
+  items: { net_weight_kg?: number | null; gross_weight_kg?: number | null }[]
+) =>
+  items.reduce(
+    (acc, item) => {
+      acc.netWeight += Number(item.net_weight_kg ?? 0);
+      acc.grossWeight += Number(item.gross_weight_kg ?? 0);
+      return acc;
+    },
+    { netWeight: 0, grossWeight: 0 }
+  );
+
+const ensurePackingSummary = async ({
+  supabase,
+  orderId,
+  packingLines,
+  existingSummary,
+  orderItems,
+  packingListItems,
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  orderId: string;
+  packingLines: { packages_count?: number | null; net_weight?: number | null; gross_weight?: number | null }[];
+  existingSummary: PackingSummaryInput | null;
+  orderItems: { net_weight_kg?: number | null; gross_weight_kg?: number | null }[];
+  packingListItems: {
+    packages?: number | null;
+    net_weight_kg?: number | null;
+    gross_weight_kg?: number | null;
+    weight_kg?: number | null;
+    cbm?: number | null;
+  }[];
+}) => {
+  const hasExisting =
+    existingSummary &&
+    (existingSummary.total_packages ??
+      existingSummary.total_net_weight_kg ??
+      existingSummary.total_gross_weight_kg ??
+      existingSummary.total_cbm);
+  if (hasExisting) return existingSummary;
+
+  const fromPacking = packingLines.length ? sumPackingLines(packingLines) : null;
+  const fromPackingItems = packingListItems.length
+    ? packingListItems.reduce<{
+        packages: number;
+        netWeight: number;
+        grossWeight: number;
+        cbm: number;
+      }>(
+        (acc, item) => {
+          acc.packages += Number(item.packages ?? 0);
+          acc.netWeight += Number(item.net_weight_kg ?? item.weight_kg ?? 0);
+          acc.grossWeight += Number(item.gross_weight_kg ?? item.weight_kg ?? 0);
+          acc.cbm += Number(item.cbm ?? 0);
+          return acc;
+        },
+        { packages: 0, netWeight: 0, grossWeight: 0, cbm: 0 }
+      )
+    : null;
+  const fromItems = sumOrderItemsForPacking(orderItems);
+
+  const payload = {
+    order_id: orderId,
+    total_packages: fromPacking?.packages ?? fromPackingItems?.packages ?? 0,
+    total_net_weight_kg:
+      fromPacking?.netWeight ?? fromPackingItems?.netWeight ?? fromItems.netWeight ?? 0,
+    total_gross_weight_kg:
+      fromPacking?.grossWeight ?? fromPackingItems?.grossWeight ?? fromItems.grossWeight ?? 0,
+    total_cbm: Number(existingSummary?.total_cbm ?? fromPackingItems?.cbm ?? 0),
+    notes: existingSummary?.notes ?? null,
+  };
+
+  const { data: upserted } = await supabase
+    .from("order_packing_list_summary")
+    .upsert([payload], { onConflict: "order_id" })
+    .select()
+    .maybeSingle();
+
+  return upserted ?? payload;
+};
 
 type SearchParams = {
   tab?: string;
@@ -127,6 +234,21 @@ export default async function OrderDetailPage({
         .in("packing_list_id", packingListIds)
     : { data: [] as any[] };
 
+  const packingSummaryResolved = await ensurePackingSummary({
+    supabase,
+    orderId: order.id,
+    packingLines: packingLines ?? [],
+    existingSummary: packingSummary ?? null,
+    orderItems: orderItemsAll ?? [],
+    packingListItems: packingListItems ?? [],
+  });
+
+  const { data: groupsWithAttrsData } = await supabase
+    .from("product_groups")
+    .select("id, name, product_attributes(id, name, unit, value_type)")
+    .order("name");
+  const groupsWithAttrs = groupsWithAttrsData ?? [];
+
   const productIdsFromOrder = Array.from(
     new Set(
       (orderItems ?? [])
@@ -218,7 +340,9 @@ export default async function OrderDetailPage({
 
   const { data: orderDocuments } = await supabase
     .from("order_documents")
-    .select("id, file_name, storage_path, notes, uploaded_at, document_type_id, status, received_at, insurance_amount, insurance_currency, document_types(name)")
+    .select(
+      "id, file_name, storage_path, notes, uploaded_at, document_type_id, status, received_at, insurance_amount, insurance_currency, freight_amount, freight_currency, document_types(name)"
+    )
     .eq("order_id", order.id)
     .order("received_at", { ascending: false, nullsFirst: false })
     .order("uploaded_at", { ascending: false });
@@ -257,7 +381,9 @@ export default async function OrderDetailPage({
     isPackingListType(doc.document_types ?? null)
   );
   const packingListCompleted =
-    hasPackingDocument || Boolean(packingSummary) || (packingListItems ?? []).length > 0;
+    hasPackingDocument ||
+    Boolean(packingSummaryResolved) ||
+    (packingListItems ?? []).length > 0;
 
   const missingOrderTypes = orderDocumentTypes
     .filter((type) => type.is_required)
@@ -352,55 +478,13 @@ export default async function OrderDetailPage({
     { qty: 0, amount: 0 }
   );
 
-  const fallbackPackingTotals = (packingListItems ?? []).reduce(
-    (acc, item) => {
-      acc.qty += Number(item.quantity ?? 0);
-      acc.packages += Number(item.packages ?? 0);
-      const netWeight = Number(item.net_weight_kg ?? item.weight_kg ?? 0);
-      const grossWeight = Number(item.gross_weight_kg ?? item.weight_kg ?? 0);
-      acc.netWeight += netWeight;
-      acc.grossWeight += grossWeight;
-      acc.cbm += Number(item.cbm ?? 0);
-      return acc;
-    },
-    { qty: 0, packages: 0, netWeight: 0, grossWeight: 0, cbm: 0 }
-  );
-
-  // Customs import (packing_list_lines) is the source of truth for box/net/gross totals.
-  const importedPackingTotals = (packingLines ?? []).reduce(
-    (acc, line) => {
-      acc.qty += Number(line.quantity ?? 0);
-      acc.packages += Number(line.packages_count ?? 0);
-      acc.netWeight += Number(line.net_weight ?? 0);
-      acc.grossWeight += Number(line.gross_weight ?? 0);
-      return acc;
-    },
-    { qty: 0, packages: 0, netWeight: 0, grossWeight: 0 }
-  );
-
-  const hasImportedPackingTotals =
-    importedPackingTotals.qty > 0 ||
-    importedPackingTotals.packages > 0 ||
-    importedPackingTotals.netWeight > 0 ||
-    importedPackingTotals.grossWeight > 0;
-
-  const packingTotals = hasImportedPackingTotals
-    ? {
-        qty: importedPackingTotals.qty,
-        packages: importedPackingTotals.packages,
-        netWeight: importedPackingTotals.netWeight,
-        grossWeight: importedPackingTotals.grossWeight,
-        cbm: Number(packingSummary?.total_cbm ?? fallbackPackingTotals.cbm ?? 0),
-      }
-    : packingSummary
-    ? {
-        qty: fallbackPackingTotals.qty,
-        packages: Number(packingSummary.total_packages ?? 0),
-        netWeight: Number(packingSummary.total_net_weight_kg ?? 0),
-        grossWeight: Number(packingSummary.total_gross_weight_kg ?? 0),
-        cbm: Number(packingSummary.total_cbm ?? 0),
-      }
-    : fallbackPackingTotals;
+  const packingTotals = {
+    qty: Number(packingSummaryResolved?.total_qty ?? 0),
+    packages: Number(packingSummaryResolved?.total_packages ?? 0),
+    netWeight: Number(packingSummaryResolved?.total_net_weight_kg ?? 0),
+    grossWeight: Number(packingSummaryResolved?.total_gross_weight_kg ?? 0),
+    cbm: Number(packingSummaryResolved?.total_cbm ?? 0),
+  };
 
   const parseNumber = (value: string | number | null | undefined) => {
     if (value === null || value === undefined) return null;
@@ -552,6 +636,36 @@ export default async function OrderDetailPage({
     }
   });
 
+  const insuranceTotals = (orderDocuments ?? []).reduce(
+    (acc, doc) => {
+      if (doc.insurance_amount !== null && doc.insurance_amount !== undefined) {
+        acc.amount += Number(doc.insurance_amount);
+        acc.currency =
+          (doc.insurance_currency as string | null) ??
+          acc.currency ??
+          order.currency ??
+          "USD";
+      }
+      return acc;
+    },
+    { amount: 0, currency: null as string | null }
+  );
+
+  const freightTotals = (orderDocuments ?? []).reduce(
+    (acc, doc) => {
+      if (doc.freight_amount !== null && doc.freight_amount !== undefined) {
+        acc.amount += Number(doc.freight_amount);
+        acc.currency =
+          (doc.freight_currency as string | null) ??
+          acc.currency ??
+          order.currency ??
+          "USD";
+      }
+      return acc;
+    },
+    { amount: 0, currency: null as string | null }
+  );
+
   const formatMoney = (value: number | null, currency: string | null) => {
     if (value === null || value === undefined) return "-";
     return `${value.toLocaleString("tr-TR", {
@@ -605,6 +719,9 @@ export default async function OrderDetailPage({
     "Depoya Teslim Edildi",
   ];
   const orderStatusLabel = order.order_status ?? "Siparis Verildi";
+
+  const docById = new Map((orderDocuments ?? []).map((d) => [d.id, d]));
+  const docByPath = new Map((orderDocuments ?? []).map((d) => [d.storage_path, d]));
 
   return (
     <section className="space-y-6">
@@ -671,11 +788,21 @@ export default async function OrderDetailPage({
                 Adet: {formatNumber(totalsAll.qty, 0)}
               </span>
               <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                Agirlik: {formatNumber(order.weight_kg)} kg
+                Agirlik: {formatNumber(packingTotals.netWeight)} kg
               </span>
               <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
                 Liman varis: {formatDate(orderEta)}
               </span>
+              {insuranceTotals.amount > 0 ? (
+                <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
+                  Navlun sigortasi: {formatMoney(insuranceTotals.amount, insuranceTotals.currency)}
+                </span>
+              ) : null}
+              {freightTotals.amount > 0 ? (
+                <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
+                  Navlun fatura: {formatMoney(freightTotals.amount, freightTotals.currency)}
+                </span>
+              ) : null}
               <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
                 <span>Shipment:</span>
                 {linkedShipments.length ? (
@@ -901,9 +1028,17 @@ export default async function OrderDetailPage({
                     </p>
                     <p className="text-lg font-semibold">Ürün kalemleri</p>
                   </div>
-                  <div className="rounded-full border border-black/10 bg-[var(--sky)]/60 px-4 py-2 text-xs font-semibold text-black/60">
-                    Toplam: {formatNumber(totalsPage.qty, 0)} adet
-                    {canSeeFinance ? ` | ${formatMoney(totalsPage.amount, order.currency)}` : ""}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <div className="rounded-full border border-black/10 bg-[var(--sky)]/60 px-4 py-2 font-semibold text-black/60">
+                        Toplam: {formatNumber(totalsPage.qty, 0)} adet
+                        {canSeeFinance ? ` | ${formatMoney(totalsPage.amount, order.currency)}` : ""}
+                      </div>
+                    <a
+                      href={`/api/orders/${order.id}/items-export?format=xlsx`}
+                      className="flex items-center gap-2 rounded-full border border-black/15 bg-white px-3 py-2 font-semibold text-black hover:bg-[var(--mint)]/50"
+                    >
+                      <Download size={14} /> Ürünleri dışa aktar (Excel)
+                    </a>
                   </div>
                 </div>
                 <table className="mt-4 w-full min-w-[1100px]">
@@ -1039,11 +1174,57 @@ export default async function OrderDetailPage({
             )}
 
             {!isSales ? (
-              <OrderItemCreateForm
-                orderId={order.id}
-                products={products ?? []}
-                action={createOrderItem}
-              />
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm shadow-sm">
+                  <p className="text-base font-semibold">Katalogdan ürün ekle</p>
+                  <p className="mt-1 text-xs text-black/60">
+                    Mevcut ürün kodu / adı ile arayıp hızlıca satır ekleyin.
+                  </p>
+                  <div className="mt-3">
+                    <OrderItemCreateForm
+                      orderId={order.id}
+                      products={products ?? []}
+                      action={createOrderItem}
+                    />
+                  </div>
+                </div>
+                <form
+                  action={completeSingleMissingProduct}
+                  className="rounded-2xl border border-black/10 bg-white p-4 text-sm shadow-sm"
+                >
+                  <input type="hidden" name="order_id" value={order.id} />
+                  <p className="text-base font-semibold">Yeni ürün oluştur + kalem ekle</p>
+                  <p className="mt-1 text-xs text-black/60">
+                    Eksik ürün akışındaki gelişmiş form; ürün yoksa oluşturur, varsa fiyatı günceller ve satır ekler.
+                  </p>
+                  <div className="mt-4 grid gap-4">
+                    <MissingProductRow
+                      row={{
+                        code: "",
+                        name: "",
+                        quantity: null,
+                        unit_price: null,
+                        total_amount: null,
+                        net_weight_kg: null,
+                        gross_weight_kg: null,
+                        notes: "",
+                        attributes: [],
+                      }}
+                      index={0}
+                      groups={groupsWithAttrs}
+                      showQuantity
+                    />
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      type="submit"
+                      className="rounded-full bg-[var(--ocean)] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+                    >
+                      Kaydet ve ekle
+                    </button>
+                  </div>
+                </form>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -1056,7 +1237,7 @@ export default async function OrderDetailPage({
               <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
                 <span>
                   Dokuman: {hasPackingDocument ? "Var" : "Yok"} Â· Son guncelleme:{" "}
-                  {packingSummary?.updated_at ?? "-"}
+                  {packingSummaryResolved?.updated_at ?? "-"}
                 </span>
               </div>
             </div>
@@ -1157,7 +1338,7 @@ export default async function OrderDetailPage({
                   Not
                   <textarea
                     name="notes"
-                    defaultValue={packingSummary?.notes ?? ""}
+                    defaultValue={packingSummaryResolved?.notes ?? ""}
                     className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                     placeholder="Tedarikçiden gelen ozet / aciklama"
                     rows={3}
@@ -1446,6 +1627,19 @@ export default async function OrderDetailPage({
                             <input type="hidden" name="order_id" value={order.id} />
                             <input type="hidden" name="payment_id" value={payment.id} />
                           </ConfirmActionForm>
+                          {(() => {
+                            const notes = payment.notes ?? "";
+                            const docIdMatch = notes.match(/doc:([0-9a-f-]+)/i);
+                            const pathMatch = notes.match(/path:([\\w\\-\\/.]+)/i);
+                            const doc =
+                              (docIdMatch && docById.get(docIdMatch[1])) ||
+                              (pathMatch && docByPath.get(pathMatch[1]));
+                            return doc ? (
+                              <div className="mt-2">
+                                <PaymentDocLink storagePath={doc.storage_path} fileName={doc.file_name} />
+                              </div>
+                            ) : null;
+                          })()}
                         </td>
                       </tr>
                     ))}
@@ -1527,25 +1721,30 @@ export default async function OrderDetailPage({
                       <th className="px-3 py-2">Tip</th>
                       <th className="px-3 py-2">Dosya</th>
                       <th className="px-3 py-2">Durum</th>
-                      <th className="px-3 py-2">Navlun sigortasi</th>
+                      <th className="px-3 py-2">Navlun tutari</th>
                       <th className="px-3 py-2">Not</th>
                       <th className="px-3 py-2">Tarih</th>
                       <th className="px-3 py-2 text-right">Islem</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {orderDocuments.map((doc, index) => (
-                    <tr
-                      key={doc.id}
-                      style={{ animationDelay: `${index * 45}ms` }}
-                      className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/15 [&>td]:bg-white [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:shadow-[0_16px_26px_-24px_rgba(15,61,62,0.6)] hover:[&>td]:bg-[var(--mint)] hover:[&>td]:shadow-[0_20px_30px_-24px_rgba(15,61,62,0.7)]"
-                    >
+                    {orderDocuments.map((doc, index) => {
+                      const dt = (doc as any).document_types;
+                      const docTypeName = Array.isArray(dt) ? dt[0]?.name ?? "-" : dt?.name ?? "-";
+                      const docTypeLower = docTypeName.toLowerCase();
+                      const isPaymentDoc =
+                        docTypeLower.includes("odeme") ||
+                        docTypeLower.includes("ödeme") ||
+                        docTypeLower.includes("payment") ||
+                        docTypeLower.includes("dekont");
+                      return (
+                        <tr
+                          key={doc.id}
+                          style={{ animationDelay: `${index * 45}ms` }}
+                          className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/15 [&>td]:bg-white [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:shadow-[0_16px_26px_-24px_rgba(15,61,62,0.6)] hover:[&>td]:bg-[var(--mint)] hover:[&>td]:shadow-[0_20px_30px_-24px_rgba(15,61,62,0.7)]"
+                        >
                         <td className="px-3 py-4 text-xs font-semibold text-black/70">
-                          {(() => {
-                            const dt = (doc as any).document_types;
-                            if (Array.isArray(dt)) return dt[0]?.name ?? "-";
-                            return dt?.name ?? "-";
-                          })()}
+                          {docTypeName}
                         </td>
                         <td className="px-3 py-4">
                           <div className="flex items-center gap-2 text-sm">
@@ -1565,7 +1764,12 @@ export default async function OrderDetailPage({
                           {doc.received_at ? ` | ${doc.received_at}` : ""}
                         </td>
                         <td className="px-3 py-4 text-xs font-semibold text-black/70">
-                          {doc.insurance_amount !== null && doc.insurance_amount !== undefined
+                          {doc.freight_amount !== null && doc.freight_amount !== undefined
+                            ? formatMoney(
+                                Number(doc.freight_amount),
+                                doc.freight_currency ?? order.currency
+                              )
+                            : doc.insurance_amount !== null && doc.insurance_amount !== undefined
                             ? formatMoney(
                                 Number(doc.insurance_amount),
                                 doc.insurance_currency ?? order.currency
@@ -1577,18 +1781,26 @@ export default async function OrderDetailPage({
                         </td>
                         <td className="px-3 py-4">{doc.uploaded_at ?? "-"}</td>
                         <td className="px-3 py-4 text-right">
-                          <ConfirmActionForm
-                            action={deleteOrderDocument}
-                            confirmText="Belge silinsin mi?"
-                            buttonText="Sil"
-                            className="inline"
-                          >
-                            <input type="hidden" name="order_id" value={order.id} />
-                            <input type="hidden" name="document_id" value={doc.id} />
-                          </ConfirmActionForm>
+                          <div className="flex flex-col items-end gap-2">
+                              {isPaymentDoc && doc.storage_path ? (
+                                <span className="text-[11px] text-black/50">
+                                  Ödeme bilgisi manuel girildi.
+                                </span>
+                              ) : null}
+                            <ConfirmActionForm
+                              action={deleteOrderDocument}
+                              confirmText="Belge silinsin mi?"
+                              buttonText="Sil"
+                              className="inline"
+                            >
+                              <input type="hidden" name="order_id" value={order.id} />
+                              <input type="hidden" name="document_id" value={doc.id} />
+                            </ConfirmActionForm>
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

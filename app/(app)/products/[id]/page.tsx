@@ -1,9 +1,9 @@
 ﻿import Link from "next/link";
-import sql from "mssql";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { deleteProduct } from "@/app/actions/products";
 import { computeCosts, pickWeightKg, GtipRow } from "@/lib/gtipCost";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
+import { fetchLiveStockMap } from "@/lib/live-mssql";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import type { Metadata } from "next";
 
@@ -54,55 +54,6 @@ const fmtInt = (value: number | null | undefined) => {
   });
 };
 
-async function fetchNetsisStock(code: string | null | undefined) {
-  if (!code) return { value: null as number | null, error: "Netsis kodu yok" };
-
-  const {
-    MSSQL_SERVER,
-    MSSQL_PORT,
-    MSSQL_DB,
-    MSSQL_USER,
-    MSSQL_PASS,
-    MSSQL_TRUST_CERT,
-    MSSQL_ENCRYPT,
-  } = process.env;
-
-  const envOk = MSSQL_SERVER && MSSQL_DB && MSSQL_USER && MSSQL_PASS;
-  if (!envOk)
-    return { value: null, error: "MSSQL baglanti ayarlari eksik (.env.local)" };
-
-  try {
-    const pool = await sql.connect({
-      server: MSSQL_SERVER!,
-      port: MSSQL_PORT ? Number(MSSQL_PORT) : 1433,
-      database: MSSQL_DB!,
-      user: MSSQL_USER!,
-      password: MSSQL_PASS!,
-      options: {
-        encrypt: MSSQL_ENCRYPT !== "false",
-        trustServerCertificate: MSSQL_TRUST_CERT === "true",
-        cryptoCredentialsDetails: { minVersion: "TLSv1", maxVersion: "TLSv1.2" },
-        enableArithAbort: true,
-      },
-    });
-
-    const result = await pool
-      .request()
-      .input("stok", sql.VarChar, String(code).trim())
-      .query(`
-        SELECT SUM(CASE WHEN Har.STHAR_GCKOD='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
-        FROM TBLSTHAR Har
-        WHERE LTRIM(RTRIM(Har.STOK_KODU)) = @stok
-      `);
-
-    await pool.close();
-    return { value: result.recordset?.[0]?.NetMiktar ?? 0, error: null };
-  } catch (err: any) {
-    console.error("[product detail mssql]", err);
-    return { value: null, error: err?.message ?? String(err) };
-  }
-}
-
 export default async function ProductDetailPage({
   params,
 }: {
@@ -131,7 +82,11 @@ export default async function ProductDetailPage({
     );
   }
 
-  const stockResult = await fetchNetsisStock(product.netsis_stok_kodu);
+  const stockCode = product.netsis_stok_kodu ? String(product.netsis_stok_kodu).trim() : "";
+  const stockMap = stockCode ? await fetchLiveStockMap([stockCode], "exact") : new Map<string, number>();
+  const stockResult = stockCode
+    ? { value: stockMap.get(stockCode) ?? 0, error: null }
+    : { value: null, error: "Netsis kodu yok" };
 
   const { data: group } = product.group_id
     ? await supabase

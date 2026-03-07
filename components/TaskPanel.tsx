@@ -117,7 +117,7 @@ export default async function TaskPanel() {
       <summary className="cursor-pointer list-none text-sm font-semibold">
         Gorev paneli
       </summary>
-      <div className="mt-4 space-y-3 text-sm text-black/70">
+      <div className="mt-4 space-y-3 text-sm text-black/70 max-h-[70vh] overflow-y-auto pr-1">
         {readyToday?.length ? (
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">

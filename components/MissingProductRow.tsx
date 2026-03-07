@@ -38,6 +38,7 @@ type Props = {
   row: MissingRow;
   index: number;
   groups: GroupWithAttrs[];
+  showQuantity?: boolean;
 };
 
 const normalize = (value: string) =>
@@ -48,7 +49,7 @@ const normalize = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\u0131|\u0130/g, "i");
 
-export default function MissingProductRow({ row, index, groups }: Props) {
+export default function MissingProductRow({ row, index, groups, showQuantity = false }: Props) {
   const [selectedGroupId, setSelectedGroupId] = useState<string>(row.group_id ?? "");
   const [newGroupName, setNewGroupName] = useState<string>(row.group_name ?? "");
 
@@ -78,6 +79,15 @@ export default function MissingProductRow({ row, index, groups }: Props) {
         <div className="text-xs text-black/60">Adet: {row.quantity ?? "-"}</div>
       </div>
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <label className="text-xs font-semibold text-black/60">
+          Ürün kodu
+          <input
+            name={`row_${index}_code`}
+            defaultValue={row.code ?? ""}
+            className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
+            placeholder="Ürün kodu"
+          />
+        </label>
         <label className="text-xs font-semibold text-black/60">
           Ürün adi
           <input
@@ -121,6 +131,17 @@ export default function MissingProductRow({ row, index, groups }: Props) {
             placeholder="Birim fiyat"
           />
         </label>
+        {showQuantity ? (
+          <label className="text-xs font-semibold text-black/60">
+            Adet
+            <input
+              name={`row_${index}_qty`}
+              defaultValue={row.quantity ?? ""}
+              className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
+              placeholder="Adet"
+            />
+          </label>
+        ) : null}
         <label className="text-xs font-semibold text-black/60 lg:col-span-3">
           Not
           <input

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import sql from "mssql";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { fetchLiveSalesPerDb } from "@/lib/live-mssql";
 
 // 10 yıllık pencere, mevcut sipariş planı ile tutarlı
 const TEN_YEARS_DAYS = 3650;
@@ -14,39 +14,6 @@ const chunk = <T,>(arr: T[], size = 200) => {
   return res;
 };
 
-const connectMssql = async (databaseName?: string) => {
-  const {
-    MSSQL_SERVER,
-    MSSQL_PORT,
-    MSSQL_DB,
-    MSSQL_USER,
-    MSSQL_PASS,
-    MSSQL_TRUST_CERT,
-    MSSQL_ENCRYPT,
-  } = process.env;
-  if (!MSSQL_SERVER || !MSSQL_DB || !MSSQL_USER || !MSSQL_PASS) return null;
-  try {
-    const pool = new sql.ConnectionPool({
-      server: MSSQL_SERVER,
-      port: MSSQL_PORT ? Number(MSSQL_PORT) : 1433,
-      database: databaseName ?? MSSQL_DB,
-      user: MSSQL_USER,
-      password: MSSQL_PASS,
-      options: {
-        encrypt: MSSQL_ENCRYPT !== "false",
-        trustServerCertificate: MSSQL_TRUST_CERT === "true",
-        cryptoCredentialsDetails: { minVersion: "TLSv1", maxVersion: "TLSv1.2" },
-        enableArithAbort: true,
-      },
-    });
-    pool.setMaxListeners(0);
-    await pool.connect();
-    return pool;
-  } catch {
-    return null;
-  }
-};
-
 // MSSQL_DB_SALES_LIST virgüllü liste: her bir DB ayrı sütun olarak rapora eklenecek
 const getSalesDbs = () => {
   const raw = process.env.MSSQL_DB_SALES_LIST ?? "";
@@ -56,54 +23,6 @@ const getSalesDbs = () => {
     .filter(Boolean);
   const base = process.env.MSSQL_DB ? [process.env.MSSQL_DB] : [];
   return Array.from(new Set([...arr, ...base]));
-};
-
-const buildInClause = (alias: string, items: string[]) => {
-  const params = items.map((_, idx) => `@${alias}${idx}`).join(",");
-  return { clause: `(${params})`, params };
-};
-
-const fetchSalesPerDb = async (codes: string[]) => {
-  type DbTotals = Map<string, number>; // dbName -> qty
-  const result = new Map<string, DbTotals>();
-  if (!codes.length) return result;
-  const dbs = getSalesDbs();
-  const start10y = new Date();
-  start10y.setHours(0, 0, 0, 0);
-  start10y.setDate(start10y.getDate() - TEN_YEARS_DAYS);
-
-  for (const dbName of dbs) {
-    const pool = await connectMssql(dbName);
-    if (!pool) continue;
-    try {
-      for (const part of chunk(codes, 100)) {
-        const { clause, params } = buildInClause("c", part);
-        const req = pool.request().input("start10y", sql.DateTime, start10y);
-        part.forEach((code, idx) => req.input(`c${idx}`, sql.VarChar, code.trim()));
-        const query = `
-          SELECT LTRIM(RTRIM(STOK_KODU)) AS code, SUM(STHAR_GCMIK) AS qty
-          FROM TBLSTHAR
-          WHERE UPPER(STHAR_GCKOD) = 'C'
-            AND STHAR_TARIH >= @start10y
-            AND LTRIM(RTRIM(STOK_KODU)) IN ${clause}
-          GROUP BY LTRIM(RTRIM(STOK_KODU))
-        `;
-        const rs = await req.query(query);
-        (rs.recordset ?? []).forEach((row: any) => {
-          const code = String(row.code ?? "").trim();
-          if (!code) return;
-          const dbMap = result.get(code) ?? new Map<string, number>();
-          dbMap.set(dbName, (dbMap.get(dbName) ?? 0) + Number(row.qty ?? 0));
-          result.set(code, dbMap);
-        });
-      }
-    } catch {
-      /* ignore this db */
-    } finally {
-      await pool.close();
-    }
-  }
-  return result;
 };
 
 export async function GET(req: NextRequest) {
@@ -239,7 +158,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const salesPerDb = await fetchSalesPerDb(netsisCodes);
+  const salesPerDb = await fetchLiveSalesPerDb(netsisCodes, TEN_YEARS_DAYS);
   const dbList = getSalesDbs();
 
   const wb = new ExcelJS.Workbook();

@@ -1,5 +1,4 @@
 ﻿import Link from "next/link";
-import sql from "mssql";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canViewModule } from "@/lib/roles";
 import OrderPlanInput from "@/components/OrderPlanInput";
@@ -7,6 +6,7 @@ import Sales10ySyncButton from "@/components/Sales10ySyncButton";
 import RfqCreateModal from "@/components/RfqCreateModal";
 import PlanRowClickBinder from "@/components/PlanRowClickBinder";
 import { updateOrderPlanDefaults } from "@/app/actions/order-plan";
+import { fetchLiveSalesAgg, fetchLiveStockMap } from "@/lib/live-mssql";
 
 const FALLBACK_LEAD_TIME_DAYS = 105;
 const FALLBACK_SAFETY_DAYS = 15;
@@ -121,143 +121,6 @@ const fetchTransitByProduct = async (supabase: any, productIds: string[]) => {
   });
 
   return totals;
-};
-
-const connectMssql = async (databaseName?: string) => {
-  const {
-    MSSQL_SERVER,
-    MSSQL_PORT,
-    MSSQL_DB,
-    MSSQL_USER,
-    MSSQL_PASS,
-    MSSQL_TRUST_CERT,
-    MSSQL_ENCRYPT,
-  } = process.env;
-  if (!MSSQL_SERVER || !MSSQL_DB || !MSSQL_USER || !MSSQL_PASS) return null;
-  try {
-    const pool = new sql.ConnectionPool({
-      server: MSSQL_SERVER,
-      port: MSSQL_PORT ? Number(MSSQL_PORT) : 1433,
-      database: databaseName ?? MSSQL_DB,
-      user: MSSQL_USER,
-      password: MSSQL_PASS,
-      options: {
-        encrypt: MSSQL_ENCRYPT !== "false",
-        trustServerCertificate: MSSQL_TRUST_CERT === "true",
-        cryptoCredentialsDetails: { minVersion: "TLSv1", maxVersion: "TLSv1.2" },
-        enableArithAbort: true,
-      },
-    });
-    pool.setMaxListeners(0);
-    await pool.connect();
-    return pool;
-  } catch {
-    return null;
-  }
-};
-
-const fetchNetsisStockMap = async (codes: string[]) => {
-  const map = new Map<string, number>();
-  const pool = await connectMssql();
-  if (!pool) return map;
-  try {
-    for (const code of codes) {
-      const key = code.trim();
-      try {
-        const result = await pool
-          .request()
-          .input("stok", sql.VarChar, `${key}%`)
-          .query(
-            `SELECT SUM(CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
-             FROM TBLSTHAR Har
-             WHERE LTRIM(RTRIM(Har.STOK_KODU)) LIKE @stok`
-          );
-        const net = Number(result.recordset?.[0]?.NetMiktar ?? 0);
-        map.set(key, net);
-      } catch {
-        map.set(key, 0);
-      }
-    }
-  } finally {
-    await pool.close();
-  }
-  return map;
-};
-
-const fetchSalesAgg = async (codes: string[]): Promise<Map<string, SalesAgg>> => {
-  const res = new Map<string, SalesAgg>();
-
-  const salesDbs = (() => {
-    const raw = process.env.MSSQL_DB_SALES_LIST ?? "";
-    const arr = raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const base = process.env.MSSQL_DB ? [process.env.MSSQL_DB] : [];
-    return Array.from(new Set([...arr, ...base]));
-  })();
-
-  const pools: any[] = [];
-  for (const dbName of salesDbs) {
-    const pool = await connectMssql(dbName);
-    if (pool) pools.push(pool);
-  }
-  if (!pools.length) return res;
-
-  const today = new Date();
-  const start120 = new Date(today);
-  start120.setHours(0, 0, 0, 0);
-  start120.setDate(start120.getDate() - 120);
-  const start60 = new Date(today);
-  start60.setHours(0, 0, 0, 0);
-  start60.setDate(start60.getDate() - 60);
-  const startPrev60 = new Date(today);
-  startPrev60.setHours(0, 0, 0, 0);
-  startPrev60.setDate(startPrev60.getDate() - 120);
-  const start10y = new Date(today);
-  start10y.setHours(0, 0, 0, 0);
-  start10y.setDate(start10y.getDate() - 3650);
-
-  try {
-    for (const code of codes) {
-      const key = code.trim();
-      let agg = { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
-      for (const pool of pools) {
-        try {
-          const query = `
-            SELECT
-              SUM(CASE WHEN STHAR_TARIH >= @start120 THEN STHAR_GCMIK ELSE 0 END) AS sales120,
-              SUM(CASE WHEN STHAR_TARIH >= @start60 THEN STHAR_GCMIK ELSE 0 END) AS sales60,
-              SUM(CASE WHEN STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS salesPrev60,
-              SUM(CASE WHEN STHAR_TARIH >= @start10y THEN STHAR_GCMIK ELSE 0 END) AS sales10y
-            FROM TBLSTHAR
-            WHERE LTRIM(RTRIM(STOK_KODU)) LIKE @code AND UPPER(STHAR_GCKOD) = 'C'
-          `;
-          const result = await pool
-            .request()
-            .input("start120", sql.DateTime, start120)
-            .input("start60", sql.DateTime, start60)
-            .input("startPrev60", sql.DateTime, startPrev60)
-            .input("start10y", sql.DateTime, start10y)
-            .input("code", sql.VarChar, `${key}%`)
-            .query(query);
-          const row = result.recordset?.[0] ?? {};
-          agg = {
-            sales120: agg.sales120 + Number(row.sales120 ?? 0),
-            sales60: agg.sales60 + Number(row.sales60 ?? 0),
-            salesPrev60: agg.salesPrev60 + Number(row.salesPrev60 ?? 0),
-            sales10y: agg.sales10y + Number(row.sales10y ?? 0),
-          };
-        } catch {
-          // ignore this db
-        }
-      }
-      res.set(key, agg);
-    }
-  } finally {
-    await Promise.all(pools.map((p) => p.close()));
-  }
-  return res;
 };
 
 const ceil = (n: number) => Math.ceil(n);
@@ -474,8 +337,8 @@ export default async function OrderPlanPage({
   );
 
   const [stockMap, salesMap] = await Promise.all([
-    fetchNetsisStockMap(codes),
-    fetchSalesAgg(codes),
+    fetchLiveStockMap(codes, "prefix"),
+    fetchLiveSalesAgg(codes),
   ]);
 
   const { data: sales10yRows } = await supabase

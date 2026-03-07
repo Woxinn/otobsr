@@ -1,12 +1,12 @@
 ﻿import Link from "next/link";
 import type { CSSProperties } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import sql from "mssql";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import ProductsListToast from "@/components/ProductsListToast";
 import ProductsSelectionControls from "@/components/ProductsSelectionControls";
 import { deleteAllProducts, deleteSelectedProducts } from "@/app/actions/products";
 import { computeCosts, GtipRow, pickWeightKg } from "@/lib/gtipCost";
+import { fetchLiveStockMap } from "@/lib/live-mssql";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 
 const logError = (label: string, error: any) => {
@@ -39,81 +39,6 @@ const fmtMoney = (value: number | null | undefined) => {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
   });
-};
-
-const fetchNetsisStocks = async (products: any[]) => {
-  const map = new Map<string, number | null>();
-  const {
-    MSSQL_SERVER,
-    MSSQL_PORT,
-    MSSQL_DB,
-    MSSQL_USER,
-    MSSQL_PASS,
-    MSSQL_TRUST_CERT,
-    MSSQL_ENCRYPT,
-  } = process.env;
-  const canConnect = MSSQL_SERVER && MSSQL_DB && MSSQL_USER && MSSQL_PASS;
-  if (!canConnect) return map;
-
-  const codes = products
-    .map((p) => (p.netsis_stok_kodu ? String(p.netsis_stok_kodu).trim() : null))
-    .filter(Boolean) as string[];
-  const distinctCodes = Array.from(new Set(codes));
-  if (!distinctCodes.length) return map;
-
-  try {
-    const pool = await sql.connect({
-      server: MSSQL_SERVER!,
-      port: MSSQL_PORT ? Number(MSSQL_PORT) : 1433,
-      database: MSSQL_DB!,
-      user: MSSQL_USER!,
-      password: MSSQL_PASS!,
-      options: {
-        encrypt: MSSQL_ENCRYPT !== "false",
-        trustServerCertificate: MSSQL_TRUST_CERT === "true",
-        cryptoCredentialsDetails: { minVersion: "TLSv1", maxVersion: "TLSv1.2" },
-        enableArithAbort: true,
-      },
-    });
-
-    // Kod basina LIKE ile sorgula ("22 6200%" gibi) - perPage <= 100 oldugu icin kabul edilebilir
-    for (const code of distinctCodes) {
-      const key = code.trim();
-      try {
-        const result = await pool
-          .request()
-          .input("stok", sql.VarChar, `${key}%`)
-          .query(
-            `SELECT SUM(CASE WHEN Har.STHAR_GCKOD='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
-             FROM TBLSTHAR Har
-             WHERE LTRIM(RTRIM(Har.STOK_KODU)) LIKE @stok`
-          );
-        const net = result.recordset?.[0]?.NetMiktar ?? null;
-        map.set(key, net);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error("[netsis-stock] fetch error for code", key, err);
-        map.set(key, null);
-      }
-    }
-
-    await pool.close();
-  } catch (err) {
-    // Baglanti hatasi olursa tum map bos kalir; logla ve geri don.
-    // eslint-disable-next-line no-console
-    console.error("[netsis-stock] connection failed", err);
-  }
-  // Debug: kac kod ve kac sonuc dondu.
-  // eslint-disable-next-line no-console
-  console.log("[netsis-stock] codes", distinctCodes.length, "map size", map.size);
-  // eslint-disable-next-line no-console
-  console.log(
-    "[netsis-stock] sample",
-    Array.from(map.entries())
-      .slice(0, 10)
-      .map(([k, v]) => `${k}:${v}`)
-  );
-  return map;
 };
 
 const buildWeightSource = (values: any[], productId: string) =>
@@ -263,7 +188,12 @@ export default async function ProductsPage({
   const productsList = (products as any[] | null | undefined) ?? [];
 
   // MSSQL stok cek (Netsis koduna gore)
-  const netsisStockMap = await fetchNetsisStocks(productsList);
+  const netsisCodes = productsList
+    .map((product) =>
+      product.netsis_stok_kodu ? String(product.netsis_stok_kodu).trim() : null
+    )
+    .filter(Boolean) as string[];
+  const netsisStockMap = await fetchLiveStockMap(netsisCodes, "prefix");
 
   const productIds = Array.from(
     new Set(productsList.map((product) => product.id).filter(Boolean))

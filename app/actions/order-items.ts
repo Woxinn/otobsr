@@ -950,7 +950,7 @@ export async function importOrderItems(formData: FormData) {
     );
   }
 
-  if (!orderItemsPayload.length) {
+  if (!orderItemsPayload.length && !missingRows.length) {
     redirect(`/orders/${orderId}?toast=items-import-empty`);
   }
 
@@ -1315,4 +1315,186 @@ export async function completeMissingOrderProducts(formData: FormData) {
   await updateOrderTotals(supabase, orderId);
   revalidatePath(`/orders/${orderId}`);
   redirect(`/orders/${orderId}?toast=items-imported`);
+}
+
+// Tek satırlık gelişmiş form (sipariş detayında inline kullanılır)
+export async function completeSingleMissingProduct(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!orderId) redirect("/orders?toast=missing-products-error");
+
+  const code = nullIfEmpty(formData.get("row_0_code"));
+  const name = nullIfEmpty(formData.get("row_0_name")) ?? code ?? "-";
+  if (!code) redirect(`/orders/${orderId}?toast=missing-products-error`);
+
+  const groupIdInput = nullIfEmpty(formData.get("row_0_group_id"));
+  const newGroup = nullIfEmpty(formData.get("row_0_new_group"));
+  let groupId = groupIdInput;
+  if (!groupId && newGroup) {
+    const { data: inserted, error: gErr } = await supabase
+      .from("product_groups")
+      .upsert({ name: newGroup }, { onConflict: "name" })
+      .select("id")
+      .maybeSingle();
+    if (!gErr) groupId = inserted?.id ?? null;
+  }
+
+  const quantity =
+    toNumberFromText(String(formData.get("row_0_qty") ?? "")) ??
+    toIntegerFromText(String(formData.get("row_0_qty") ?? "")) ??
+    null;
+  const unitPrice =
+    toNumberFromText(String(formData.get("row_0_unit_price") ?? "")) ?? null;
+  const totalAmount =
+    toNumberFromText(String(formData.get("row_0_total_amount") ?? "")) ??
+    (unitPrice !== null && quantity !== null ? unitPrice * quantity : null);
+  const notes = nullIfEmpty(formData.get("row_0_notes"));
+
+  const netWeight =
+    toNumberFromText(String(formData.get("row_0_net_weight") ?? "")) ?? null;
+  const grossWeight =
+    toNumberFromText(String(formData.get("row_0_gross_weight") ?? "")) ?? null;
+
+  // Ürün var mı?
+  const { data: existing } = await supabase
+    .from("products")
+    .select("id, group_id")
+    .eq("code", code)
+    .maybeSingle();
+
+  let productId = existing?.id ?? null;
+  if (!productId) {
+    const { data: created, error } = await supabase
+      .from("products")
+      .insert({
+        code,
+        name,
+        group_id: groupId,
+        unit_price: unitPrice,
+      })
+      .select("id, group_id")
+      .single();
+    if (error || !created) {
+      console.error("create product failed", error);
+      redirect(`/orders/${orderId}?toast=missing-products-error`);
+    }
+    productId = created.id;
+    groupId = created.group_id ?? groupId;
+  } else {
+    // ürün varsa fiyatı güncelle
+    if (unitPrice !== null) {
+      await supabase.from("products").upsert({ id: productId, unit_price: unitPrice });
+    }
+    if (existing && !existing.group_id && groupId) {
+      await supabase.from("products").upsert({ id: productId, group_id: groupId });
+    }
+  }
+
+  // Kategori nitelikleri
+  for (let catIndex = 0; ; catIndex += 1) {
+    const attrId = nullIfEmpty(formData.get(`row_0_cat_attr_id_${catIndex}`));
+    if (!attrId) break;
+    const attrType =
+      (nullIfEmpty(formData.get(`row_0_cat_attr_type_${catIndex}`)) ?? "text") as
+        | "text"
+        | "number";
+    const attrValue = nullIfEmpty(formData.get(`row_0_cat_attr_value_${catIndex}`));
+    const valueNumber =
+      attrType === "number" ? toNumberFromText(attrValue ?? "") : null;
+    const valueText = attrType === "text" ? attrValue : null;
+    if (valueNumber === null && valueText === null) continue;
+    await supabase
+      .from("product_attribute_values")
+      .upsert(
+        {
+          product_id: productId,
+          attribute_id: attrId,
+          value_text: valueText,
+          value_number: valueNumber,
+        },
+        { onConflict: "product_id,attribute_id" }
+      );
+  }
+
+  // Ek nitelikler (2 slot)
+  for (let extraIndex = 0; extraIndex < 2; extraIndex += 1) {
+    const extraName = nullIfEmpty(formData.get(`row_0_extra_attr_name_${extraIndex}`));
+    if (!extraName) continue;
+    const extraValue = nullIfEmpty(
+      formData.get(`row_0_extra_attr_value_${extraIndex}`)
+    );
+    const extraUnit = nullIfEmpty(
+      formData.get(`row_0_extra_attr_unit_${extraIndex}`)
+    );
+    const extraType =
+      (nullIfEmpty(formData.get(`row_0_extra_attr_type_${extraIndex}`)) ?? "text") as
+        | "text"
+        | "number";
+
+    await supabase
+      .from("product_extra_attributes")
+      .delete()
+      .eq("product_id", productId)
+      .eq("name", extraName);
+
+    await supabase.from("product_extra_attributes").insert({
+      product_id: productId,
+      name: extraName,
+      unit: extraUnit,
+      value_type: extraType,
+      value_text: extraType === "text" ? extraValue : null,
+      value_number: extraType === "number" ? toNumberFromText(extraValue ?? "") : null,
+    });
+  }
+
+  // Order item ekle
+  await supabase.from("order_items").insert({
+    order_id: orderId,
+    product_id: productId,
+    name,
+    quantity,
+    unit_price: unitPrice,
+    total_amount: totalAmount,
+    net_weight_kg: netWeight,
+    gross_weight_kg: grossWeight,
+    notes,
+  });
+
+  await updateOrderTotals(supabase, orderId);
+  revalidatePath(`/orders/${orderId}`);
+  redirect(`/orders/${orderId}?toast=item-added`);
+}
+
+// Tek satırlık gelişmiş ürün ekleme formunu açmak için (sipariş detay altından)
+export async function startManualMissingProduct(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!orderId) {
+    redirect(`/orders?toast=missing-products-error`);
+  }
+
+  const draftRow: MissingRow = {
+    code: "",
+    name: null,
+    quantity: null,
+    unit_price: null,
+    total_amount: null,
+    net_weight_kg: null,
+    gross_weight_kg: null,
+    notes: null,
+    attributes: [],
+  };
+
+  const { data: staging, error } = await supabase
+    .from("order_item_import_staging")
+    .insert({ order_id: orderId, payload: [draftRow] })
+    .select("id")
+    .single();
+
+  if (error || !staging) {
+    console.error("startManualMissingProduct staging failed", error);
+    redirect(`/orders/${orderId}?toast=missing-products-error`);
+  }
+
+  redirect(`/orders/${orderId}/missing-products?stagingId=${staging.id}`);
 }

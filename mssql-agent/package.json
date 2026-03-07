@@ -1,0 +1,13 @@
+{
+  "name": "otobsr-mssql-agent",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "mssql": "^12.2.0"
+  }
+}
