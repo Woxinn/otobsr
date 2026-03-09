@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-export function createSupabaseAdminClient() {
+export function createSupabaseAdminClient(extraHeaders?: Record<string, string>) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
@@ -12,6 +12,10 @@ export function createSupabaseAdminClient() {
       fetch: (input, init) =>
         fetch(input, {
           ...init,
+          headers: {
+            ...(init?.headers ?? {}),
+            ...(extraHeaders ?? {}),
+          },
           cache: "no-store",
           next: { revalidate: 0 },
         }),

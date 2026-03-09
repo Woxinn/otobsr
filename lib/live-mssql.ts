@@ -95,7 +95,10 @@ async function runBridgeRequest<T>(requestType: string, payload: Record<string, 
 
   const deadline = Date.now() + BRIDGE_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const { data: requestRow, error } = await supabase
+    const pollClient = createSupabaseAdminClient({
+      "x-mssql-bridge-poll": `${inserted.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    });
+    const { data: requestRow, error } = await pollClient
       .from("mssql_bridge_requests")
       .select("status, result, error")
       .eq("id", inserted.id)
