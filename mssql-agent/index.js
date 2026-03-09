@@ -313,14 +313,18 @@ async function workerLoop() {
       }
 
       console.log("[mssql-agent] request", request.id, request.request_type);
+      const startedAt = Date.now();
       try {
         const result = await processRequest(request);
+        console.log("[mssql-agent] request result", request.id, request.request_type, `${Date.now() - startedAt}ms`);
         await respond(request.id, "completed", { result });
+        console.log("[mssql-agent] request responded", request.id, "completed");
       } catch (error) {
         console.error("[mssql-agent] request fail", request.id, error);
         await respond(request.id, "failed", {
           error: error instanceof Error ? error.message : String(error),
         });
+        console.log("[mssql-agent] request responded", request.id, "failed");
       }
     } catch (error) {
       console.error("[mssql-agent] loop fail", error);
