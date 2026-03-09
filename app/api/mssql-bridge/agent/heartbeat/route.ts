@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireBridgeAgent } from "@/lib/mssql-bridge-auth";
+import { getBridgeAgentAuthDebug, requireBridgeAgent } from "@/lib/mssql-bridge-auth";
 
 export async function POST(req: NextRequest) {
   try {
     requireBridgeAgent(req);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message ?? "unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      {
+        error: error.message ?? "unauthorized",
+        debug: getBridgeAgentAuthDebug(req),
+      },
+      { status: 401 }
+    );
   }
 
   const body = await req.json().catch(() => ({}));
