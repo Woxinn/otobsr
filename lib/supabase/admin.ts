@@ -9,16 +9,19 @@ export function createSupabaseAdminClient(extraHeaders?: Record<string, string>)
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: {
-      fetch: (input, init) =>
-        fetch(input, {
+      fetch: (input, init) => {
+        const headers = new Headers(init?.headers);
+        Object.entries(extraHeaders ?? {}).forEach(([key, value]) => {
+          headers.set(key, value);
+        });
+
+        return fetch(input, {
           ...init,
-          headers: {
-            ...(init?.headers ?? {}),
-            ...(extraHeaders ?? {}),
-          },
+          headers,
           cache: "no-store",
           next: { revalidate: 0 },
-        }),
+        });
+      },
     },
   });
 }
