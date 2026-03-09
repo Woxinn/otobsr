@@ -3,6 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
+  // Public assets must stay reachable before login.
+  if (/\.[a-zA-Z0-9]+$/.test(pathname)) {
+    return NextResponse.next();
+  }
+
   // MSSQL bridge agent authenticates via bearer token in the route handler,
   // so it must bypass the browser-session redirect middleware.
   if (pathname.startsWith("/api/mssql-bridge/agent/")) {

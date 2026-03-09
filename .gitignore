@@ -9,6 +9,12 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+/mssql-agent/node_modules/
+/mssql-agent/build/
+/mssql-agent/dist/
+/mssql-agent-cs/bin/
+/mssql-agent-cs/obj/
+/mssql-agent-cs/publish/
 
 # testing
 /coverage
