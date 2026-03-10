@@ -396,21 +396,17 @@ export default async function DashboardPage() {
     dt.setHours(0, 0, 0, 0);
     return dt;
   };
+  const inProductionStatuses = ["uretimde"];
   const producedStatuses = ["hazir"];
   const missingReadyOrders = (orders ?? []).filter(
     (order) => !order.expected_ready_date
   );
   const producedOrders = (orders ?? []).filter((order) =>
-    producedStatuses.includes((order.order_status ?? "").toLowerCase())
+    producedStatuses.includes(normalizeStatus(order.order_status))
   );
   const inProductionOrders = (orders ?? []).filter((order) => {
     if (!order.expected_ready_date) return false;
-    if (
-      producedStatuses.includes((order.order_status ?? "").toLowerCase())
-    ) {
-      return false;
-    }
-    return true;
+    return inProductionStatuses.includes(normalizeStatus(order.order_status));
   });
 
   const withCountdown = inProductionOrders.map((order) => {
@@ -812,4 +808,3 @@ export default async function DashboardPage() {
     </section>
   );
 }
-
