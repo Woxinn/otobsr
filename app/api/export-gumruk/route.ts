@@ -414,7 +414,7 @@ export async function GET(req: NextRequest) {
     { header: "Ürün Adi", key: "urun_adi", width: 28 },
     { header: "Uzunluk", key: "uzunluk", width: 12 },
     { header: "Adet", key: "adet", width: 10 },
-    { header: "Birim Fiyat", key: "birim_fiyat", width: 14 },
+    { header: "Tutar", key: "tutar", width: 14 },
     { header: "Net Agirlik", key: "net", width: 12 },
     { header: "Brut Agirlik", key: "brut", width: 12 },
     { header: "Koli Adedi", key: "koli", width: 12 },
@@ -432,7 +432,7 @@ export async function GET(req: NextRequest) {
       urun_adi: string;
       uzunluk: string | number | null;
       adet: number;
-      birim_fiyat: number | string | null;
+      tutar: number | string | null;
       net: number;
       brut: number;
       koli: number;
@@ -480,7 +480,6 @@ export async function GET(req: NextRequest) {
     const tipKey = typeByProduct.get(product.id) ?? product.product_type?.name ?? "Belirtilecek";
     const comp = pickCompliance(product.product_type_id, product.product_type?.name ?? tipKey);
 
-    const unitPrice = Number(oi.unit_price ?? 0) || 0;
     const amountDbCents = toCents(oi.total_amount);
     const amountCents = amountDbCents !== null ? amountDbCents : 0; // sadece kaydedilmiş satır toplamını kullan
     const gtipCode = (product as any).gtip?.code ?? "Belirlenmedi";
@@ -490,7 +489,7 @@ export async function GET(req: NextRequest) {
       urun_adi: product.name ?? "",
       uzunluk: lengthByProduct.get(product.id) ?? "",
       adet: 0,
-      birim_fiyat: oi.unit_price ?? "",
+      tutar: 0,
       net: 0,
       brut: 0,
       koli: 0,
@@ -503,6 +502,7 @@ export async function GET(req: NextRequest) {
       _gtipKey: gtipCode,
     };
     existing.adet += amountQty;
+    existing.tutar = (Number(existing.tutar ?? 0) || 0) + amountCents / 100;
     existing.net += Number(netExport || 0);
     existing.brut += Number(grossExport || 0);
     existing.koli += Number(boxesExport || 0);
@@ -524,7 +524,7 @@ export async function GET(req: NextRequest) {
   const rows = Array.from(rowMap.values()).map((row) => ({
     ...row,
     adet: fmt2(row.adet),
-    birim_fiyat: fmt2(row.birim_fiyat),
+    tutar: fmt2(row.tutar),
     net: fmt2(row.net),
     brut: fmt2(row.brut),
     koli: fmt2(row.koli),
@@ -587,6 +587,41 @@ export async function GET(req: NextRequest) {
         right: { style: "medium", color: { argb: "FF000000" } },
       };
     });
+  });
+
+  const upperTotals = sorted.reduce(
+    (acc, row) => {
+      acc.adet += Number(row.adet ?? 0) || 0;
+      acc.tutar += Number(row.tutar ?? 0) || 0;
+      acc.net += Number(row.net ?? 0) || 0;
+      acc.brut += Number(row.brut ?? 0) || 0;
+      acc.koli += Number(row.koli ?? 0) || 0;
+      return acc;
+    },
+    { adet: 0, tutar: 0, net: 0, brut: 0, koli: 0 }
+  );
+
+  const upperTotalRow = ws.addRow({
+    urun_adi: "TOPLAM",
+    adet: fmt2(upperTotals.adet),
+    tutar: fmt2(upperTotals.tutar),
+    net: fmt2(upperTotals.net),
+    brut: fmt2(upperTotals.brut),
+    koli: fmt2(upperTotals.koli),
+  });
+  upperTotalRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFFFEB3B" },
+    };
+    cell.border = {
+      top: { style: "medium", color: { argb: "FF000000" } },
+      left: { style: "medium", color: { argb: "FF000000" } },
+      bottom: { style: "medium", color: { argb: "FF000000" } },
+      right: { style: "medium", color: { argb: "FF000000" } },
+    };
   });
 
   ws.getRow(1).font = { bold: true };
