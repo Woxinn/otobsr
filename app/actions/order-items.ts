@@ -11,6 +11,8 @@ const nullIfEmpty = (value: FormDataEntryValue | null) => {
   return text.length ? text : null;
 };
 
+const UNIT_PRICE_SCALE = 6;
+
 const normalizeNumberText = (value: string | null | undefined) => {
   if (!value) return null;
   const raw = value
@@ -52,6 +54,18 @@ const toIntegerFromText = (value: string | null | undefined) => {
   if (parsed === null) return null;
   return Math.round(parsed);
 };
+
+const roundToScale = (value: number | null | undefined, scale: number) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  const factor = 10 ** scale;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
+const normalizeUnitPrice = (value: number | null | undefined) =>
+  roundToScale(value, UNIT_PRICE_SCALE);
+
+const normalizeLineAmount = (value: number | null | undefined) =>
+  roundToScale(value, UNIT_PRICE_SCALE);
 
 const parseCsvLine = (line: string, delimiter: string) => {
   const result: string[] = [];
@@ -383,8 +397,10 @@ export async function createOrderItem(formData: FormData) {
 
   const resolvedProductId = product?.id ?? productId ?? null;
   const quantity = toIntegerFromText(String(formData.get("quantity") ?? ""));
-  const unitPriceInput = toNumberFromText(String(formData.get("unit_price") ?? ""));
-  const unitPrice = unitPriceInput ?? product?.unit_price ?? null;
+  const unitPriceInput = normalizeUnitPrice(
+    toNumberFromText(String(formData.get("unit_price") ?? ""))
+  );
+  const unitPrice = unitPriceInput ?? normalizeUnitPrice(product?.unit_price) ?? null;
 
   let netWeight = toNumberFromText(String(formData.get("net_weight_kg") ?? ""));
   let grossWeight = toNumberFromText(
@@ -408,7 +424,9 @@ export async function createOrderItem(formData: FormData) {
   }
 
   const totalAmount =
-    unitPrice !== null && quantity !== null ? unitPrice * quantity : null;
+    unitPrice !== null && quantity !== null
+      ? normalizeLineAmount(unitPrice * quantity)
+      : null;
 
   const name = nullIfEmpty(formData.get("name")) ?? product?.name ?? null;
 
@@ -446,8 +464,10 @@ export async function updateOrderItem(formData: FormData) {
     : null;
 
   const quantity = toIntegerFromText(String(formData.get("quantity") ?? ""));
-  const unitPriceInput = toNumberFromText(String(formData.get("unit_price") ?? ""));
-  const unitPrice = unitPriceInput ?? product?.unit_price ?? null;
+  const unitPriceInput = normalizeUnitPrice(
+    toNumberFromText(String(formData.get("unit_price") ?? ""))
+  );
+  const unitPrice = unitPriceInput ?? normalizeUnitPrice(product?.unit_price) ?? null;
 
   let netWeight = toNumberFromText(String(formData.get("net_weight_kg") ?? ""));
   let grossWeight = toNumberFromText(
@@ -464,7 +484,9 @@ export async function updateOrderItem(formData: FormData) {
   }
 
   const totalAmount =
-    unitPrice !== null && quantity !== null ? unitPrice * quantity : null;
+    unitPrice !== null && quantity !== null
+      ? normalizeLineAmount(unitPrice * quantity)
+      : null;
 
   const name = nullIfEmpty(formData.get("name")) ?? product?.name ?? null;
 
@@ -833,11 +855,15 @@ export async function importOrderItems(formData: FormData) {
       }
     }
 
-    if (product && unitPriceInput !== null) {
-      productUpdates.set(product.id, { id: product.id, unit_price: unitPriceInput });
+    const normalizedUnitPriceInput = normalizeUnitPrice(unitPriceInput);
+    const normalizedTotalAmountInput = normalizeLineAmount(totalAmountInput);
+
+    if (product && normalizedUnitPriceInput !== null) {
+      productUpdates.set(product.id, { id: product.id, unit_price: normalizedUnitPriceInput });
     }
 
-    const unitPrice = unitPriceInput ?? product?.unit_price ?? null;
+    const unitPrice =
+      normalizedUnitPriceInput ?? normalizeUnitPrice(product?.unit_price) ?? null;
 
     let resolvedNetWeight = netWeightInput;
     let resolvedGrossWeight = grossWeightInput;
@@ -857,8 +883,10 @@ export async function importOrderItems(formData: FormData) {
     }
 
     const totalAmount =
-      totalAmountInput ??
-      (unitPrice !== null && quantity !== null ? unitPrice * quantity : null);
+      normalizedTotalAmountInput ??
+      (unitPrice !== null && quantity !== null
+        ? normalizeLineAmount(unitPrice * quantity)
+        : null);
 
     const resolvedName = nameInput || product?.name || null;
 
@@ -1069,8 +1097,10 @@ export async function completeMissingOrderProducts(formData: FormData) {
       requestedGroupNames.add(groupName.toLowerCase());
     }
     const unitPrice =
-      toNumberFromText(String(formData.get(`row_${index}_unit_price`) ?? "")) ??
-      row.unit_price ??
+      normalizeUnitPrice(
+        toNumberFromText(String(formData.get(`row_${index}_unit_price`) ?? ""))
+      ) ??
+      normalizeUnitPrice(row.unit_price) ??
       null;
     const notes =
       nullIfEmpty(formData.get(`row_${index}_notes`)) ?? row.notes ?? null;
@@ -1160,7 +1190,11 @@ export async function completeMissingOrderProducts(formData: FormData) {
         line_no: row.line_no ?? null,
         quantity: row.quantity,
         unit_price: unitPrice,
-        total_amount: row.total_amount,
+        total_amount:
+          normalizeLineAmount(row.total_amount) ??
+          (unitPrice !== null && row.quantity !== null
+            ? normalizeLineAmount(unitPrice * row.quantity)
+            : null),
         net_weight_kg: resolvedNet,
         gross_weight_kg: resolvedGross,
       notes,
@@ -1258,11 +1292,15 @@ export async function completeMissingOrderProducts(formData: FormData) {
         name: rows[index]?.name ?? product.code,
         line_no: row.line_no ?? null,
         quantity: row.quantity,
-        unit_price: productInserts[index]?.unit_price ?? null,
+        unit_price: normalizeUnitPrice(productInserts[index]?.unit_price ?? null),
         total_amount:
-        rows[index]?.total_amount ??
-        ((productInserts[index]?.unit_price ?? null) !== null && row.quantity !== null
-          ? (productInserts[index]?.unit_price as number) * row.quantity
+        normalizeLineAmount(rows[index]?.total_amount) ??
+        ((normalizeUnitPrice(productInserts[index]?.unit_price ?? null)) !== null &&
+        row.quantity !== null
+          ? normalizeLineAmount(
+              (normalizeUnitPrice(productInserts[index]?.unit_price ?? null) as number) *
+                row.quantity
+            )
           : null),
       net_weight_kg: row.net_weight_kg,
       gross_weight_kg: row.gross_weight_kg,
@@ -1343,11 +1381,16 @@ export async function completeSingleMissingProduct(formData: FormData) {
     toNumberFromText(String(formData.get("row_0_qty") ?? "")) ??
     toIntegerFromText(String(formData.get("row_0_qty") ?? "")) ??
     null;
-  const unitPrice =
-    toNumberFromText(String(formData.get("row_0_unit_price") ?? "")) ?? null;
+  const unitPrice = normalizeUnitPrice(
+    toNumberFromText(String(formData.get("row_0_unit_price") ?? ""))
+  );
   const totalAmount =
-    toNumberFromText(String(formData.get("row_0_total_amount") ?? "")) ??
-    (unitPrice !== null && quantity !== null ? unitPrice * quantity : null);
+    normalizeLineAmount(
+      toNumberFromText(String(formData.get("row_0_total_amount") ?? ""))
+    ) ??
+    (unitPrice !== null && quantity !== null
+      ? normalizeLineAmount(unitPrice * quantity)
+      : null);
   const notes = nullIfEmpty(formData.get("row_0_notes"));
 
   const netWeight =

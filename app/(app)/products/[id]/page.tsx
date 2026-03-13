@@ -29,6 +29,16 @@ const fmt = (value: number | string | null | undefined) => {
     maximumFractionDigits: 2,
   });
 };
+
+const fmtUnitPrice = (value: number | string | null | undefined) => {
+  if (value === null || value === undefined) return "-";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  return num.toLocaleString("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  });
+};
 const fmtPercent = (value: number | null | undefined) => {
   if (value === null || value === undefined || !Number.isFinite(value)) return "-";
   return `${value.toFixed(1)}%`;
@@ -437,7 +447,7 @@ export default async function ProductDetailPage({
               ? [
                   {
                     label: "Birim fiyat",
-                    value: product.unit_price ? `${fmt(product.unit_price)} USD` : "-",
+                    value: product.unit_price ? `${fmtUnitPrice(product.unit_price)} USD` : "-",
                   },
                   { label: "Yurtici masraf %", value: fmt(product.domestic_cost_percent ?? 0) },
                 ]
@@ -532,7 +542,7 @@ export default async function ProductDetailPage({
                     </td>
                     <td className="px-3 py-3">{fmtDate(linked.shipment_eta)}</td>
                     {canSeeFinance ? (
-                      <td className="px-3 py-3 text-right">{fmt(linked.unit_price)}</td>
+                      <td className="px-3 py-3 text-right">{fmtUnitPrice(linked.unit_price)}</td>
                     ) : null}
                     <td className="px-3 py-3 text-right">{linked.quantity ?? "-"}</td>
                       {role !== "Satis" ? (

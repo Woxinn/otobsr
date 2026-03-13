@@ -79,7 +79,7 @@ create table if not exists orders (
   weight_kg numeric(12, 2),
   payment_method text,
   incoterm text,
-  total_amount numeric(12, 2),
+  total_amount numeric(18, 6),
   extra_cost_percent numeric(8, 3),
   currency text default 'USD',
   expected_ready_date date,
@@ -114,7 +114,7 @@ create table if not exists products (
   code text not null unique,
   name text not null,
   group_id uuid references product_groups(id) on delete set null,
-  unit_price numeric(12, 2),
+  unit_price numeric(18, 6),
   description text,
   notes text,
   created_at timestamp with time zone default now(),
@@ -167,8 +167,8 @@ create table if not exists order_items (
   product_id uuid references products(id) on delete set null,
   name text,
   quantity integer,
-  unit_price numeric(12, 2),
-  total_amount numeric(12, 2),
+  unit_price numeric(18, 6),
+  total_amount numeric(18, 6),
   net_weight_kg numeric(12, 2),
   gross_weight_kg numeric(12, 2),
   notes text,
@@ -423,12 +423,12 @@ alter table orders add column if not exists packages integer;
 alter table orders add column if not exists weight_kg numeric(12, 2);
 alter table orders add column if not exists payment_method text;
 alter table orders add column if not exists incoterm text;
-alter table orders add column if not exists total_amount numeric(12, 2);
+alter table orders add column if not exists total_amount numeric(18, 6);
 alter table orders add column if not exists extra_cost_percent numeric(8, 3);
 alter table orders add column if not exists currency text;
 alter table orders add column if not exists expected_ready_date date;
 alter table orders add column if not exists notes text;
-alter table products add column if not exists unit_price numeric(12, 2);
+alter table products add column if not exists unit_price numeric(18, 6);
 alter table shipment_orders add column if not exists shipment_id uuid;
 alter table shipment_orders add column if not exists order_id uuid;
 alter table order_items add column if not exists order_id uuid;
@@ -436,8 +436,8 @@ alter table order_items add column if not exists product_id uuid;
 alter table order_items add column if not exists name text;
 alter table order_items add column if not exists line_no integer;
 alter table order_items add column if not exists quantity integer;
-alter table order_items add column if not exists unit_price numeric(12, 2);
-alter table order_items add column if not exists total_amount numeric(12, 2);
+alter table order_items add column if not exists unit_price numeric(18, 6);
+alter table order_items add column if not exists total_amount numeric(18, 6);
 alter table order_items add column if not exists net_weight_kg numeric(12, 2);
 alter table order_items add column if not exists gross_weight_kg numeric(12, 2);
 alter table order_items add column if not exists notes text;

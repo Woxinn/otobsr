@@ -11,6 +11,8 @@ const nullIfEmpty = (value: FormDataEntryValue | null) => {
   return text.length ? text : null;
 };
 
+const UNIT_PRICE_SCALE = 6;
+
 const normalizeNumber = (value: FormDataEntryValue | null) => {
   const text = nullIfEmpty(value);
   if (!text) return null;
@@ -36,6 +38,15 @@ const toNumberFromText = (value: string | null | undefined) => {
   const parsed = Number(normalized);
   return Number.isNaN(parsed) ? null : parsed;
 };
+
+const roundToScale = (value: number | null | undefined, scale: number) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  const factor = 10 ** scale;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
+const normalizeUnitPrice = (value: number | null | undefined) =>
+  roundToScale(value, UNIT_PRICE_SCALE);
 
 const parseCsvLine = (line: string, delimiter: string) => {
   const result: string[] = [];
@@ -277,6 +288,7 @@ export async function createProduct(formData: FormData) {
   const brand = nullIfEmpty(formData.get("brand"));
   const gtipId = nullIfEmpty(formData.get("gtip_id"));
   const domesticCostPercent = toNumber(formData.get("domestic_cost_percent"));
+  const unitPrice = normalizeUnitPrice(toNumber(formData.get("unit_price")));
   if (!code || !name) return;
 
   const { data: product, error } = await supabase
@@ -285,7 +297,7 @@ export async function createProduct(formData: FormData) {
       code,
       name,
       group_id: groupId,
-      unit_price: toNumber(formData.get("unit_price")),
+      unit_price: unitPrice,
       brand,
       gtip_id: gtipId,
       domestic_cost_percent: domesticCostPercent ?? 0,
@@ -338,6 +350,7 @@ export async function updateProduct(formData: FormData) {
   const brand = nullIfEmpty(formData.get("brand"));
   const gtipId = nullIfEmpty(formData.get("gtip_id"));
   const domesticCostPercent = toNumber(formData.get("domestic_cost_percent"));
+  const unitPrice = normalizeUnitPrice(toNumber(formData.get("unit_price")));
 
   const { error } = await supabase
     .from("products")
@@ -345,7 +358,7 @@ export async function updateProduct(formData: FormData) {
       code: nullIfEmpty(formData.get("code")),
       name: nullIfEmpty(formData.get("name")),
       group_id: groupId,
-      unit_price: toNumber(formData.get("unit_price")),
+      unit_price: unitPrice,
       brand,
       gtip_id: gtipId,
       domestic_cost_percent: domesticCostPercent ?? 0,
@@ -678,7 +691,8 @@ export async function importProducts(formData: FormData) {
       const groupId = category
         ? groupByName.get(category.toLowerCase()) ?? null
         : null;
-      const unitPrice = idxUnitPrice >= 0 ? toNumberFromText(row[idxUnitPrice]) : null;
+      const unitPrice =
+        idxUnitPrice >= 0 ? normalizeUnitPrice(toNumberFromText(row[idxUnitPrice])) : null;
       const brand = idxBrand >= 0 ? nullIfEmpty(row[idxBrand]) : null;
       const description = idxDescription >= 0 ? row[idxDescription] : "";
       const notes = idxNotes >= 0 ? row[idxNotes] : "";

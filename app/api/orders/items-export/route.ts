@@ -62,7 +62,7 @@ export async function GET() {
     { header: "unit_price", key: "unit_price", width: 14 },
   ];
   rows.forEach((r) => ws.addRow(r));
-  ws.getColumn("unit_price").numFmt = "#,##0.00";
+  ws.getColumn("unit_price").numFmt = "#,##0.######";
 
   const buffer = await wb.xlsx.writeBuffer();
 

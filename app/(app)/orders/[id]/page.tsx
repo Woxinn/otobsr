@@ -674,6 +674,14 @@ export default async function OrderDetailPage({
     })} ${currency ?? "USD"}`;
   };
 
+  const formatUnitPrice = (value: number | null, currency: string | null) => {
+    if (value === null || value === undefined) return "-";
+    return `${value.toLocaleString("tr-TR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    })} ${currency ?? "USD"}`;
+  };
+
   const formatNumber = (value: number | null, fractionDigits = 2) => {
     if (value === null || value === undefined) return "-";
     return value.toLocaleString("tr-TR", {
@@ -1089,7 +1097,7 @@ export default async function OrderDetailPage({
                           </td>
                           {canSeeFinance ? (
                             <td className="py-4">
-                              {formatMoney(
+                              {formatUnitPrice(
                                 item.unit_price ?? item.products?.unit_price ?? null,
                                 order.currency
                               )}

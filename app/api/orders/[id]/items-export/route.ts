@@ -97,7 +97,7 @@ export async function GET(
     ];
 
     rows.forEach((row) => sheet.addRow(row));
-    sheet.getColumn("unit_price").numFmt = "#,##0.00";
+    sheet.getColumn("unit_price").numFmt = "#,##0.######";
 
     const buffer = await workbook.xlsx.writeBuffer();
     const body = buffer instanceof ArrayBuffer ? buffer : Buffer.from(buffer);
