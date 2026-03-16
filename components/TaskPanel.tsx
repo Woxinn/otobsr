@@ -80,11 +80,16 @@ export default async function TaskPanel() {
       .replaceAll("Ã§", "c")
       .trim();
   const producedStatuses = ["hazir", "uretildi"];
+  const productionStatuses = ["uretimde"];
   const readyToday = (readyTodayRaw ?? []).filter(
-    (o) => !producedStatuses.includes(normalizeStatus(o.order_status))
+    (o) =>
+      productionStatuses.includes(normalizeStatus(o.order_status)) &&
+      !producedStatuses.includes(normalizeStatus(o.order_status))
   );
   const overdueOrders = (overdueRaw ?? []).filter(
-    (o) => !producedStatuses.includes(normalizeStatus(o.order_status))
+    (o) =>
+      productionStatuses.includes(normalizeStatus(o.order_status)) &&
+      !producedStatuses.includes(normalizeStatus(o.order_status))
   );
 
   const { data: shipmentEtaRaw } = await supabase

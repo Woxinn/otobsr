@@ -6,6 +6,7 @@ import { getCurrentUserRole, canEdit } from "@/lib/roles";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import { selectForwarderQuote, updateForwarderQuote, deleteForwarderQuote, createForwarderQuoteForShipment } from "@/app/actions/forwarder-quotes";
 import { deleteShipment } from "@/app/actions/shipments";
+import { ShipmentArchiveButton } from "@/components/ShipmentArchiveButton";
 import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -260,6 +261,11 @@ export default async function ShipmentDetailPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {shipment.archived_at ? (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                Arsivde
+              </span>
+            ) : null}
             <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-xs font-semibold">
               Durum: {shipment.status ?? "Planlandi"}
             </span>
@@ -285,6 +291,12 @@ export default async function ShipmentDetailPage({
               >
                 Düzenle
               </Link>
+            ) : null}
+            {canEditPage ? (
+              <ShipmentArchiveButton
+                shipmentId={shipment.id}
+                archived={Boolean(shipment.archived_at)}
+              />
             ) : null}
             <Link
               href="/shipments"
@@ -711,6 +723,7 @@ export default async function ShipmentDetailPage({
     </section>
   );
 }
+
 
 
 

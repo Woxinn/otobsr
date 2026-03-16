@@ -2,6 +2,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit } from "@/lib/roles";
 import { getShipmentFlags } from "@/lib/shipments";
+import { ShipmentArchiveButton } from "@/components/ShipmentArchiveButton";
 
 type SearchParams = {
   q?: string;
@@ -71,14 +72,14 @@ export default async function ShipmentsPage({
     (type) => type.is_required
   );
 
-  const sortKey = resolvedParams.sort ?? "created";
+  const sortKey = resolvedParams.sort ?? "eta";
   const sortDirParam = resolvedParams.sortDir ?? "";
   const sortMap: Record<string, { column: string; ascending: boolean }> = {
     eta: { column: "eta_current", ascending: true },
     etd: { column: "etd_planned", ascending: true },
     created: { column: "created_at", ascending: false },
   };
-  const baseSort = sortMap[sortKey] ?? sortMap.created;
+  const baseSort = sortMap[sortKey] ?? sortMap.eta;
   const sortAscending =
     sortDirParam === "asc"
       ? true
@@ -94,7 +95,7 @@ export default async function ShipmentsPage({
     )
     .order(sortConfig.column, { ascending: sortConfig.ascending, nullsFirst: false });
 
-  const includeArchived = resolvedParams.archived === "1";
+  const archivedMode = (resolvedParams.archived ?? "").toLowerCase();
   const exportParams = new URLSearchParams();
   Object.entries(resolvedParams).forEach(([key, value]) => {
     if (value) {
@@ -132,9 +133,12 @@ export default async function ShipmentsPage({
     return dt.toLocaleDateString("tr-TR");
   };
 
-  const filteredShipments = includeArchived
-    ? shipments ?? []
-    : (shipments ?? []).filter((item) => !item.archived_at);
+  const filteredShipments =
+    archivedMode === "only"
+      ? (shipments ?? []).filter((item) => Boolean(item.archived_at))
+      : archivedMode === "all"
+      ? shipments ?? []
+      : (shipments ?? []).filter((item) => !item.archived_at);
 
   const shipmentIds = filteredShipments.map((item) => item.id);
   const { data: shipmentOrdersRows } = shipmentIds.length
@@ -483,7 +487,7 @@ export default async function ShipmentsPage({
             Sıralama
             <select
               name="sort"
-              defaultValue={resolvedParams.sort ?? "created"}
+              defaultValue={resolvedParams.sort ?? "eta"}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="created">Eklenme tarihi</option>
@@ -587,14 +591,17 @@ export default async function ShipmentsPage({
               />
               Evrak eksik
             </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+            <label className="text-sm font-medium">
+              Arsiv
+              <select
                 name="archived"
-                value="1"
-                defaultChecked={resolvedParams.archived === "1"}
-              />
-              Arsivdekiler dahil
+                defaultValue={resolvedParams.archived ?? ""}
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Sadece aktifler</option>
+                <option value="all">Tumu</option>
+                <option value="only">Sadece arsiv</option>
+              </select>
             </label>
           </div>
         </div>
@@ -647,6 +654,11 @@ export default async function ShipmentsPage({
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                      {shipment.archived_at ? (
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
+                          Arsivde
+                        </span>
+                      ) : null}
                       <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 font-semibold">
                         ETA: {formatDate(shipment.eta_current)}
                       </span>
@@ -681,12 +693,20 @@ export default async function ShipmentsPage({
                         {formatMoney(orderTotalsByShipment.get(shipment.id)?.amount ?? 0, "USD")}
                       </p>
                     </div>
-                    <Link
-                      href={`/shipments/${shipment.id}`}
-                      className="rounded-full border border-black/20 px-4 py-1 text-xs font-semibold"
-                    >
-                      Detay
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/shipments/${shipment.id}`}
+                        className="rounded-full border border-black/20 px-4 py-1 text-xs font-semibold"
+                      >
+                        Detay
+                      </Link>
+                      {canEditPage ? (
+                        <ShipmentArchiveButton
+                          shipmentId={shipment.id}
+                          archived={Boolean(shipment.archived_at)}
+                        />
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -741,5 +761,6 @@ export default async function ShipmentsPage({
     </section>
   );
 }
+
 
 
