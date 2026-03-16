@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Otobsr MSSQL Agent</title>
+    <style>
+      :root {
+        --bg: #121826;
+        --panel: #1c2434;
+        --panel-2: #0f1725;
+        --text: #f8fafc;
+        --muted: #9ca3af;
+        --accent: #303238;
+        --border: #263143;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top left, #1f2937, var(--bg) 45%);
+        color: var(--text);
+      }
+      .shell { padding: 24px; }
+      .hero {
+        display: grid;
+        grid-template-columns: 92px 1fr auto;
+        gap: 18px;
+        align-items: center;
+      }
+      .logo {
+        width: 88px;
+        height: 88px;
+        background: transparent;
+      }
+      .logo svg { width: 100%; height: 100%; }
+      h1 { margin: 0 0 6px; font-size: 30px; }
+      .sub { color: var(--muted); font-size: 13px; }
+      .actions { display: flex; gap: 10px; }
+      button {
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 10px 14px;
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .grid {
+        margin-top: 22px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: rgba(28, 36, 52, 0.92);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px;
+      }
+      .card h2 {
+        margin: 0 0 16px;
+        font-size: 16px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      }
+      .row:last-child { border-bottom: none; }
+      .row .k { color: var(--muted); }
+      .logs {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        min-height: 260px;
+        max-height: 260px;
+        overflow: auto;
+        padding: 12px;
+      }
+      .log-item {
+        font-family: Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.45;
+        color: #d1d5db;
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+        word-break: break-word;
+      }
+      .log-item.error { color: #fca5a5; }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="hero">
+        <div class="logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+            <g transform="rotate(-8 64 64)">
+              <rect x="18" y="16" width="92" height="92" rx="18" fill="#303238"/>
+              <rect x="42" y="40" width="44" height="44" rx="10" fill="#121826"/>
+            </g>
+          </svg>
+        </div>
+        <div>
+          <h1>Otobsr MSSQL Agent</h1>
+          <div class="sub">Durmushan Balkan tarafindan gelistirilmistir</div>
+        </div>
+        <div class="actions">
+          <button id="hideBtn">Simge durumuna al</button>
+          <button id="quitBtn">Kapat</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>Canli Durum</h2>
+          <div class="row"><div class="k">Durum</div><div id="state">-</div></div>
+          <div class="row"><div class="k">Son heartbeat</div><div id="heartbeat">-</div></div>
+          <div class="row"><div class="k">Son istek</div><div id="request">-</div></div>
+          <div class="row"><div class="k">Son hata</div><div id="error">-</div></div>
+        </div>
+        <div class="card">
+          <h2>Canli Log</h2>
+          <div class="logs" id="logs"></div>
+        </div>
+      </div>
+    </div>
+    <script src="./electron-renderer.js"></script>
+  </body>
+  </html>

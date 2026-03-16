@@ -1,0 +1,44 @@
+{
+  "name": "otobsr-mssql-agent",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Otobsr MSSQL bridge agent",
+  "author": "Durmushan Balkan",
+  "main": "electron-main.js",
+  "bin": {
+    "otobsr-mssql-agent": "index.js"
+  },
+  "scripts": {
+    "start": "electron .",
+    "start:cli": "node index.js",
+    "build:exe": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mssql": "^11.0.1"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.otobasar.mssqlagent",
+    "productName": "Otobsr MSSQL Agent",
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!node_modules/.cache/**"
+    ],
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "signAndEditExecutable": false,
+      "icon": "assets/tray-icon.png"
+    }
+  }
+}
