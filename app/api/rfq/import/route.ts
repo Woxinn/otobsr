@@ -5,6 +5,7 @@ import { getCurrentUserRole } from "@/lib/roles";
 type ImportRow = {
   product_code?: string | null;
   supplier_name?: string | null;
+  target_unit_price?: number | null;
   unit_price?: number | null;
   currency?: string | null;
   quantity?: number | null;
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
     const to = from + DB_PAGE_SIZE - 1;
     const { data, error } = await supabase
       .from("rfq_items")
-      .select("id, product_id, product_code, product_name")
+      .select("id, product_id, product_code, product_name, target_unit_price")
       .eq("rfq_id", rfqId)
       .range(from, to);
     if (error) {
@@ -144,23 +145,46 @@ export async function POST(req: Request) {
   const missingSuppliers: Set<string> = new Set();
   const ambiguousSuppliers: Array<{ input: string; options: { id: string; name: string }[] }> = [];
 
-  const newItemsPayload: any[] = [];
+  const newItemsByCode = new Map<
+    string,
+    {
+      rfq_id: string;
+      product_id: string | null;
+      product_code: string;
+      product_name: string;
+      quantity: number;
+      target_unit_price: number | null;
+    }
+  >();
+  const targetPriceByCode = new Map<string, number | null>();
   rows.forEach((r) => {
     const code = (r.product_code ?? "").trim();
     if (!code) return;
     const key = code.toLowerCase();
+    const targetPrice = toNumber(r.target_unit_price);
+    if (targetPrice !== null) targetPriceByCode.set(key, targetPrice);
     if (rfqItemsByCode.has(key)) return; // RFQ'de zaten var
 
     missingProducts.add(code); // RFQ'ye eklenecek her yeni satırı kullanıcıya sor
     const prod = productByCode.get(key);
-    newItemsPayload.push({
+    const qtyNum = Math.max(0, toNumber(r.quantity) ?? 0);
+    const existing = newItemsByCode.get(key);
+    if (existing) {
+      existing.quantity = Math.max(existing.quantity, qtyNum);
+      if (targetPrice !== null) existing.target_unit_price = targetPrice;
+      newItemsByCode.set(key, existing);
+      return;
+    }
+    newItemsByCode.set(key, {
       rfq_id: rfqId,
       product_id: prod?.id ?? null,
       product_code: prod?.code ?? code,
       product_name: prod?.name ?? code,
-      quantity: 0,
+      quantity: qtyNum,
+      target_unit_price: targetPrice,
     });
   });
+  const newItemsPayload = Array.from(newItemsByCode.values());
 
   const wantCreateMissing = body?.add_missing_products === true;
   if (missingProducts.size && !wantCreateMissing) {
@@ -200,6 +224,27 @@ export async function POST(req: Request) {
       createdItems.push(...(data ?? []));
     }
     (createdItems ?? []).forEach((it) => rfqItemsByCode.set((it.product_code ?? "").toLowerCase(), it));
+  }
+
+  const targetPriceUpdates = Array.from(targetPriceByCode.entries())
+    .map(([code, targetUnitPrice]) => {
+      const rfqItem = rfqItemsByCode.get(code);
+      if (!rfqItem?.id) return null;
+      return {
+        id: rfqItem.id,
+        target_unit_price: targetUnitPrice,
+      };
+    })
+    .filter(Boolean) as { id: string; target_unit_price: number | null }[];
+
+  if (targetPriceUpdates.length) {
+    for (const updateChunk of chunkArray(targetPriceUpdates, 500)) {
+      const { error: targetErr } = await supabase.from("rfq_items").upsert(updateChunk, { onConflict: "id" });
+      if (targetErr) {
+        console.error("[rfq-import] target price update err", targetErr);
+        return NextResponse.json({ error: targetErr.message, debug }, { status: 500 });
+      }
+    }
   }
 
   type Key = string;

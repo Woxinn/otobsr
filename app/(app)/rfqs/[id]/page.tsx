@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
+import { deleteDocument } from "@/app/actions/documents";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canViewModule, getCurrentUserRole } from "@/lib/roles";
 import RfqActionBar from "@/components/RfqActionBar";
@@ -19,9 +20,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: `RFQ | ${title}` };
 }
 import RfqQuoteGrid from "@/components/RfqQuoteGrid";
+import ConfirmActionForm from "@/components/ConfirmActionForm";
 import DocumentUploader from "@/components/DocumentUploader";
+import DocumentDownloadButton from "@/components/DocumentDownloadButton";
 import SupplierQuoteList from "@/components/SupplierQuoteList";
 import RfqConvertModal from "@/components/RfqConvertModal";
+import RfqItemDeleteButton from "@/components/RfqItemDeleteButton";
+import RfqSupplierAdder from "@/components/RfqSupplierAdder";
+import RfqTargetPriceField from "@/components/RfqTargetPriceField";
 
 export default async function RfqDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -92,7 +98,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
   const { data: rawItems, error: itemsErr } = await fetchAll<any>((from, to) =>
     supabase
       .from("rfq_items")
-      .select("id, rfq_id, product_id, quantity, product_code, product_name")
+      .select("id, rfq_id, product_id, quantity, product_code, product_name, target_unit_price")
       .eq("rfq_id", id)
       .range(from, to)
   );
@@ -163,6 +169,16 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
     return <div className="p-6 text-sm text-red-600">Tedarikciler okunamadi: {rfqSuppliersErr.message}</div>;
   }
 
+  const selectedSupplierIds = new Set((rfqSuppliers ?? []).map((row: any) => String(row.supplier_id)));
+  const { data: allSuppliers, error: allSuppliersErr } = await supabase
+    .from("suppliers")
+    .select("id, name")
+    .order("name", { ascending: true });
+  if (allSuppliersErr) {
+    return <div className="p-6 text-sm text-red-600">Tedarikci listesi okunamadi: {allSuppliersErr.message}</div>;
+  }
+  const availableSuppliers = (allSuppliers ?? []).filter((row: any) => !selectedSupplierIds.has(String(row.id)));
+
   const { data: rawQuotes, error: quotesErr } = await fetchAll<any>((from, to) =>
     supabase
       .from("rfq_quotes")
@@ -211,6 +227,13 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
     .select("id, file_name, storage_path, uploaded_at, notes")
     .ilike("notes", `%rfq:${id}%`)
     .order("uploaded_at", { ascending: false });
+
+  const { data: proformaDocType } = await supabase
+    .from("document_types")
+    .select("id, name, code")
+    .eq("code", "PROFORMA")
+    .limit(1)
+    .maybeSingle();
 
   return (
     <section className="space-y-6">
@@ -274,6 +297,8 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                 <th className="px-3 py-2">Kod</th>
                 <th className="px-3 py-2">Ürün</th>
                 <th className="px-3 py-2 text-right">Miktar</th>
+                <th className="px-3 py-2 text-right">Hedef fiyat</th>
+                <th className="px-3 py-2 text-right">Aksiyon</th>
               </tr>
             </thead>
             <tbody>
@@ -282,7 +307,22 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                   <tr key={item.id} className="border-b border-black/5 last:border-none">
                     <td className="px-3 py-3 font-semibold">{item.product_code ?? "-"}</td>
                     <td className="px-3 py-3">{item.product_name ?? "-"}</td>
-                  <td className="px-3 py-3 text-right">{fmtNum(item.quantity, 2)}</td>
+                    <td className="px-3 py-3 text-right">{fmtNum(item.quantity, 2)}</td>
+                    <td className="px-3 py-3 text-right">
+                      <RfqTargetPriceField
+                        rfqId={rfq.id}
+                        rfqItemId={item.id}
+                        value={item.target_unit_price ?? null}
+                        currency={rfq.currency ?? null}
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <RfqItemDeleteButton
+                        rfqId={rfq.id}
+                        rfqItemId={item.id}
+                        productCode={item.product_code ?? null}
+                      />
+                    </td>
                   </tr>
                 );
               })}
@@ -306,6 +346,15 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           </div>
           <div>
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-black/50">Tedarikçiler</h3>
+            <div className="mb-3">
+              <RfqSupplierAdder
+                rfqId={rfq.id}
+                suppliers={availableSuppliers.map((row: any) => ({
+                  id: String(row.id),
+                  name: row.name ?? String(row.id),
+                }))}
+              />
+            </div>
             <SupplierQuoteList
               rfqId={rfq.id}
               suppliers={(rfq.rfq_suppliers ?? []).map((row: any) => ({
@@ -327,6 +376,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         </div>
         <RfqQuoteGrid
           rfqId={rfq.id}
+          currency={rfq.currency ?? null}
           items={rfq.rfq_items ?? []}
           suppliers={Array.from(
             new Map(
@@ -351,15 +401,36 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           <ul className="space-y-2 text-sm text-black/70">
             {(documents ?? []).map((doc: any) => (
               <li key={doc.id} className="flex items-center justify-between rounded-xl border border-black/10 bg-black/5 px-3 py-2">
-                <span className="truncate">{doc.file_name}</span>
-                <span className="text-[11px] text-black/50">{doc.uploaded_at?.slice(0, 10) ?? ""}</span>
+                <div className="min-w-0">
+                  <div className="truncate">{doc.file_name}</div>
+                  <div className="text-[11px] text-black/50">{doc.uploaded_at?.slice(0, 10) ?? ""}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {doc.storage_path ? <DocumentDownloadButton storagePath={doc.storage_path} label="Gor" /> : null}
+                  <ConfirmActionForm
+                    action={deleteDocument}
+                    confirmText="Bu belgeyi silmek istiyor musun?"
+                    buttonText="Sil"
+                    className="contents"
+                    buttonClassName="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
+                  >
+                    <input type="hidden" name="document_id" value={doc.id} />
+                    <input type="hidden" name="rfq_id" value={rfq.id} />
+                  </ConfirmActionForm>
+                </div>
               </li>
             ))}
             {!documents?.length ? <li className="text-black/40">Henüz belge yok</li> : null}
           </ul>
         </div>
         <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm md:col-span-2">
-          <DocumentUploader rfqId={rfq.id} documentTypes={[{ id: "proforma", name: "Proforma" }]} />
+          {proformaDocType ? (
+            <DocumentUploader rfqId={rfq.id} documentTypes={[{ id: proformaDocType.id, name: proformaDocType.name }]} />
+          ) : (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+              Proforma belge tipi bulunamadi. `document_types` tablosunda `Proforma` kaydi gerekli.
+            </div>
+          )}
         </div>
       </div>
     </section>

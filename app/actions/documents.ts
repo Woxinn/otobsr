@@ -37,6 +37,7 @@ export async function deleteDocument(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const documentId = String(formData.get("document_id") ?? "");
   const shipmentId = String(formData.get("shipment_id") ?? "");
+  const rfqId = String(formData.get("rfq_id") ?? "");
   if (!documentId) return;
 
   const { data: doc } = await supabase
@@ -52,6 +53,9 @@ export async function deleteDocument(formData: FormData) {
   await supabase.from("documents").delete().eq("id", documentId);
   if (shipmentId) {
     revalidatePath(`/shipments/${shipmentId}`);
+  }
+  if (rfqId) {
+    revalidatePath(`/rfqs/${rfqId}`);
   }
   revalidatePath("/documents");
 }

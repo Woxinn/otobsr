@@ -97,7 +97,7 @@ export default function RfqImportModal({ rfqId }: Props) {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-black/60">
               <span>
-                CSV formatı: product_code,supplier_name,unit_price,currency,quantity,transit_days,min_order,delivery_time,validity_date,notes
+                CSV formatı: product_code,target_unit_price,supplier_name,unit_price,currency,quantity,transit_days,min_order,delivery_time,validity_date,notes
               </span>
               <a
                 href={`/api/rfq/import/template?rfq_id=${encodeURIComponent(rfqId)}`}
@@ -146,7 +146,7 @@ export default function RfqImportModal({ rfqId }: Props) {
               className="mt-3 h-48 w-full rounded-2xl border border-black/15 px-3 py-2 text-sm font-mono"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="product_code,supplier_name,unit_price,currency,quantity&#10;ABC-01,Supplier A,1.2,USD,100"
+              placeholder="product_code;target_unit_price;supplier_name;unit_price;currency;quantity&#10;ABC-01;1.15;Supplier A;1.2;USD;100"
             />
             <div className="mt-3 flex items-center justify-between">
               {message ? <span className="text-xs text-red-600">{message}</span> : <span />}
@@ -285,6 +285,7 @@ function parseCsv(raw: string): any[] {
   let header = lines[0].split(delimiter).map((h) => h.trim());
   const defaultHeader = [
     "product_code",
+    "target_unit_price",
     "supplier_name",
     "unit_price",
     "currency",
@@ -305,7 +306,7 @@ function parseCsv(raw: string): any[] {
     header.forEach((h, idx) => {
       obj[h] = cells[idx] ?? "";
     });
-    ["unit_price", "quantity", "transit_days", "min_order"].forEach((k) => {
+    ["target_unit_price", "unit_price", "quantity", "transit_days", "min_order"].forEach((k) => {
       if (obj[k] !== undefined && obj[k] !== "") obj[k] = parseLocalizedNumber(obj[k]);
     });
     return obj;

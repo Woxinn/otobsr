@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export async function GET(req: NextRequest) {
   const header = [
     "product_code",
+    "target_unit_price",
     "supplier_name",
     "unit_price",
     "currency",
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
         const to = from + pageSize - 1;
         const { data: items, error } = await supabase
           .from("rfq_items")
-          .select("product_code, quantity")
+          .select("product_code, quantity, target_unit_price")
           .eq("rfq_id", rfqId)
           .range(from, to);
         if (error) {
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
         batch.forEach((it) => {
           rows.push([
             it.product_code ?? "",
+            it.target_unit_price ?? "",
             "",
             "",
             "USD",
@@ -59,7 +61,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!rows.length) {
-    rows = [["ABC-01", "", "", "USD", 100, "", "", "", "", ""]];
+    rows = [["ABC-01", "", "", "", "USD", 100, "", "", "", "", ""]];
   }
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
