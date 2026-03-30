@@ -125,8 +125,10 @@ export async function GET(request: Request) {
         price != null &&
         item?.target_unit_price != null &&
         (!rfq.currency || !sup.currency || String(sup.currency) === String(rfq.currency));
-      const diff = comparable ? Number(price) - Number(item.target_unit_price) : null;
-      const diffPct = comparable && Number(item.target_unit_price) !== 0 ? diff / Number(item.target_unit_price) : null;
+      const diffPct =
+        comparable && Number(item.target_unit_price) !== 0
+          ? (Number(price) - Number(item.target_unit_price)) / Number(item.target_unit_price)
+          : null;
 
       row[`price_${sup.id}`] = price;
       row[`diff_pct_${sup.id}`] = diffPct;
