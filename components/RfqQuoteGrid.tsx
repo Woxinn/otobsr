@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useToast } from "./ToastProvider";
 import { computeCosts } from "@/lib/gtipCost";
 
@@ -23,6 +23,11 @@ type QuoteItem = {
   target_unit_price?: number | null;
 };
 
+type Baseline = {
+  kind: "offer" | "target" | null;
+  value: number | null;
+};
+
 export default function RfqQuoteGrid({
   rfqId,
   currency,
@@ -38,6 +43,14 @@ export default function RfqQuoteGrid({
   const [value, setValue] = useState<string>("");
   const [saving, setSaving] = useState<string | null>(null);
   const { addToast } = useToast();
+
+  const formatNumber = (value: number | null | undefined, digits = 2) => {
+    if (value == null || !Number.isFinite(value)) return "-";
+    return value.toLocaleString("tr-TR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: digits,
+    });
+  };
 
   const startEdit = (supplierId: string, itemId: string, current?: number | null) => {
     const key = `${supplierId}-${itemId}`;
@@ -91,6 +104,9 @@ export default function RfqQuoteGrid({
     return qi?.unit_price ?? null;
   };
 
+  const isComparableCurrency = (sup: QuoteSupplier) =>
+    !currency || !sup.currency || String(sup.currency) === String(currency);
+
   const getNetCost = (sup: QuoteSupplier, item: QuoteItem) => {
     const current = getCurrentPrice(sup, item);
     const gtip = Array.isArray((item as any).gtip) ? (item as any).gtip?.[0] ?? null : (item as any).gtip ?? null;
@@ -109,13 +125,65 @@ export default function RfqQuoteGrid({
     };
   };
 
-  const getComparableDiffPct = (sup: QuoteSupplier, item: QuoteItem) => {
-    const current = getCurrentPrice(sup, item);
-    const target = item.target_unit_price ?? null;
-    if (current == null || target == null || target === 0) return null;
-    if (currency && sup.currency && String(sup.currency) !== String(currency)) return null;
-    return ((current - target) / target) * 100;
+  const getItemBaseline = (item: QuoteItem): Baseline => {
+    const offerPrices = suppliers
+      .filter((sup) => isComparableCurrency(sup))
+      .map((sup) => getCurrentPrice(sup, item))
+      .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+
+    if (offerPrices.length >= 2) {
+      return { kind: "offer", value: Math.min(...offerPrices) };
+    }
+
+    if (offerPrices.length === 1 && item.target_unit_price != null && Number(item.target_unit_price) !== 0) {
+      return { kind: "target", value: Number(item.target_unit_price) };
+    }
+
+    return { kind: null, value: null };
   };
+
+  const getTotalForSupplier = (sup: QuoteSupplier) => {
+    if (!isComparableCurrency(sup)) return null;
+    let total = 0;
+    for (const item of items) {
+      const qty = Number(item.quantity ?? 0);
+      const price = getCurrentPrice(sup, item);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      if (price == null || !Number.isFinite(price)) return null;
+      total += qty * price;
+    }
+    return total;
+  };
+
+  const targetTotal = useMemo(() => {
+    let total = 0;
+    let used = false;
+    for (const item of items) {
+      const qty = Number(item.quantity ?? 0);
+      const target = Number(item.target_unit_price ?? NaN);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      if (!Number.isFinite(target)) return null;
+      total += qty * target;
+      used = true;
+    }
+    return used ? total : null;
+  }, [items]);
+
+  const totalBaseline = useMemo<Baseline>(() => {
+    const totals = suppliers
+      .map((sup) => getTotalForSupplier(sup))
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+    if (totals.length >= 2) {
+      return { kind: "offer", value: Math.min(...totals) };
+    }
+
+    if (totals.length === 1 && targetTotal != null && targetTotal !== 0) {
+      return { kind: "target", value: targetTotal };
+    }
+
+    return { kind: null, value: null };
+  }, [items, suppliers, targetTotal]);
 
   const renderPriceCell = (sup: QuoteSupplier, item: QuoteItem) => {
     const current = getCurrentPrice(sup, item);
@@ -174,29 +242,70 @@ export default function RfqQuoteGrid({
   };
 
   const renderDiffPctChip = (sup: QuoteSupplier, item: QuoteItem) => {
-    const diffPct = getComparableDiffPct(sup, item);
-    if (diffPct == null) {
-      if (item.target_unit_price != null && currency && sup.currency && String(sup.currency) !== String(currency)) {
-        return (
-          <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-            Kur farkli
-          </span>
-        );
-      }
-      return <span className="text-black/35">-</span>;
+    const current = getCurrentPrice(sup, item);
+    if (current == null) return <span className="text-black/35">-</span>;
+    if (!isComparableCurrency(sup)) {
+      return (
+        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+          Kur farkli
+        </span>
+      );
     }
 
-    const favorable = diffPct <= 0;
-    const sign = diffPct > 0 ? "+" : "";
+    const baseline = getItemBaseline(item);
+    if (baseline.value == null || baseline.value === 0) return <span className="text-black/35">-</span>;
+
+    const pct = ((current - baseline.value) / baseline.value) * 100;
+    const favorable = pct <= 0;
+    const sign = pct > 0 ? "+" : "";
+    const title = baseline.kind === "offer" ? "En dusuk teklif bazli" : "Hedef fiyat bazli";
+
     return (
       <span
+        title={title}
         className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
           favorable
             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
             : "border-red-200 bg-red-50 text-red-600"
         }`}
       >
-        {sign}{diffPct.toFixed(2)}%
+        {sign}{pct.toFixed(2)}%
+      </span>
+    );
+  };
+
+  const renderTotalCell = (sup: QuoteSupplier) => {
+    const total = getTotalForSupplier(sup);
+    return total != null ? `${formatNumber(total, 2)} ${sup.currency ?? currency ?? ""}` : "-";
+  };
+
+  const renderTotalDiffPctChip = (sup: QuoteSupplier) => {
+    const total = getTotalForSupplier(sup);
+    if (total == null) return <span className="text-black/35">-</span>;
+    if (!isComparableCurrency(sup)) {
+      return (
+        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+          Kur farkli
+        </span>
+      );
+    }
+    if (totalBaseline.value == null || totalBaseline.value === 0) return <span className="text-black/35">-</span>;
+
+    const pct = ((total - totalBaseline.value) / totalBaseline.value) * 100;
+    const favorable = pct <= 0;
+    const sign = pct > 0 ? "+" : "";
+    const title = totalBaseline.kind === "offer" ? "En dusuk toplam teklif bazli" : "Toplam hedef bazli";
+
+    return (
+      <span
+        title={title}
+        className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+          favorable
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-red-200 bg-red-50 text-red-600"
+        }`}
+      >
+        {sign}{pct.toFixed(2)}%
       </span>
     );
   };
@@ -207,6 +316,9 @@ export default function RfqQuoteGrid({
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-black/10 bg-white shadow-sm">
+      <div className="border-b border-black/10 px-4 py-3 text-[11px] text-black/45">
+        Fark %: birden fazla teklifte en dusuk teklif, tek teklifte hedef fiyat baz alinir.
+      </div>
       <table className="w-full table-fixed text-sm">
         <colgroup>
           <col className="w-[18rem]" />
@@ -243,7 +355,7 @@ export default function RfqQuoteGrid({
             {supList.map((s) => (
               <Fragment key={`head-${s.id}`}>
                 <th className="border-l border-black/10 px-3 py-2 text-center">Teklif</th>
-                <th className="border-l border-black/10 px-3 py-2 text-center">Hedef %</th>
+                <th className="border-l border-black/10 px-3 py-2 text-center">Fark %</th>
               </Fragment>
             ))}
           </tr>
@@ -279,6 +391,21 @@ export default function RfqQuoteGrid({
             </tr>
           ))}
         </tbody>
+        <tfoot className="bg-black/[0.02]">
+          <tr>
+            <td className="border-t border-r border-black/10 px-4 py-4 font-semibold text-black">Toplam</td>
+            <td className="border-t border-r border-black/10 px-3 py-4 text-right text-black/45">Adet x fiyat</td>
+            <td className="border-t border-r border-black/10 px-3 py-4 text-right font-semibold text-black/75">
+              {targetTotal != null ? `${formatNumber(targetTotal, 2)} ${currency ?? ""}` : "-"}
+            </td>
+            {supList.map((s) => (
+              <Fragment key={`total-${s.id}`}>
+                <td className="border-t border-l border-black/10 px-3 py-4 text-right font-semibold text-black/85">{renderTotalCell(s)}</td>
+                <td className="border-t border-l border-black/10 px-3 py-4 text-center">{renderTotalDiffPctChip(s)}</td>
+              </Fragment>
+            ))}
+          </tr>
+        </tfoot>
       </table>
     </div>
   );

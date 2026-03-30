@@ -3,6 +3,21 @@ import ExcelJS from "exceljs";
 import { computeCosts } from "@/lib/gtipCost";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+type SupplierRow = {
+  id: string;
+  name: string;
+  currency?: string | null;
+};
+
+type ItemRow = {
+  id: string;
+  product_code?: string | null;
+  product_name?: string | null;
+  quantity?: number | null;
+  target_unit_price?: number | null;
+  products?: any;
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rfqId = searchParams.get("rfq_id");
@@ -25,7 +40,7 @@ export async function GET(request: Request) {
     .from("rfq_items")
     .select(
       `
-      id, product_id, product_code, product_name, quantity, target_unit_price,
+      id, product_code, product_name, quantity, target_unit_price,
       products(
         domestic_cost_percent,
         gtip:gtips(
@@ -61,10 +76,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: qiErr.message }, { status: 500 });
   }
 
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Teklifler");
-
-  const supplierList = Array.from(
+  const supplierList: SupplierRow[] = Array.from(
     new Map(
       (quotes ?? []).map((q: any) => [
         String(q.supplier_id),
@@ -76,6 +88,66 @@ export async function GET(request: Request) {
       ])
     ).values()
   );
+
+  const getPrice = (sup: SupplierRow, item: ItemRow) => {
+    const quote = (quotes ?? []).find((q: any) => String(q.supplier_id) === sup.id);
+    const qi = (quoteItems ?? []).find((x: any) => x.rfq_quote_id === quote?.id && x.rfq_item_id === item.id);
+    return qi?.unit_price ?? null;
+  };
+
+  const isComparableCurrency = (sup: SupplierRow) => !rfq.currency || !sup.currency || String(sup.currency) === String(rfq.currency);
+
+  const getItemBaseline = (item: ItemRow) => {
+    const offerPrices = supplierList
+      .filter((sup) => isComparableCurrency(sup))
+      .map((sup) => getPrice(sup, item))
+      .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+
+    if (offerPrices.length >= 2) return { kind: "offer" as const, value: Math.min(...offerPrices) };
+    if (offerPrices.length === 1 && item.target_unit_price != null && Number(item.target_unit_price) !== 0) {
+      return { kind: "target" as const, value: Number(item.target_unit_price) };
+    }
+    return { kind: null as const, value: null };
+  };
+
+  const getSupplierTotal = (sup: SupplierRow) => {
+    if (!isComparableCurrency(sup)) return null;
+    let total = 0;
+    for (const item of (items ?? []) as ItemRow[]) {
+      const qty = Number(item.quantity ?? 0);
+      const price = getPrice(sup, item);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      if (price == null || !Number.isFinite(price)) return null;
+      total += qty * price;
+    }
+    return total;
+  };
+
+  const targetTotal = (() => {
+    let total = 0;
+    let used = false;
+    for (const item of (items ?? []) as ItemRow[]) {
+      const qty = Number(item.quantity ?? 0);
+      const target = Number(item.target_unit_price ?? NaN);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      if (!Number.isFinite(target)) return null;
+      total += qty * target;
+      used = true;
+    }
+    return used ? total : null;
+  })();
+
+  const totalBaseline = (() => {
+    const totals = supplierList
+      .map((sup) => getSupplierTotal(sup))
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    if (totals.length >= 2) return { kind: "offer" as const, value: Math.min(...totals) };
+    if (totals.length === 1 && targetTotal != null && targetTotal !== 0) return { kind: "target" as const, value: targetTotal };
+    return { kind: null as const, value: null };
+  })();
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Teklifler");
 
   const columns: Partial<ExcelJS.Column>[] = [
     { header: "Product code", key: "code", width: 18 },
@@ -99,35 +171,30 @@ export async function GET(request: Request) {
     cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
   });
 
-  (items ?? []).forEach((item: any) => {
+  ((items ?? []) as ItemRow[]).forEach((item) => {
     const row: Record<string, any> = {
-      code: item?.product_code ?? "",
-      name: item?.product_name ?? "",
-      qty: item?.quantity ?? "",
-      target_price: item?.target_unit_price ?? null,
+      code: item.product_code ?? "",
+      name: item.product_name ?? "",
+      qty: item.quantity ?? "",
+      target_price: item.target_unit_price ?? null,
     };
+    const baseline = getItemBaseline(item);
 
     supplierList.forEach((sup) => {
-      const quote = (quotes ?? []).find((q: any) => String(q.supplier_id) === sup.id);
-      const qi = (quoteItems ?? []).find((x: any) => x.rfq_quote_id === quote?.id && x.rfq_item_id === item.id);
-      const price = qi?.unit_price ?? null;
+      const price = getPrice(sup, item);
       const costResult =
         price != null
           ? computeCosts({
               basePrice: price,
-              domesticCostPercent: item?.products?.domestic_cost_percent ?? null,
+              domesticCostPercent: item.products?.domestic_cost_percent ?? null,
               weightKg: null,
-              gtip: item?.products?.gtip ?? null,
+              gtip: item.products?.gtip ?? null,
             })
           : null;
       const netCost = costResult?.gozetimsizMatrah ?? costResult?.gozetimliMatrah ?? null;
-      const comparable =
-        price != null &&
-        item?.target_unit_price != null &&
-        (!rfq.currency || !sup.currency || String(sup.currency) === String(rfq.currency));
       const diffPct =
-        comparable && Number(item.target_unit_price) !== 0
-          ? (Number(price) - Number(item.target_unit_price)) / Number(item.target_unit_price)
+        price != null && isComparableCurrency(sup) && baseline.value != null && baseline.value !== 0
+          ? (price - baseline.value) / baseline.value
           : null;
 
       row[`price_${sup.id}`] = price;
@@ -136,11 +203,11 @@ export async function GET(request: Request) {
     });
 
     const excelRow = ws.addRow(row);
-
-    const prices = supplierList
-      .map((sup) => ({ sup, price: row[`price_${sup.id}`] }))
-      .filter((p) => p.price != null && p.price !== "");
-    const minPrice = prices.length > 0 ? Math.min(...prices.map((p) => Number(p.price))) : null;
+    const comparablePrices = supplierList
+      .filter((sup) => isComparableCurrency(sup))
+      .map((sup) => row[`price_${sup.id}`])
+      .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+    const minPrice = comparablePrices.length > 0 ? Math.min(...comparablePrices) : null;
 
     supplierList.forEach((sup) => {
       const priceCell = excelRow.getCell(`price_${sup.id}`);
@@ -174,6 +241,27 @@ export async function GET(request: Request) {
         costCell.font = { color: { argb: "FF9CA3AF" }, italic: true };
       }
     });
+  });
+
+  const totalRow: Record<string, any> = {
+    code: "TOTAL",
+    name: "Quantity x unit price",
+    qty: "",
+    target_price: targetTotal,
+  };
+
+  supplierList.forEach((sup) => {
+    const total = getSupplierTotal(sup);
+    const diffPct = total != null && totalBaseline.value != null && totalBaseline.value !== 0 ? (total - totalBaseline.value) / totalBaseline.value : null;
+    totalRow[`price_${sup.id}`] = total;
+    totalRow[`diff_pct_${sup.id}`] = diffPct;
+    totalRow[`cost_${sup.id}`] = null;
+  });
+
+  const excelTotalRow = ws.addRow(totalRow);
+  excelTotalRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
   });
 
   const buffer = await wb.xlsx.writeBuffer();
