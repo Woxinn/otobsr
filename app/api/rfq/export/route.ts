@@ -18,6 +18,11 @@ type ItemRow = {
   products?: any;
 };
 
+type Baseline = {
+  kind: "offer" | "target" | null;
+  value: number | null;
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rfqId = searchParams.get("rfq_id");
@@ -97,7 +102,7 @@ export async function GET(request: Request) {
 
   const isComparableCurrency = (sup: SupplierRow) => !rfq.currency || !sup.currency || String(sup.currency) === String(rfq.currency);
 
-  const getItemBaseline = (item: ItemRow) => {
+  const getItemBaseline = (item: ItemRow): Baseline => {
     const offerPrices = supplierList
       .filter((sup) => isComparableCurrency(sup))
       .map((sup) => getPrice(sup, item))
@@ -107,7 +112,7 @@ export async function GET(request: Request) {
     if (offerPrices.length === 1 && item.target_unit_price != null && Number(item.target_unit_price) !== 0) {
       return { kind: "target" as const, value: Number(item.target_unit_price) };
     }
-    return { kind: null as const, value: null };
+    return { kind: null, value: null };
   };
 
   const getSupplierTotal = (sup: SupplierRow) => {
@@ -137,13 +142,13 @@ export async function GET(request: Request) {
     return used ? total : null;
   })();
 
-  const totalBaseline = (() => {
+  const totalBaseline: Baseline = (() => {
     const totals = supplierList
       .map((sup) => getSupplierTotal(sup))
       .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
     if (totals.length >= 2) return { kind: "offer" as const, value: Math.min(...totals) };
     if (totals.length === 1 && targetTotal != null && targetTotal !== 0) return { kind: "target" as const, value: targetTotal };
-    return { kind: null as const, value: null };
+    return { kind: null, value: null };
   })();
 
   const wb = new ExcelJS.Workbook();

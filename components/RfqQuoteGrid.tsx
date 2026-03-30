@@ -2,11 +2,12 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { useToast } from "./ToastProvider";
-import { computeCosts } from "@/lib/gtipCost";
+import { calculateDisplayedNetCost, type CountryRateRow } from "@/lib/productCostDisplay";
 
 type QuoteSupplier = {
   id: string;
   name: string;
+  country?: string | null;
   currency?: string | null;
   transit?: string | number | null;
   quote_items?: { rfq_item_id: string; unit_price: number | null }[];
@@ -19,6 +20,7 @@ type QuoteItem = {
   quantity?: number | null;
   domestic_cost_percent?: number | null;
   gtip?: any | null;
+  country_rates?: CountryRateRow[] | null;
   weight_kg?: number | null;
   target_unit_price?: number | null;
 };
@@ -110,18 +112,20 @@ export default function RfqQuoteGrid({
   const getNetCost = (sup: QuoteSupplier, item: QuoteItem) => {
     const current = getCurrentPrice(sup, item);
     const gtip = Array.isArray((item as any).gtip) ? (item as any).gtip?.[0] ?? null : (item as any).gtip ?? null;
-    const costResult =
+    const result =
       current != null
-        ? computeCosts({
+        ? calculateDisplayedNetCost({
             basePrice: current,
             domesticCostPercent: item.domestic_cost_percent ?? null,
             weightKg: item.weight_kg ?? null,
-            gtip,
+            gtipBase: gtip,
+            countryRates: item.country_rates ?? [],
+            selectedCountry: sup.country ?? null,
           })
         : null;
     return {
-      netCost: costResult?.gozetimsizMatrah ?? costResult?.gozetimliMatrah ?? null,
-      hasGtip: Boolean(gtip),
+      netCost: result?.netCost ?? null,
+      hasGtip: result?.hasGtip ?? Boolean(gtip),
     };
   };
 

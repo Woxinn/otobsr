@@ -2,18 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { computeCosts, GtipRow } from "@/lib/gtipCost";
+import { GtipRow } from "@/lib/gtipCost";
+import { calculateDisplayedNetCost, resolveGtipForCountry, type CountryRateRow } from "@/lib/productCostDisplay";
 
-type CountryRate = {
-  country: string;
-  customs_duty_rate?: number | null;
-  additional_duty_rate?: number | null;
-  anti_dumping_applicable?: boolean | null;
-  anti_dumping_rate?: number | null;
-  surveillance_applicable?: boolean | null;
-  surveillance_unit_value?: number | null;
-  vat_rate?: number | null;
-};
+type CountryRate = CountryRateRow;
 
 type Props = {
   product: {
@@ -88,24 +80,14 @@ export default function ProductCostCalculatorClient({
   const domesticCostPercent = parseInputNumber(domesticCostText);
 
   const countryGtip = countryRates.find((c) => c.country === selectedCountry) ?? null;
-  const gtipToUse: GtipRow | null = countryGtip
-    ? {
-        ...(gtipBase as any),
-        customs_duty_rate: countryGtip.customs_duty_rate,
-        additional_duty_rate: countryGtip.additional_duty_rate,
-        anti_dumping_applicable: countryGtip.anti_dumping_applicable,
-        anti_dumping_rate: countryGtip.anti_dumping_rate,
-        surveillance_applicable: countryGtip.surveillance_applicable,
-        surveillance_unit_value: countryGtip.surveillance_unit_value,
-        vat_rate: countryGtip.vat_rate,
-      }
-    : gtipBase;
-
-  const costs = computeCosts({
+  const gtipToUse: GtipRow | null = resolveGtipForCountry(gtipBase, countryRates, selectedCountry);
+  const { netCost: kdvSizMaliyet, costs } = calculateDisplayedNetCost({
     basePrice,
     domesticCostPercent: domesticCostPercent ?? 0,
     weightKg,
-    gtip: gtipToUse,
+    gtipBase,
+    countryRates,
+    selectedCountry,
   });
 
   const customsFromGozetim = costs.customsFromGozetim;
@@ -137,17 +119,6 @@ export default function ProductCostCalculatorClient({
   kdvBaseCandidates.push(subtotalBeforeVat);
   const kdvBaz = kdvBaseCandidates.length ? Math.max(...kdvBaseCandidates) : null;
 
-  const addDutyRate = Number((gtipToUse as any)?.additional_duty_rate ?? 0);
-  const hasSurveillance = Boolean((gtipToUse as any)?.surveillance_applicable);
-  const shouldAddNetVat = addDutyRate > 0 || hasSurveillance;
-  const kdvSizMaliyet =
-    kdvBaz !== null
-      ? shouldAddNetVat
-        ? netVatPayable !== null
-          ? kdvBaz + netVatPayable
-          : null
-        : kdvBaz
-      : null;
   const kdvLiMaliyet = kdvSizMaliyet !== null && vatCredit !== null ? kdvSizMaliyet + vatCredit : null;
 
   const warnings: string[] = [];

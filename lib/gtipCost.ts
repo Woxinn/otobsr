@@ -6,6 +6,7 @@ export type GtipRow = {
   description?: string | null;
   customs_duty_rate?: number | null; // %
   additional_duty_rate?: number | null; // %
+  vat_rate?: number | null; // %
   anti_dumping_applicable?: boolean | null;
   anti_dumping_rate?: number | null; // tutar/kg
   surveillance_applicable?: boolean | null;

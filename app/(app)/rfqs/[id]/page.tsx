@@ -28,6 +28,7 @@ import RfqConvertModal from "@/components/RfqConvertModal";
 import RfqItemDeleteButton from "@/components/RfqItemDeleteButton";
 import RfqSupplierAdder from "@/components/RfqSupplierAdder";
 import RfqTargetPriceField from "@/components/RfqTargetPriceField";
+import { pickWeightKg } from "@/lib/gtipCost";
 
 export default async function RfqDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -115,6 +116,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
       brand: string | null;
       domestic_cost_percent: number | null;
       gtip: any | null;
+      gtip_id: string | null;
     }
   >();
   for (let i = 0; i < productIds.length; i += 500) {
@@ -123,9 +125,9 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
       .from("products")
       .select(
         `
-        id, code, name, brand, domestic_cost_percent,
+        id, code, name, brand, domestic_cost_percent, gtip_id,
         gtip:gtips(
-          id, code, customs_duty_rate, additional_duty_rate,
+          id, code, customs_duty_rate, additional_duty_rate, vat_rate,
           anti_dumping_applicable, anti_dumping_rate,
           surveillance_applicable, surveillance_unit_value
         )
@@ -142,14 +144,70 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         brand: p.brand ?? null,
         domestic_cost_percent: p.domestic_cost_percent ?? null,
         gtip: p.gtip ?? null,
+        gtip_id: p.gtip_id ?? null,
       })
     );
+  }
+
+  const gtipIds = Array.from(
+    new Set(
+      Array.from(productById.values())
+        .map((product) => product.gtip_id)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  const ratesByGtip = new Map<string, any[]>();
+  for (let i = 0; i < gtipIds.length; i += 500) {
+    const chunk = gtipIds.slice(i, i + 500);
+    const { data: rates, error: ratesErr } = await supabase
+      .from("gtip_country_rates")
+      .select(
+        "gtip_id, country, customs_duty_rate, additional_duty_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value, vat_rate"
+      )
+      .in("gtip_id", chunk);
+    if (ratesErr) {
+      return <div className="p-6 text-sm text-red-600">Ulke bazli GTIP oranlari okunamadi: {ratesErr.message}</div>;
+    }
+    (rates ?? []).forEach((row: any) => {
+      if (!row.gtip_id) return;
+      const current = ratesByGtip.get(String(row.gtip_id)) ?? [];
+      current.push(row);
+      ratesByGtip.set(String(row.gtip_id), current);
+    });
+  }
+
+  const attributeValuesByProductId = new Map<string, any[]>();
+  for (let i = 0; i < productIds.length; i += 500) {
+    const chunk = productIds.slice(i, i + 500);
+    const { data: attributeValues, error: attributeErr } = await supabase
+      .from("product_attribute_values")
+      .select("product_id, value_text, value_number, product_attributes(name, value_type)")
+      .in("product_id", chunk);
+    if (attributeErr) {
+      return <div className="p-6 text-sm text-red-600">Urun agirlik nitelikleri okunamadi: {attributeErr.message}</div>;
+    }
+    (attributeValues ?? []).forEach((row: any) => {
+      const productId = row.product_id ? String(row.product_id) : null;
+      if (!productId) return;
+      const current = attributeValuesByProductId.get(productId) ?? [];
+      current.push(row);
+      attributeValuesByProductId.set(productId, current);
+    });
   }
 
   const rfqItems = (rawItems ?? []).map((item: any) => {
     const prod = item.product_id ? productById.get(String(item.product_id)) : null;
     const resolvedCode = prod?.code ?? item.product_code ?? null;
     const resolvedName = prod?.name ?? item.product_name ?? null;
+    const rawAttributes = item.product_id ? attributeValuesByProductId.get(String(item.product_id)) ?? [] : [];
+    const weightSource = rawAttributes.map((raw: any) => {
+      const attr = Array.isArray(raw.product_attributes) ? raw.product_attributes[0] : raw.product_attributes;
+      return {
+        name: attr?.name,
+        value: attr?.value_type === "number" ? raw.value_number : raw.value_text,
+      };
+    });
     return {
       ...item,
       product_code: resolvedCode,
@@ -157,13 +215,14 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
       products: prod ?? null,
       domestic_cost_percent: prod?.domestic_cost_percent ?? null,
       gtip: prod?.gtip ?? null,
-      weight_kg: null,
+      country_rates: prod?.gtip_id ? ratesByGtip.get(String(prod.gtip_id)) ?? [] : [],
+      weight_kg: pickWeightKg(weightSource as any[]),
     };
   });
 
   const { data: rfqSuppliers, error: rfqSuppliersErr } = await supabase
     .from("rfq_suppliers")
-    .select("supplier_id, suppliers(name)")
+    .select("supplier_id, suppliers(name, country)")
     .eq("rfq_id", id);
   if (rfqSuppliersErr) {
     return <div className="p-6 text-sm text-red-600">Tedarikciler okunamadi: {rfqSuppliersErr.message}</div>;
@@ -172,7 +231,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
   const selectedSupplierIds = new Set((rfqSuppliers ?? []).map((row: any) => String(row.supplier_id)));
   const { data: allSuppliers, error: allSuppliersErr } = await supabase
     .from("suppliers")
-    .select("id, name")
+    .select("id, name, country")
     .order("name", { ascending: true });
   if (allSuppliersErr) {
     return <div className="p-6 text-sm text-red-600">Tedarikci listesi okunamadi: {allSuppliersErr.message}</div>;
@@ -182,7 +241,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
   const { data: rawQuotes, error: quotesErr } = await fetchAll<any>((from, to) =>
     supabase
       .from("rfq_quotes")
-      .select("id, rfq_id, supplier_id, transit_time, currency, total_amount, suppliers(name)")
+      .select("id, rfq_id, supplier_id, transit_time, currency, total_amount, suppliers(name, country)")
       .eq("rfq_id", id)
       .range(from, to)
   );
@@ -385,6 +444,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                 {
                   id: q.supplier_id,
                   name: q.suppliers?.name ?? q.supplier_id,
+                  country: q.suppliers?.country ?? null,
                   transit: q.transit_time,
                   currency: q.currency,
                   quote_items: q.rfq_quote_items ?? [],
