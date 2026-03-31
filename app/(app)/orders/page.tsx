@@ -69,6 +69,18 @@ export default async function OrdersPage({
 
   // Order -> Shipment eÅŸleÅŸmeleri
   const orderIds = (orders ?? []).map((o) => o.id);
+  const { data: packingSummaries } = orderIds.length
+    ? await supabase
+        .from("order_packing_list_summary")
+        .select("order_id, total_packages, total_net_weight_kg")
+        .in("order_id", orderIds)
+    : { data: [] as any[] };
+  const { data: orderItemQtyRows } = orderIds.length
+    ? await supabase
+        .from("order_items")
+        .select("order_id, quantity")
+        .in("order_id", orderIds)
+    : { data: [] as any[] };
   const { data: orderShipments } = orderIds.length
     ? await supabase
         .from("shipment_orders")
@@ -92,6 +104,31 @@ export default async function OrdersPage({
     list.push(row.shipments);
     shipmentsByOrder.set(row.order_id, list);
   });
+
+  const packingSummaryByOrder = new Map<
+    string,
+    { total_packages: number | null; total_net_weight_kg: number | null }
+  >();
+  (packingSummaries ?? []).forEach((row: any) => {
+    if (!row.order_id) return;
+    packingSummaryByOrder.set(String(row.order_id), {
+      total_packages:
+        row.total_packages !== null && row.total_packages !== undefined
+          ? Number(row.total_packages)
+          : null,
+      total_net_weight_kg:
+        row.total_net_weight_kg !== null && row.total_net_weight_kg !== undefined
+          ? Number(row.total_net_weight_kg)
+          : null,
+    });
+  });
+
+  const qtyByOrder = (orderItemQtyRows ?? []).reduce<Map<string, number>>((acc, row: any) => {
+    if (!row.order_id) return acc;
+    const current = acc.get(String(row.order_id)) ?? 0;
+    acc.set(String(row.order_id), current + Number(row.quantity ?? 0));
+    return acc;
+  }, new Map<string, number>());
 
   const orderDocumentTypes = (documentTypes ?? []).filter(
     (type) => type.applies_to === "order"
@@ -642,7 +679,12 @@ export default async function OrdersPage({
                                   </span>
                                 ) : null}
                                 <div className="mt-1 text-xs text-black/55">
-                                  {formatNumber(order.packages, 0)} adet | {formatNumber(order.weight_kg, 2)} kg
+                                  {formatNumber(qtyByOrder.get(order.id) ?? order.packages, 0)} adet |{" "}
+                                  {formatNumber(
+                                    packingSummaryByOrder.get(order.id)?.total_net_weight_kg ?? order.weight_kg,
+                                    2
+                                  )}{" "}
+                                  kg
                                   {role === "Satis" ? "" : ` | ${order.incoterm ?? "-"}`}
                                 </div>
                                 <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>

@@ -156,18 +156,21 @@ export async function POST(req: Request) {
       target_unit_price: number | null;
     }
   >();
+  const quantityByCode = new Map<string, number>();
   const targetPriceByCode = new Map<string, number | null>();
   rows.forEach((r) => {
     const code = (r.product_code ?? "").trim();
     if (!code) return;
     const key = code.toLowerCase();
     const targetPrice = toNumber(r.target_unit_price);
+    const parsedQty = toNumber(r.quantity);
+    if (parsedQty !== null) quantityByCode.set(key, Math.max(quantityByCode.get(key) ?? 0, Math.max(0, parsedQty)));
     if (targetPrice !== null) targetPriceByCode.set(key, targetPrice);
     if (rfqItemsByCode.has(key)) return; // RFQ'de zaten var
 
     missingProducts.add(code); // RFQ'ye eklenecek her yeni satırı kullanıcıya sor
     const prod = productByCode.get(key);
-    const qtyNum = Math.max(0, toNumber(r.quantity) ?? 0);
+    const qtyNum = Math.max(0, parsedQty ?? 0);
     const existing = newItemsByCode.get(key);
     if (existing) {
       existing.quantity = Math.max(existing.quantity, qtyNum);
@@ -226,23 +229,34 @@ export async function POST(req: Request) {
     (createdItems ?? []).forEach((it) => rfqItemsByCode.set((it.product_code ?? "").toLowerCase(), it));
   }
 
-  const targetPriceUpdates = Array.from(targetPriceByCode.entries())
-    .map(([code, targetUnitPrice]) => {
+  const itemFieldUpdates = Array.from(new Set([...targetPriceByCode.keys(), ...quantityByCode.keys()]))
+    .map((code) => {
       const rfqItem = rfqItemsByCode.get(code);
       if (!rfqItem?.id) return null;
-      return {
+      const patch: { id: string; target_unit_price?: number | null; quantity?: number } = {
         id: rfqItem.id,
-        target_unit_price: targetUnitPrice,
       };
+      if (targetPriceByCode.has(code)) patch.target_unit_price = targetPriceByCode.get(code) ?? null;
+      if (quantityByCode.has(code)) patch.quantity = quantityByCode.get(code);
+      return patch;
     })
-    .filter(Boolean) as { id: string; target_unit_price: number | null }[];
+    .filter(Boolean) as { id: string; target_unit_price?: number | null; quantity?: number }[];
 
-  if (targetPriceUpdates.length) {
-    for (const updateChunk of chunkArray(targetPriceUpdates, 500)) {
-      const { error: targetErr } = await supabase.from("rfq_items").upsert(updateChunk, { onConflict: "id" });
-      if (targetErr) {
-        console.error("[rfq-import] target price update err", targetErr);
-        return NextResponse.json({ error: targetErr.message, debug }, { status: 500 });
+  if (itemFieldUpdates.length) {
+    for (const updateChunk of chunkArray(itemFieldUpdates, 500)) {
+      for (const updateRow of updateChunk) {
+        const patch: { target_unit_price?: number | null; quantity?: number } = {};
+        if ("target_unit_price" in updateRow) patch.target_unit_price = updateRow.target_unit_price;
+        if ("quantity" in updateRow) patch.quantity = updateRow.quantity;
+        const { error: targetErr } = await supabase
+          .from("rfq_items")
+          .update(patch)
+          .eq("id", updateRow.id)
+          .eq("rfq_id", rfqId);
+        if (targetErr) {
+          console.error("[rfq-import] target price update err", targetErr);
+          return NextResponse.json({ error: targetErr.message, debug }, { status: 500 });
+        }
       }
     }
   }
