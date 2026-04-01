@@ -8,6 +8,66 @@ const MIN_VISIBLE_MS = 900;
 const MAX_VISIBLE_MS = 15000;
 const COMPLETE_HIDE_DELAY_MS = 180;
 
+function getRouteLoadingCopy(route: string | null | undefined) {
+  const clean = String(route ?? "")
+    .split("?")[0]
+    .replace(/\/+$/, "") || "/";
+  const parts = clean.split("/").filter(Boolean);
+
+  if (clean === "/") {
+    return { label: "Yukleniyor", detail: "Dashboard hazirlaniyor" };
+  }
+
+  if (parts[0] === "orders") {
+    if (parts.length === 1) return { label: "Siparisler yukleniyor", detail: "Siparis kayitlari hazirlaniyor" };
+    if (parts[2] === "packing-import") return { label: "Packing aciliyor", detail: "Koli ve agirlik verileri hazirlaniyor" };
+    if (parts[2] === "beyanname") return { label: "Beyanname aciliyor", detail: "Masraf ve vergi hesaplari hazirlaniyor" };
+    return { label: "Siparis aciliyor", detail: "Siparis detaylari ve belgeler getiriliyor" };
+  }
+
+  if (parts[0] === "products") {
+    if (parts.length === 1) return { label: "Urunler yukleniyor", detail: "Urun listesi hazirlaniyor" };
+    if (parts[1] === "import-update") return { label: "Urun aktarimi aciliyor", detail: "Import ekranı hazirlaniyor" };
+    if (parts[1] === "netsis-import") return { label: "Netsis aktarimi aciliyor", detail: "Esleme verileri hazirlaniyor" };
+    return { label: "Urun aciliyor", detail: "Kart ve canli veriler getiriliyor" };
+  }
+
+  if (parts[0] === "shipments") {
+    if (parts.length === 1) return { label: "Sevkiyatlar yukleniyor", detail: "ETA ve operasyon kayitlari hazirlaniyor" };
+    return { label: "Sevkiyat aciliyor", detail: "Rota ve belge detaylari getiriliyor" };
+  }
+
+  if (parts[0] === "rfqs") {
+    if (parts.length === 1) return { label: "RFQ'lar yukleniyor", detail: "Teklif listesi hazirlaniyor" };
+    return { label: "RFQ aciliyor", detail: "Teklif karsilastirmalari hazirlaniyor" };
+  }
+
+  if (parts[0] === "proformalar") {
+    if (parts.length === 1) return { label: "Proformalar yukleniyor", detail: "Kayitlar hazirlaniyor" };
+    return { label: "Proforma aciliyor", detail: "Kalemler ve tedarikci bilgileri getiriliyor" };
+  }
+
+  if (parts[0] === "siparis-plani") {
+    return { label: "Siparis plani yukleniyor", detail: "Stok ve satis verileri hesapaniyor" };
+  }
+
+  if (parts[0] === "suppliers") {
+    return parts.length === 1
+      ? { label: "Tedarikciler yukleniyor", detail: "Tedarikci kayitlari hazirlaniyor" }
+      : { label: "Tedarikci aciliyor", detail: "Siparis ve rapor verileri getiriliyor" };
+  }
+
+  if (parts[0] === "documents") {
+    return { label: "Belgeler yukleniyor", detail: "Evrak kayitlari hazirlaniyor" };
+  }
+
+  if (parts[0] === "gtips") {
+    return { label: "GTIP ekranı aciliyor", detail: "Vergi ve oran verileri getiriliyor" };
+  }
+
+  return { label: "Yukleniyor", detail: "Yeni ekran hazirlaniyor" };
+}
+
 export default function RouteOverlayLoader() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -18,6 +78,7 @@ export default function RouteOverlayLoader() {
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [copy, setCopy] = useState(() => getRouteLoadingCopy(currentRoute));
   const startedAtRef = useRef(0);
   const pendingRouteRef = useRef<string | null>(null);
   const currentRouteRef = useRef(currentRoute);
@@ -71,6 +132,7 @@ export default function RouteOverlayLoader() {
       startedAtRef.current = Date.now();
       pendingRouteRef.current = targetRoute;
       loadingRef.current = true;
+      setCopy(getRouteLoadingCopy(targetRoute));
       setProgress(12);
       setLoading(true);
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
@@ -163,8 +225,8 @@ export default function RouteOverlayLoader() {
   return (
     <BrandedLoadingScreen
       overlay
-      label="Yukleniyor"
-      detail="Yeni ekran hazirlaniyor"
+      label={copy.label}
+      detail={copy.detail}
       progress={progress}
     />
   );
