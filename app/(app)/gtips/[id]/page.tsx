@@ -235,7 +235,7 @@ export default async function GtipDetailPage({
                 <th className="py-2 pr-2">Ad</th>
                 <th className="py-2 pr-2">Tip</th>
                 <th className="py-2 pr-2 text-right">Fiyat</th>
-                <th className="py-2 pr-2">Netsis</th>
+                <th className="py-2 pr-2">Stok kodu</th>
                 <th className="py-2 pr-2 text-right">Detay</th>
                 <th className="py-2 pr-2 text-right">Maliyet</th>
               </tr>

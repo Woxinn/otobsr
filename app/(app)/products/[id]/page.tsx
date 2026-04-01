@@ -96,7 +96,7 @@ export default async function ProductDetailPage({
   const stockMap = stockCode ? await fetchLiveStockMap([stockCode], "exact") : new Map<string, number>();
   const stockResult = stockCode
     ? { value: stockMap.get(stockCode) ?? 0, error: null }
-    : { value: null, error: "Netsis kodu yok" };
+    : { value: null, error: "Stok kodu yok" };
 
   const { data: group } = product.group_id
     ? await supabase
@@ -390,12 +390,12 @@ export default async function ProductDetailPage({
               </span>
               <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">Grup: {group?.name ?? "Yok"}</span>
               <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">
-                Netsis kod: {product.netsis_stok_kodu ?? "-"}
+                Stok kodu: {product.netsis_stok_kodu ?? "-"}
               </span>
             </div>
             <div className="mt-3 inline-flex items-center gap-3 rounded-2xl border border-white/25 bg-white/15 px-4 py-3 text-sm backdrop-blur shadow-[0_14px_38px_-26px_rgba(15,61,62,0.8)]">
               <div className="flex flex-col leading-tight">
-                <span className="text-[11px] uppercase tracking-[0.2em] text-white/70">Netsis stok</span>
+                <span className="text-[11px] uppercase tracking-[0.2em] text-white/70">Canli stok</span>
                 <span className="text-2xl font-semibold text-white">{fmtInt(stockResult.value)}</span>
               </div>
               {stockResult.error ? (

@@ -27,7 +27,7 @@ function getRouteLoadingCopy(route: string | null | undefined) {
   if (parts[0] === "products") {
     if (parts.length === 1) return { label: "Urunler yukleniyor", detail: "Urun listesi hazirlaniyor" };
     if (parts[1] === "import-update") return { label: "Urun aktarimi aciliyor", detail: "Import ekrani hazirlaniyor" };
-    if (parts[1] === "netsis-import") return { label: "Netsis aktarimi aciliyor", detail: "Esleme verileri hazirlaniyor" };
+    if (parts[1] === "netsis-import") return { label: "Stok kodu aktarimi aciliyor", detail: "Esleme verileri hazirlaniyor" };
     return { label: "Urun aciliyor", detail: "Kart ve canli veriler getiriliyor" };
   }
 

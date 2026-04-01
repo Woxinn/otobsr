@@ -17,7 +17,7 @@ export default function ProductsListToast() {
       const updated = searchParams.get("updated");
       const missing = searchParams.get("missing");
       addToast(
-        `Netsis import: ${updated ?? "-"} gÃ¼ncellendi, ${missing ?? "0"} bulunamadÄ±.`,
+        `Stok kodu import: ${updated ?? "-"} gÃ¼ncellendi, ${missing ?? "0"} bulunamadÄ±.`,
         "info"
       );
     } else if (toastKey === "products-import-ok") {

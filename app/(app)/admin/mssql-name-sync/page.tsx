@@ -72,7 +72,7 @@ export default function MssqlNameSyncPage() {
     <div className="p-6 space-y-4 max-w-3xl">
       <h1 className="text-2xl font-semibold">MSSQL Ürün İsmi Eşleştirme</h1>
       <p className="text-sm text-black/60">
-        Netsis stok kodu dolu, adı boş ürünler için TBLSTSABIT.STOK_ADI değerini çekip products.name alanına yazar.
+        Stok kodu dolu, adı boş ürünler için TBLSTSABIT.STOK_ADI değerini çekip products.name alanına yazar.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-sm text-black/70">Limit</label>

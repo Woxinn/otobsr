@@ -60,6 +60,46 @@ const nowIso = () => new Date().toISOString();
 const trimCode = (value) => String(value || "").trim();
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+async function fetchStockMapChunk(pool, codes, matchMode) {
+  const request = pool.request();
+  const normalizedCodes = codes.map(trimCode).filter(Boolean);
+  if (!normalizedCodes.length) return {};
+
+  const params = normalizedCodes.map((code, index) => {
+    const param = `stok${index}`;
+    request.input(param, sql.VarChar, matchMode === "exact" ? code : `${code}%`);
+    return { code, param };
+  });
+
+  const whereClause = params
+    .map(({ param }) =>
+      matchMode === "exact"
+        ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
+        : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
+    )
+    .join(" OR ");
+
+  const selectClause = params
+    .map(
+      ({ param }, index) => `SUM(CASE WHEN ${
+        matchMode === "exact"
+          ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
+          : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
+      } THEN CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END ELSE 0 END) AS s${index}`
+    )
+    .join(",\n              ");
+
+  const rs = await request.query(`
+    SELECT
+      ${selectClause}
+    FROM TBLSTHAR Har
+    WHERE ${whereClause}
+  `);
+
+  const row = rs.recordset?.[0] || {};
+  return Object.fromEntries(params.map(({ code }, index) => [code, Number(row[`s${index}`] || 0)]));
+}
+
 class AgentCore extends EventEmitter {
   constructor(options = {}) {
     super();
@@ -257,21 +297,9 @@ class AgentCore extends EventEmitter {
 
     return this.withPool(undefined, async (pool) => {
       const result = {};
-      for (const code of codes) {
-        const query =
-          matchMode === "exact"
-            ? `SELECT SUM(CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
-               FROM TBLSTHAR Har
-               WHERE LTRIM(RTRIM(Har.STOK_KODU)) = @stok`
-            : `SELECT SUM(CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
-               FROM TBLSTHAR Har
-               WHERE LTRIM(RTRIM(Har.STOK_KODU)) LIKE @stok`;
-
-        const rs = await pool
-          .request()
-          .input("stok", sql.VarChar, matchMode === "exact" ? code : `${code}%`)
-          .query(query);
-        result[code] = Number(rs.recordset?.[0]?.NetMiktar || 0);
+      for (let i = 0; i < codes.length; i += 100) {
+        const chunkResult = await fetchStockMapChunk(pool, codes.slice(i, i + 100), matchMode);
+        Object.assign(result, chunkResult);
       }
       return result;
     });

@@ -19,10 +19,83 @@ export type Sales10yDebugRow = {
 
 const BRIDGE_TIMEOUT_MS = Math.max(5000, Number(process.env.MSSQL_BRIDGE_TIMEOUT_MS ?? "30000"));
 const BRIDGE_POLL_MS = Math.max(250, Number(process.env.MSSQL_BRIDGE_POLL_MS ?? "500"));
+const STOCK_CACHE_TTL_MS = Math.max(0, Number(process.env.MSSQL_STOCK_CACHE_TTL_MS ?? "15000"));
+
+const stockCache = new Map<string, { expiresAt: number; result: Map<string, number> }>();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const trimDistinctCodes = (codes: string[]) => Array.from(new Set(codes.map((code) => code.trim()).filter(Boolean)));
+
+const cloneStockMap = (source: Map<string, number>) =>
+  new Map(Array.from(source.entries()).map(([key, value]) => [key, Number(value ?? 0)]));
+
+const getStockCacheKey = (codes: string[], matchMode: StockMatchMode) =>
+  `${matchMode}:${codes.slice().sort((a, b) => a.localeCompare(b)).join("|")}`;
+
+const readStockCache = (codes: string[], matchMode: StockMatchMode) => {
+  if (!STOCK_CACHE_TTL_MS) return null;
+  const entry = stockCache.get(getStockCacheKey(codes, matchMode));
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    stockCache.delete(getStockCacheKey(codes, matchMode));
+    return null;
+  }
+  return cloneStockMap(entry.result);
+};
+
+const writeStockCache = (codes: string[], matchMode: StockMatchMode, result: Map<string, number>) => {
+  if (!STOCK_CACHE_TTL_MS) return;
+  stockCache.set(getStockCacheKey(codes, matchMode), {
+    expiresAt: Date.now() + STOCK_CACHE_TTL_MS,
+    result: cloneStockMap(result),
+  });
+};
+
+async function fetchDirectStockMapChunk(
+  pool: sql.ConnectionPool,
+  codes: string[],
+  matchMode: StockMatchMode
+) {
+  const request = pool.request();
+  const normalizedCodes = codes.map((code) => code.trim()).filter(Boolean);
+  if (!normalizedCodes.length) return new Map<string, number>();
+
+  const params = normalizedCodes.map((code, index) => {
+    const param = `stok${index}`;
+    request.input(param, sql.VarChar, matchMode === "exact" ? code : `${code}%`);
+    return { code, param };
+  });
+
+  const whereClause = params
+    .map(({ param }) =>
+      matchMode === "exact"
+        ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
+        : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
+    )
+    .join(" OR ");
+
+  const selectClause = params
+    .map(
+      ({ param }, index) => `SUM(CASE WHEN ${
+        matchMode === "exact"
+          ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
+          : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
+      } THEN CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END ELSE 0 END) AS s${index}`
+    )
+    .join(",\n            ");
+
+  const result = await request.query(`
+    SELECT
+      ${selectClause}
+    FROM TBLSTHAR Har
+    WHERE ${whereClause}
+  `);
+
+  const row = result.recordset?.[0] ?? {};
+  return new Map(params.map(({ code }, index) => [code, Number((row as any)[`s${index}`] ?? 0)]));
+}
 
 const canUseDirectMssql = () => {
   const { MSSQL_SERVER, MSSQL_DB, MSSQL_USER, MSSQL_PASS } = process.env;
@@ -158,24 +231,10 @@ async function fetchDirectStockMap(codes: string[], matchMode: StockMatchMode) {
   if (!pool) return map;
 
   try {
-    for (const code of codes) {
-      const key = code.trim();
-      const query =
-        matchMode === "exact"
-          ? `SELECT SUM(CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
-             FROM TBLSTHAR Har
-             WHERE LTRIM(RTRIM(Har.STOK_KODU)) = @stok`
-          : `SELECT SUM(CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END) AS NetMiktar
-             FROM TBLSTHAR Har
-             WHERE LTRIM(RTRIM(Har.STOK_KODU)) LIKE @stok`;
-
-      const request = pool.request().input(
-        "stok",
-        sql.VarChar,
-        matchMode === "exact" ? key : `${key}%`
-      );
-      const result = await request.query(query);
-      map.set(key, Number(result.recordset?.[0]?.NetMiktar ?? 0));
+    for (let i = 0; i < codes.length; i += 100) {
+      const chunk = codes.slice(i, i + 100);
+      const chunkResult = await fetchDirectStockMapChunk(pool, chunk, matchMode);
+      chunkResult.forEach((value, key) => map.set(key, value));
     }
   } finally {
     await pool.close();
@@ -351,10 +410,12 @@ async function fetchDirectSales10yChunk(codes: string[]) {
 }
 
 export async function fetchLiveStockMap(codes: string[], matchMode: StockMatchMode = "prefix") {
-  const distinctCodes = Array.from(new Set(codes.map((code) => code.trim()).filter(Boolean)));
+  const distinctCodes = trimDistinctCodes(codes);
   if (!distinctCodes.length) return new Map<string, number>();
+  const cached = readStockCache(distinctCodes, matchMode);
+  if (cached) return cached;
   try {
-    return await withModeFallback(
+    const result = await withModeFallback(
       "stock.lookup",
       () => fetchDirectStockMap(distinctCodes, matchMode),
       async () => {
@@ -366,6 +427,8 @@ export async function fetchLiveStockMap(codes: string[], matchMode: StockMatchMo
         return new Map(Object.entries(result ?? {}).map(([key, value]) => [key, Number(value ?? 0)]));
       }
     );
+    writeStockCache(distinctCodes, matchMode, result);
+    return result;
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("[live-mssql] fetchLiveStockMap failed", error);

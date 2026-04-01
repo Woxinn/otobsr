@@ -67,39 +67,26 @@ export default async function ProductsPage({
   const canSeeFinance = canViewFinance(role);
   const canEdit = role === "Admin";
 
-  const { data: groups, error: groupsError } = await supabase
-    .from("product_groups")
-    .select("id, name")
-    .order("name");
+  const [
+    { data: groups, error: groupsError },
+    { data: suppliers, error: suppliersError },
+    { data: gtips, error: gtipsError },
+    { data: groupStatsRaw, error: groupStatsError },
+    { count: totalProductsCount, error: totalProductsError },
+    { count: uncategorizedCount, error: uncategorizedError },
+  ] = await Promise.all([
+    supabase.from("product_groups").select("id, name").order("name"),
+    supabase.from("suppliers").select("id, name").order("name"),
+    supabase.from("gtips").select("id, code").order("code"),
+    supabase.from("product_groups").select("id, name, products(count)").order("name"),
+    supabase.from("products").select("id", { count: "exact", head: true }),
+    supabase.from("products").select("id", { count: "exact", head: true }).is("group_id", null),
+  ]);
   logError("groups", groupsError);
-
-  const { data: suppliers, error: suppliersError } = await supabase
-    .from("suppliers")
-    .select("id, name")
-    .order("name");
   logError("suppliers", suppliersError);
-
-  const { data: gtips, error: gtipsError } = await supabase
-    .from("gtips")
-    .select("id, code")
-    .order("code");
   logError("gtips", gtipsError);
-
-  const { data: groupStatsRaw, error: groupStatsError } = await supabase
-    .from("product_groups")
-    .select("id, name, products(count)")
-    .order("name");
   logError("groupStats", groupStatsError);
-
-  const { count: totalProductsCount, error: totalProductsError } = await supabase
-    .from("products")
-    .select("id", { count: "exact", head: true });
   logError("totalProductsCount", totalProductsError);
-
-  const { count: uncategorizedCount, error: uncategorizedError } = await supabase
-    .from("products")
-    .select("id", { count: "exact", head: true })
-    .is("group_id", null);
   logError("uncategorizedCount", uncategorizedError);
 
   const query = resolvedParams.q?.trim();
@@ -193,20 +180,57 @@ export default async function ProductsPage({
       product.netsis_stok_kodu ? String(product.netsis_stok_kodu).trim() : null
     )
     .filter(Boolean) as string[];
-  const netsisStockMap = await fetchLiveStockMap(netsisCodes, "prefix");
 
   const productIds = Array.from(
     new Set(productsList.map((product) => product.id).filter(Boolean))
   );
+  const gtipIds = Array.from(
+    new Set(
+      productsList
+        .map((product) => product.gtip_id)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
 
-  const { data: orderItems, error: orderItemsError } =
+  const [
+    netsisStockMap,
+    { data: orderItems, error: orderItemsError },
+    { data: attributeValues, error: attrError },
+    { data: extraAttributeValues, error: extraAttrError },
+    { data: countryRates },
+  ] = await Promise.all([
+    fetchLiveStockMap(netsisCodes, "prefix"),
     productIds.length > 0
-      ? await supabase
+      ? supabase
           .from("order_items")
           .select("product_id, unit_price, created_at, order_id")
           .in("product_id", productIds)
           .order("created_at", { ascending: false })
-      : { data: [] };
+      : Promise.resolve({ data: [] as any[], error: null }),
+    productIds.length > 0
+      ? supabase
+          .from("product_attribute_values")
+          .select(
+            "product_id, value_text, value_number, product_attributes(name, unit, value_type)"
+          )
+          .in("product_id", productIds)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    productIds.length > 0
+      ? supabase
+          .from("product_extra_attributes")
+          .select("product_id, name, unit, value_type, value_text, value_number")
+          .in("product_id", productIds)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    gtipIds.length
+      ? supabase
+          .from("gtip_country_rates")
+          .select(
+            "gtip_id, country, customs_duty_rate, additional_duty_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value, vat_rate"
+          )
+          .in("gtip_id", gtipIds)
+          .order("country")
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
   logError("order_items", orderItemsError);
 
   const latestPriceByProduct = new Map<string, OrderItemRow>();
@@ -246,24 +270,8 @@ export default async function ProductsPage({
     latestCountryByProduct.set(productId, country);
   });
 
-  const { data: attributeValues, error: attrError } =
-    productIds.length > 0
-      ? await supabase
-          .from("product_attribute_values")
-          .select(
-            "product_id, value_text, value_number, product_attributes(name, unit, value_type)"
-          )
-          .in("product_id", productIds)
-      : { data: [] };
   logError("product_attribute_values", attrError);
 
-  const { data: extraAttributeValues, error: extraAttrError } =
-    productIds.length > 0
-      ? await supabase
-          .from("product_extra_attributes")
-          .select("product_id, name, unit, value_type, value_text, value_number")
-          .in("product_id", productIds)
-      : { data: [] };
   logError("product_extra_attributes", extraAttrError);
 
   const extraAttributesByProduct = (extraAttributeValues ?? []).reduce<Record<string, string[]>>(
@@ -319,23 +327,6 @@ export default async function ProductsPage({
     acc[pid] = pickWeightKg(source as any[]);
     return acc;
   }, {});
-
-  const gtipIds = Array.from(
-    new Set(
-      productsList
-        .map((product) => product.gtip_id)
-        .filter((value): value is string => Boolean(value))
-    )
-  );
-  const { data: countryRates } = gtipIds.length
-    ? await supabase
-        .from("gtip_country_rates")
-        .select(
-          "gtip_id, country, customs_duty_rate, additional_duty_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value, vat_rate"
-        )
-        .in("gtip_id", gtipIds)
-        .order("country")
-    : { data: [] as any[] };
 
   const ratesByGtip = (countryRates ?? []).reduce<Record<string, any[]>>(
     (acc, row) => {
@@ -520,7 +511,7 @@ export default async function ProductsPage({
               href="/products/netsis-import"
               className="rounded-full border border-black/20 bg-white px-4 py-2 text-xs font-semibold text-black/70"
             >
-              Netsis stok import
+              Stok kodu import
             </Link>
             <Link
               href="/products/import-update"
@@ -615,15 +606,15 @@ export default async function ProductsPage({
             </select>
           </label>
           <label className="text-sm font-medium">
-            Netsis kodu
+            Stok kodu
             <select
               name="netsis"
               defaultValue={resolvedParams.netsis ?? ""}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
-              <option value="none">Netsis kodu yok</option>
-              <option value="exists">Netsis kodu var</option>
+              <option value="none">Stok kodu yok</option>
+              <option value="exists">Stok kodu var</option>
             </select>
           </label>
           <label className="text-sm font-medium">
@@ -733,7 +724,7 @@ export default async function ProductsPage({
                     <th className="px-4 pt-2">Kod</th>
                     <th className="px-4 pt-2">Ürün</th>
                     <th className="px-4 pt-2">Kategori</th>
-                      <th className="px-4 pt-2">Netsis Stok</th>
+                      <th className="px-4 pt-2">Canli stok</th>
                       <th className="px-4 pt-2">GTIP</th>
                       <th className="px-4 pt-2">Nitelikler</th>
                     {!isSales ? <th className="px-4 pt-2 text-right">Alis (son)</th> : null}

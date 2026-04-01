@@ -37,7 +37,7 @@ export default function NetsisImportPage() {
     setError(null);
     try {
       if (!rows.length) {
-        throw new Error("Hiç geçerli satır yok. Kod ve Netsis stok kodu dolu olmalı.");
+        throw new Error("Hiç geçerli satır yok. Kod ve stok kodu dolu olmalı.");
       }
       const res = await fetch("/api/netsis-import", {
         method: "POST",
@@ -70,7 +70,7 @@ export default function NetsisImportPage() {
           <div>
             <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">Import</p>
             <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">
-              Netsis stok kodu import
+              Stok kodu import
             </h1>
             <p className="text-sm text-black/60">
               Ayraç: noktalı virgül (;) veya tab. Başlık şart değil.
@@ -96,7 +96,7 @@ export default function NetsisImportPage() {
           <div className="rounded-2xl border border-dashed border-black/10 px-4 py-3 text-xs text-black/70">
             <div className="font-semibold text-black">Adımlar</div>
             <ol className="mt-2 list-decimal pl-4 space-y-1">
-              <li>Excel’den Netsis kodlarını kopyala.</li>
+              <li>Excel’den stok kodlarını kopyala.</li>
               <li>Alanlara ; veya tab ile ayırarak yapıştır.</li>
               <li>“İçe aktar”a bas; bittiğinde otomatik listeye dönersin.</li>
             </ol>
@@ -138,3 +138,4 @@ export default function NetsisImportPage() {
     </section>
   );
 }
+

@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
 
   ws.columns = [
     { header: "Product code", key: "code", width: 18 },
-    { header: "Netsis code", key: "netsis", width: 18 },
+    { header: "Stock code", key: "netsis", width: 18 },
     { header: "Product name", key: "name", width: 30 },
     { header: "Tip", key: "tip", width: 12 },
     { header: "Uzunluk", key: "uzunluk", width: 12 },
