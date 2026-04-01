@@ -14,9 +14,7 @@ function getRouteLoadingCopy(route: string | null | undefined) {
     .replace(/\/+$/, "") || "/";
   const parts = clean.split("/").filter(Boolean);
 
-  if (clean === "/") {
-    return { label: "Yukleniyor", detail: "Dashboard hazirlaniyor" };
-  }
+  if (clean === "/") return { label: "Yukleniyor", detail: "Dashboard hazirlaniyor" };
 
   if (parts[0] === "orders") {
     if (parts.length === 1) return { label: "Siparisler yukleniyor", detail: "Siparis kayitlari hazirlaniyor" };
@@ -27,7 +25,7 @@ function getRouteLoadingCopy(route: string | null | undefined) {
 
   if (parts[0] === "products") {
     if (parts.length === 1) return { label: "Urunler yukleniyor", detail: "Urun listesi hazirlaniyor" };
-    if (parts[1] === "import-update") return { label: "Urun aktarimi aciliyor", detail: "Import ekranı hazirlaniyor" };
+    if (parts[1] === "import-update") return { label: "Urun aktarimi aciliyor", detail: "Import ekrani hazirlaniyor" };
     if (parts[1] === "netsis-import") return { label: "Netsis aktarimi aciliyor", detail: "Esleme verileri hazirlaniyor" };
     return { label: "Urun aciliyor", detail: "Kart ve canli veriler getiriliyor" };
   }
@@ -62,7 +60,7 @@ function getRouteLoadingCopy(route: string | null | undefined) {
   }
 
   if (parts[0] === "gtips") {
-    return { label: "GTIP ekranı aciliyor", detail: "Vergi ve oran verileri getiriliyor" };
+    return { label: "GTIP ekrani aciliyor", detail: "Vergi ve oran verileri getiriliyor" };
   }
 
   return { label: "Yukleniyor", detail: "Yeni ekran hazirlaniyor" };
@@ -71,6 +69,7 @@ function getRouteLoadingCopy(route: string | null | undefined) {
 export default function RouteOverlayLoader() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
   const currentRoute = useMemo(() => {
     const query = searchParams?.toString();
     return `${pathname ?? ""}${query ? `?${query}` : ""}`;
@@ -79,77 +78,67 @@ export default function RouteOverlayLoader() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [copy, setCopy] = useState(() => getRouteLoadingCopy(currentRoute));
-  const startedAtRef = useRef(0);
-  const pendingRouteRef = useRef<string | null>(null);
+
   const currentRouteRef = useRef(currentRoute);
-  const loadingRef = useRef(false);
-  const scheduledRouteRef = useRef<string | null>(null);
-  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const failSafeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingRouteRef = useRef<string | null>(null);
+  const startedAtRef = useRef(0);
+  const progressTimerRef = useRef<number | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const failSafeTimerRef = useRef<number | null>(null);
 
   const clearTimers = () => {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    if (failSafeTimerRef.current) clearTimeout(failSafeTimerRef.current);
-    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    if (failSafeTimerRef.current) window.clearTimeout(failSafeTimerRef.current);
+    progressTimerRef.current = null;
     hideTimerRef.current = null;
     failSafeTimerRef.current = null;
-    progressTimerRef.current = null;
   };
 
-  const stopLoading = () => {
+  const finishLoading = () => {
     clearTimers();
-    setProgress(100);
     pendingRouteRef.current = null;
-    scheduledRouteRef.current = null;
-    loadingRef.current = false;
+    setProgress(100);
     window.setTimeout(() => {
       setLoading(false);
       setProgress(0);
     }, COMPLETE_HIDE_DELAY_MS);
   };
 
-  const scheduleStop = () => {
+  const scheduleFinish = () => {
     const elapsed = Date.now() - startedAtRef.current;
-    const delay = Math.max(MIN_VISIBLE_MS - elapsed, 0);
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => {
-      stopLoading();
-    }, delay);
+    const wait = Math.max(MIN_VISIBLE_MS - elapsed, 0);
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => {
+      finishLoading();
+    }, wait);
   };
 
-  const startLoading = (nextRoute?: string | null) => {
-    const targetRoute = nextRoute ?? pendingRouteRef.current ?? "__pending__";
-    if (targetRoute && targetRoute === currentRouteRef.current) return;
-    if (loadingRef.current && (!targetRoute || targetRoute === pendingRouteRef.current)) return;
-    if (scheduledRouteRef.current && scheduledRouteRef.current === targetRoute) return;
-    scheduledRouteRef.current = targetRoute;
-    window.setTimeout(() => {
-      if (scheduledRouteRef.current !== targetRoute) return;
-      scheduledRouteRef.current = null;
-      if (targetRoute && targetRoute === currentRouteRef.current) return;
-      if (loadingRef.current && targetRoute === pendingRouteRef.current) return;
-      startedAtRef.current = Date.now();
-      pendingRouteRef.current = targetRoute;
-      loadingRef.current = true;
-      setCopy(getRouteLoadingCopy(targetRoute));
-      setProgress(12);
-      setLoading(true);
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-      progressTimerRef.current = window.setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 86) return prev;
-          if (prev < 35) return prev + 9;
-          if (prev < 60) return prev + 5;
-          if (prev < 76) return prev + 2;
-          return prev + 1;
-        });
-      }, 220) as unknown as NodeJS.Timeout;
-      if (failSafeTimerRef.current) clearTimeout(failSafeTimerRef.current);
-      failSafeTimerRef.current = setTimeout(() => {
-        stopLoading();
-      }, MAX_VISIBLE_MS);
-    }, 0);
+  const beginLoading = (route: string | null) => {
+    const targetRoute = route ?? "__pending__";
+    if (targetRoute === currentRouteRef.current) return;
+    if (pendingRouteRef.current === targetRoute && loading) return;
+
+    clearTimers();
+    pendingRouteRef.current = targetRoute;
+    startedAtRef.current = Date.now();
+    setCopy(getRouteLoadingCopy(route));
+    setProgress(12);
+    setLoading(true);
+
+    progressTimerRef.current = window.setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 86) return prev;
+        if (prev < 35) return prev + 9;
+        if (prev < 60) return prev + 5;
+        if (prev < 76) return prev + 2;
+        return prev + 1;
+      });
+    }, 220);
+
+    failSafeTimerRef.current = window.setTimeout(() => {
+      finishLoading();
+    }, MAX_VISIBLE_MS);
   };
 
   useEffect(() => {
@@ -158,12 +147,12 @@ export default function RouteOverlayLoader() {
     const pendingRoute = pendingRouteRef.current;
     if (!pendingRoute) return;
     if (pendingRoute === "__pending__" || pendingRoute === currentRoute) {
-      scheduleStop();
+      scheduleFinish();
     }
   }, [currentRoute, loading]);
 
   useEffect(() => {
-    const handleClickCapture = (event: MouseEvent) => {
+    const onClickCapture = (event: MouseEvent) => {
       if (event.defaultPrevented) return;
       if (event.button !== 0) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -174,51 +163,27 @@ export default function RouteOverlayLoader() {
       if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
 
       const href = anchor.getAttribute("href");
-      if (!href || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("#")) return;
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
 
       const url = new URL(href, window.location.origin);
       if (url.origin !== window.location.origin) return;
 
-      const nextRoute = `${url.pathname}${url.search}`;
-      startLoading(nextRoute);
+      beginLoading(`${url.pathname}${url.search}`);
     };
 
-    const originalPushState = window.history.pushState.bind(window.history);
-    const originalReplaceState = window.history.replaceState.bind(window.history);
-
-    window.history.pushState = function pushState(...args) {
-      const url = args[2];
-      if (typeof url === "string") {
-        const parsed = new URL(url, window.location.origin);
-        startLoading(`${parsed.pathname}${parsed.search}`);
-      }
-      return originalPushState(...args);
+    const onPopState = () => {
+      beginLoading(null);
     };
 
-    window.history.replaceState = function replaceState(...args) {
-      const url = args[2];
-      if (typeof url === "string") {
-        const parsed = new URL(url, window.location.origin);
-        startLoading(`${parsed.pathname}${parsed.search}`);
-      }
-      return originalReplaceState(...args);
-    };
-
-    const handlePopState = () => {
-      startLoading("__pending__");
-    };
-
-    document.addEventListener("click", handleClickCapture, true);
-    window.addEventListener("popstate", handlePopState);
+    document.addEventListener("click", onClickCapture, true);
+    window.addEventListener("popstate", onPopState);
 
     return () => {
-      document.removeEventListener("click", handleClickCapture, true);
-      window.removeEventListener("popstate", handlePopState);
-      window.history.pushState = originalPushState;
-      window.history.replaceState = originalReplaceState;
+      document.removeEventListener("click", onClickCapture, true);
+      window.removeEventListener("popstate", onPopState);
       clearTimers();
     };
-  }, []);
+  }, [loading]);
 
   if (!loading) return null;
 
