@@ -337,7 +337,9 @@ export default function RfqQuoteGrid({
         </colgroup>
         <thead className="bg-black/[0.02] text-[11px] uppercase tracking-[0.18em] text-black/45">
           <tr>
-            <th rowSpan={2} className="border-r border-black/10 px-4 py-4 text-left">Ürün</th>
+            <th rowSpan={2} className="sticky left-0 z-30 border-r border-black/10 bg-[inherit] px-4 py-4 text-left shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)]">
+              Ürün
+            </th>
             <th rowSpan={2} className="border-r border-black/10 px-3 py-4 text-right">RFQ adet</th>
             <th rowSpan={2} className="border-r border-black/10 px-3 py-4 text-right">Hedef fiyat</th>
             {supList.map((s) => (
@@ -365,9 +367,11 @@ export default function RfqQuoteGrid({
           </tr>
         </thead>
         <tbody>
-          {items.map((it, idx) => (
-            <tr key={it.id} className={idx % 2 === 0 ? "bg-white" : "bg-black/[0.015]"}>
-              <td className="border-t border-r border-black/10 px-4 py-4 align-top">
+          {items.map((it, idx) => {
+            const rowBgClass = idx % 2 === 0 ? "bg-white" : "bg-[#f6f7f8]";
+            return (
+            <tr key={it.id} className={rowBgClass}>
+              <td className={`sticky left-0 z-20 border-t border-r border-black/10 px-4 py-4 align-top shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)] ${rowBgClass}`}>
                 <div className="font-semibold text-black">{it.product_code ?? "-"}</div>
                 <div className="mt-1 text-xs text-black/60">{it.product_name ?? "-"}</div>
               </td>
@@ -393,11 +397,13 @@ export default function RfqQuoteGrid({
                 </Fragment>
               ))}
             </tr>
-          ))}
+          )})}
         </tbody>
-        <tfoot className="bg-black/[0.02]">
+        <tfoot className="bg-[#f1f3f4]">
           <tr>
-            <td className="border-t border-r border-black/10 px-4 py-4 font-semibold text-black">Toplam</td>
+            <td className="sticky left-0 z-20 border-t border-r border-black/10 bg-[#f1f3f4] px-4 py-4 font-semibold text-black shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)]">
+              Toplam
+            </td>
             <td className="border-t border-r border-black/10 px-3 py-4 text-right text-black/45">Adet x fiyat</td>
             <td className="border-t border-r border-black/10 px-3 py-4 text-right font-semibold text-black/75">
               {targetTotal != null ? `${formatNumber(targetTotal, 2)} ${currency ?? ""}` : "-"}

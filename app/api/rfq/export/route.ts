@@ -1,11 +1,13 @@
 ﻿import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { computeCosts } from "@/lib/gtipCost";
+import { pickWeightKg } from "@/lib/gtipCost";
+import { calculateDisplayedNetCost, type CountryRateRow } from "@/lib/productCostDisplay";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type SupplierRow = {
   id: string;
   name: string;
+  country?: string | null;
   currency?: string | null;
 };
 
@@ -15,6 +17,10 @@ type ItemRow = {
   product_name?: string | null;
   quantity?: number | null;
   target_unit_price?: number | null;
+  domestic_cost_percent?: number | null;
+  weight_kg?: number | null;
+  gtip?: any | null;
+  country_rates?: CountryRateRow[] | null;
   products?: any;
 };
 
@@ -45,12 +51,12 @@ export async function GET(request: Request) {
     .from("rfq_items")
     .select(
       `
-      id, product_code, product_name, quantity, target_unit_price,
+      id, product_code, product_name, quantity, target_unit_price, product_id,
       products(
         domestic_cost_percent,
         gtip:gtips(
           id, code, customs_duty_rate, additional_duty_rate,
-          anti_dumping_applicable, anti_dumping_rate,
+          anti_dumping_applicable, anti_dumping_rate, vat_rate,
           surveillance_applicable, surveillance_unit_value
         )
       )
@@ -61,8 +67,83 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: itemErr.message }, { status: 500 });
   }
 
-  const { data: suppliers } = await supabase.from("suppliers").select("id, name");
+  const productIds = Array.from(
+    new Set(((items ?? []) as any[]).map((item) => item.product_id).filter((value): value is string => Boolean(value)))
+  );
+  const gtipIds = Array.from(
+    new Set(
+      ((items ?? []) as any[])
+        .map((item) => item.products?.gtip?.id ?? null)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  const [{ data: suppliers }, { data: countryRates }, { data: attrRows }] = await Promise.all([
+    supabase.from("suppliers").select("id, name, country"),
+    gtipIds.length
+      ? supabase
+          .from("gtip_country_rates")
+          .select(
+            "gtip_id, country, customs_duty_rate, additional_duty_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value, vat_rate"
+          )
+          .in("gtip_id", gtipIds)
+      : Promise.resolve({ data: [], error: null } as any),
+    productIds.length
+      ? supabase
+          .from("product_attribute_values")
+          .select("product_id, value_text, value_number, product_attributes(name, value_type)")
+          .in("product_id", productIds)
+      : Promise.resolve({ data: [], error: null } as any),
+  ]);
   const supplierById = new Map<string, any>((suppliers ?? []).map((s: any) => [String(s.id), s]));
+  const countryRatesByGtip = new Map<string, CountryRateRow[]>();
+  (countryRates ?? []).forEach((row: any) => {
+    const key = String(row.gtip_id ?? "");
+    if (!key) return;
+    const list = countryRatesByGtip.get(key) ?? [];
+    list.push({
+      country: row.country,
+      customs_duty_rate: row.customs_duty_rate,
+      additional_duty_rate: row.additional_duty_rate,
+      anti_dumping_applicable: row.anti_dumping_applicable,
+      anti_dumping_rate: row.anti_dumping_rate,
+      surveillance_applicable: row.surveillance_applicable,
+      surveillance_unit_value: row.surveillance_unit_value,
+      vat_rate: row.vat_rate,
+    });
+    countryRatesByGtip.set(key, list);
+  });
+  const attrsByProduct = new Map<string, any[]>();
+  (attrRows ?? []).forEach((row: any) => {
+    const key = String(row.product_id ?? "");
+    if (!key) return;
+    const list = attrsByProduct.get(key) ?? [];
+    list.push({
+      value_text: row.value_text,
+      value_number: row.value_number,
+      name: row.product_attributes?.name,
+      value_type: row.product_attributes?.value_type,
+    });
+    attrsByProduct.set(key, list);
+  });
+
+  const normalizedItems: ItemRow[] = ((items ?? []) as any[]).map((item) => {
+    const gtip = item.products?.gtip ?? null;
+    const gtipId = gtip?.id ? String(gtip.id) : null;
+    const productId = item.product_id ? String(item.product_id) : null;
+    return {
+      id: item.id,
+      product_code: item.product_code,
+      product_name: item.product_name,
+      quantity: item.quantity,
+      target_unit_price: item.target_unit_price,
+      domestic_cost_percent: item.products?.domestic_cost_percent ?? null,
+      gtip,
+      weight_kg: productId ? pickWeightKg(attrsByProduct.get(productId) ?? []) : null,
+      country_rates: gtipId ? countryRatesByGtip.get(gtipId) ?? [] : [],
+      products: item.products,
+    };
+  });
 
   const { data: quotes, error: quoteErr } = await supabase
     .from("rfq_quotes")
@@ -88,6 +169,7 @@ export async function GET(request: Request) {
         {
           id: String(q.supplier_id),
           name: supplierById.get(String(q.supplier_id))?.name ?? q.supplier_id ?? "",
+          country: supplierById.get(String(q.supplier_id))?.country ?? null,
           currency: q.currency ?? rfq.currency ?? "",
         },
       ])
@@ -118,7 +200,7 @@ export async function GET(request: Request) {
   const getSupplierTotal = (sup: SupplierRow) => {
     if (!isComparableCurrency(sup)) return null;
     let total = 0;
-    for (const item of (items ?? []) as ItemRow[]) {
+    for (const item of normalizedItems) {
       const qty = Number(item.quantity ?? 0);
       const price = getPrice(sup, item);
       if (!Number.isFinite(qty) || qty <= 0) continue;
@@ -131,7 +213,7 @@ export async function GET(request: Request) {
   const targetTotal = (() => {
     let total = 0;
     let used = false;
-    for (const item of (items ?? []) as ItemRow[]) {
+    for (const item of normalizedItems) {
       const qty = Number(item.quantity ?? 0);
       const target = Number(item.target_unit_price ?? NaN);
       if (!Number.isFinite(qty) || qty <= 0) continue;
@@ -176,7 +258,7 @@ export async function GET(request: Request) {
     cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
   });
 
-  ((items ?? []) as ItemRow[]).forEach((item) => {
+  normalizedItems.forEach((item) => {
     const row: Record<string, any> = {
       code: item.product_code ?? "",
       name: item.product_name ?? "",
@@ -189,14 +271,16 @@ export async function GET(request: Request) {
       const price = getPrice(sup, item);
       const costResult =
         price != null
-          ? computeCosts({
+          ? calculateDisplayedNetCost({
               basePrice: price,
-              domesticCostPercent: item.products?.domestic_cost_percent ?? null,
-              weightKg: null,
-              gtip: item.products?.gtip ?? null,
+              domesticCostPercent: item.domestic_cost_percent ?? null,
+              weightKg: item.weight_kg ?? null,
+              gtipBase: item.gtip ?? null,
+              countryRates: item.country_rates ?? [],
+              selectedCountry: sup.country ?? null,
             })
           : null;
-      const netCost = costResult?.gozetimsizMatrah ?? costResult?.gozetimliMatrah ?? null;
+      const netCost = costResult?.netCost ?? null;
       const diffPct =
         price != null && isComparableCurrency(sup) && baseline.value != null && baseline.value !== 0
           ? (price - baseline.value) / baseline.value
