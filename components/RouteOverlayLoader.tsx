@@ -6,7 +6,8 @@ import BrandedLoadingScreen from "@/components/BrandedLoadingScreen";
 
 const MIN_VISIBLE_MS = 900;
 const MAX_VISIBLE_MS = 15000;
-const COMPLETE_HIDE_DELAY_MS = 180;
+const COMPLETE_HIDE_DELAY_MS = 360;
+const COMPLETE_RAMP_DELAY_MS = 170;
 
 function getRouteLoadingCopy(route: string | null | undefined) {
   const clean = String(route ?? "")
@@ -86,21 +87,27 @@ export default function RouteOverlayLoader() {
   const progressTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
   const failSafeTimerRef = useRef<number | null>(null);
+  const completeTimerRef = useRef<number | null>(null);
 
   const clearTimers = () => {
     if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     if (failSafeTimerRef.current) window.clearTimeout(failSafeTimerRef.current);
+    if (completeTimerRef.current) window.clearTimeout(completeTimerRef.current);
     progressTimerRef.current = null;
     hideTimerRef.current = null;
     failSafeTimerRef.current = null;
+    completeTimerRef.current = null;
   };
 
   const finishLoading = () => {
     clearTimers();
     pendingRouteRef.current = null;
-    setProgress(100);
-    window.setTimeout(() => {
+    setProgress((prev) => Math.max(prev, 88));
+    completeTimerRef.current = window.setTimeout(() => {
+      setProgress(100);
+    }, COMPLETE_RAMP_DELAY_MS);
+    hideTimerRef.current = window.setTimeout(() => {
       setLoading(false);
       setProgress(0);
     }, COMPLETE_HIDE_DELAY_MS);
@@ -131,12 +138,12 @@ export default function RouteOverlayLoader() {
     progressTimerRef.current = window.setInterval(() => {
       setProgress((prev) => {
         if (prev >= 86) return prev;
-        if (prev < 35) return prev + 9;
-        if (prev < 60) return prev + 5;
-        if (prev < 76) return prev + 2;
+        if (prev < 28) return prev + 6;
+        if (prev < 52) return prev + 4;
+        if (prev < 72) return prev + 2;
         return prev + 1;
       });
-    }, 220);
+    }, 160);
 
     failSafeTimerRef.current = window.setTimeout(() => {
       finishLoading();
