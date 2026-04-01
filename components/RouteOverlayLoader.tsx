@@ -179,6 +179,10 @@ export default function RouteOverlayLoader() {
 
     const onHold = (event: Event) => {
       const customEvent = event as CustomEvent<{ label?: string; detail?: string }>;
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
       if (!loading && !pendingRouteRef.current) {
         beginLoading(null);
       }
@@ -193,6 +197,7 @@ export default function RouteOverlayLoader() {
 
     const onRelease = () => {
       holdCountRef.current = Math.max(holdCountRef.current - 1, 0);
+      if (holdCountRef.current > 0) return;
       if (!loading) return;
       const pendingRoute = pendingRouteRef.current;
       if (pendingRoute && (pendingRoute === "__pending__" || pendingRoute === currentRouteRef.current)) {
