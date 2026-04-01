@@ -1,63 +1,171 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import Logo from "@/components/Logo";
+import BrandedLoadingScreen from "@/components/BrandedLoadingScreen";
+
+const MIN_VISIBLE_MS = 900;
+const MAX_VISIBLE_MS = 15000;
+const COMPLETE_HIDE_DELAY_MS = 180;
 
 export default function RouteOverlayLoader() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentRoute = useMemo(() => {
+    const query = searchParams?.toString();
+    return `${pathname ?? ""}${query ? `?${query}` : ""}`;
+  }, [pathname, searchParams]);
+
   const [loading, setLoading] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [progress, setProgress] = useState(0);
+  const startedAtRef = useRef(0);
+  const pendingRouteRef = useRef<string | null>(null);
+  const currentRouteRef = useRef(currentRoute);
+  const loadingRef = useRef(false);
+  const scheduledRouteRef = useRef<string | null>(null);
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const failSafeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Path or query degistiginde overlay'i hemen kapatmak yerine kisa bir gecikme
-  // birakiyoruz ki yeni sayfa gorunur hale gelene kadar loader kalsin.
-  useEffect(() => {
-    if (!loading) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
+  const clearTimers = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (failSafeTimerRef.current) clearTimeout(failSafeTimerRef.current);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    hideTimerRef.current = null;
+    failSafeTimerRef.current = null;
+    progressTimerRef.current = null;
+  };
+
+  const stopLoading = () => {
+    clearTimers();
+    setProgress(100);
+    pendingRouteRef.current = null;
+    scheduledRouteRef.current = null;
+    loadingRef.current = false;
+    window.setTimeout(() => {
       setLoading(false);
-    }, 800); // min. 0.8s kal, sonra otomatik kapanir
-  }, [pathname, searchParams, loading]);
+      setProgress(0);
+    }, COMPLETE_HIDE_DELAY_MS);
+  };
+
+  const scheduleStop = () => {
+    const elapsed = Date.now() - startedAtRef.current;
+    const delay = Math.max(MIN_VISIBLE_MS - elapsed, 0);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      stopLoading();
+    }, delay);
+  };
+
+  const startLoading = (nextRoute?: string | null) => {
+    const targetRoute = nextRoute ?? pendingRouteRef.current ?? "__pending__";
+    if (targetRoute && targetRoute === currentRouteRef.current) return;
+    if (loadingRef.current && (!targetRoute || targetRoute === pendingRouteRef.current)) return;
+    if (scheduledRouteRef.current && scheduledRouteRef.current === targetRoute) return;
+    scheduledRouteRef.current = targetRoute;
+    window.setTimeout(() => {
+      if (scheduledRouteRef.current !== targetRoute) return;
+      scheduledRouteRef.current = null;
+      if (targetRoute && targetRoute === currentRouteRef.current) return;
+      if (loadingRef.current && targetRoute === pendingRouteRef.current) return;
+      startedAtRef.current = Date.now();
+      pendingRouteRef.current = targetRoute;
+      loadingRef.current = true;
+      setProgress(12);
+      setLoading(true);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      progressTimerRef.current = window.setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 86) return prev;
+          if (prev < 35) return prev + 9;
+          if (prev < 60) return prev + 5;
+          if (prev < 76) return prev + 2;
+          return prev + 1;
+        });
+      }, 220) as unknown as NodeJS.Timeout;
+      if (failSafeTimerRef.current) clearTimeout(failSafeTimerRef.current);
+      failSafeTimerRef.current = setTimeout(() => {
+        stopLoading();
+      }, MAX_VISIBLE_MS);
+    }, 0);
+  };
 
   useEffect(() => {
-    const handleClick = (event: MouseEvent) => {
+    currentRouteRef.current = currentRoute;
+    if (!loading) return;
+    const pendingRoute = pendingRouteRef.current;
+    if (!pendingRoute) return;
+    if (pendingRoute === "__pending__" || pendingRoute === currentRoute) {
+      scheduleStop();
+    }
+  }, [currentRoute, loading]);
+
+  useEffect(() => {
+    const handleClickCapture = (event: MouseEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
       const target = event.target as HTMLElement | null;
-      if (!target) return;
-      const anchor = target.closest("a");
+      const anchor = target?.closest("a");
       if (!anchor) return;
-      if (anchor.target === "_blank") return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+
       const href = anchor.getAttribute("href");
-      if (!href || href.startsWith("http") || href.startsWith("mailto:")) return;
-      setLoading(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      // en fazla 8 sn acik kalsin (ağır sayfa icin fail-safe)
-      timerRef.current = setTimeout(() => {
-        setLoading(false);
-      }, 8000);
+      if (!href || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("#")) return;
+
+      const url = new URL(href, window.location.origin);
+      if (url.origin !== window.location.origin) return;
+
+      const nextRoute = `${url.pathname}${url.search}`;
+      startLoading(nextRoute);
     };
-    document.addEventListener("click", handleClick);
+
+    const originalPushState = window.history.pushState.bind(window.history);
+    const originalReplaceState = window.history.replaceState.bind(window.history);
+
+    window.history.pushState = function pushState(...args) {
+      const url = args[2];
+      if (typeof url === "string") {
+        const parsed = new URL(url, window.location.origin);
+        startLoading(`${parsed.pathname}${parsed.search}`);
+      }
+      return originalPushState(...args);
+    };
+
+    window.history.replaceState = function replaceState(...args) {
+      const url = args[2];
+      if (typeof url === "string") {
+        const parsed = new URL(url, window.location.origin);
+        startLoading(`${parsed.pathname}${parsed.search}`);
+      }
+      return originalReplaceState(...args);
+    };
+
+    const handlePopState = () => {
+      startLoading("__pending__");
+    };
+
+    document.addEventListener("click", handleClickCapture, true);
+    window.addEventListener("popstate", handlePopState);
+
     return () => {
-      document.removeEventListener("click", handleClick);
+      document.removeEventListener("click", handleClickCapture, true);
+      window.removeEventListener("popstate", handlePopState);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+      clearTimers();
     };
   }, []);
 
   if (!loading) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(15,61,62,0.12),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.75),rgba(247,244,235,0.88))] backdrop-blur-md">
-      <div className="flex flex-col items-center gap-5 rounded-[28px] border border-black/10 bg-white/80 px-12 py-9 shadow-[0_40px_80px_-50px_rgba(12,45,52,0.65)] backdrop-blur">
-        <Logo className="h-12 w-auto" alt="Logo" />
-        <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.35em] text-black/60">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#0f3d3e]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#0f3d3e]/70" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#0f3d3e]/40" />
-          Yukleniyor
-        </div>
-        <div className="h-1 w-56 overflow-hidden rounded-full bg-black/10">
-          <div className="h-full w-1/3 animate-[loading-bar_0.9s_ease_infinite] rounded-full bg-[#0f3d3e]" />
-        </div>
-      </div>
-    </div>
+    <BrandedLoadingScreen
+      overlay
+      label="Yukleniyor"
+      detail="Yeni ekran hazirlaniyor"
+      progress={progress}
+    />
   );
 }

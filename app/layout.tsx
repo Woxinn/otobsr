@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import RouteOverlayLoader from "@/components/RouteOverlayLoader";
 import PerfMeasureGuard from "@/components/PerfMeasureGuard";
+import GlobalLoadingProvider from "@/components/GlobalLoadingProvider";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-sans",
@@ -33,11 +34,13 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${fraunces.variable} antialiased`}
       >
-        <Suspense fallback={null}>
-          <RouteOverlayLoader />
-        </Suspense>
-        <PerfMeasureGuard />
-        {children}
+        <GlobalLoadingProvider>
+          <Suspense fallback={null}>
+            <RouteOverlayLoader />
+          </Suspense>
+          <PerfMeasureGuard />
+          {children}
+        </GlobalLoadingProvider>
       </body>
     </html>
   );

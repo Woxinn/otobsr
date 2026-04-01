@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
+import { useGlobalLoading } from "@/components/GlobalLoadingProvider";
 
 type ParsedRow = {
   product_code: string;
@@ -96,6 +97,7 @@ export default function DiscrepancyImportForm() {
   const [packingRows, setPackingRows] = useState<ParsedRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const { startLoading, updateLoading, stopLoading } = useGlobalLoading();
 
   const canSubmit = useMemo(
     () => Boolean(title.trim() && orderRows.length > 0 && packingRows.length > 0 && !loading),
@@ -104,6 +106,7 @@ export default function DiscrepancyImportForm() {
 
   const onPickOrder = async (file?: File) => {
     if (!file) return;
+    startLoading({ label: "Fark kontrol", detail: "Order dosyasi okunuyor", progress: 16 });
     try {
       const parsed = await parseFile(file);
       setOrderRows(parsed);
@@ -113,11 +116,14 @@ export default function DiscrepancyImportForm() {
       setMessage(err?.message ?? "Order dosyasi okunamadi.");
       setOrderRows([]);
       setOrderFileName("");
+    } finally {
+      stopLoading();
     }
   };
 
   const onPickPacking = async (file?: File) => {
     if (!file) return;
+    startLoading({ label: "Fark kontrol", detail: "Packing dosyasi okunuyor", progress: 16 });
     try {
       const parsed = await parseFile(file);
       setPackingRows(parsed);
@@ -127,6 +133,8 @@ export default function DiscrepancyImportForm() {
       setMessage(err?.message ?? "Packing dosyasi okunamadi.");
       setPackingRows([]);
       setPackingFileName("");
+    } finally {
+      stopLoading();
     }
   };
 
@@ -134,7 +142,9 @@ export default function DiscrepancyImportForm() {
     if (!canSubmit) return;
     setLoading(true);
     setMessage(null);
+    startLoading({ label: "Fark kontrol", detail: "Karsilastirma olusturuluyor", progress: 18 });
     try {
+      updateLoading({ detail: "Veriler gonderiliyor", progress: 44 });
       const res = await fetch("/api/discrepancy-runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,11 +176,13 @@ export default function DiscrepancyImportForm() {
         setMessage("Kayit olusturuldu ama run id donmedi. API cevabini kontrol edin.");
         return;
       }
+      updateLoading({ detail: "Ekran aciliyor", progress: 92 });
       router.push(`/fark-kontrol/${data.id}`);
     } catch (err: any) {
       setMessage(err?.message ?? "Beklenmeyen hata.");
     } finally {
       setLoading(false);
+      stopLoading();
     }
   };
 

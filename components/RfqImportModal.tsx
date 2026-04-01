@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
+import { useGlobalLoading } from "@/components/GlobalLoadingProvider";
 
 type Props = {
   rfqId: string;
@@ -18,24 +19,27 @@ export default function RfqImportModal({ rfqId }: Props) {
   const [pendingAmbiguous, setPendingAmbiguous] = useState<
     { input: string; options: { id: string; name: string }[]; chosen?: string }[] | null
   >(null);
+  const { startLoading, updateLoading, stopLoading } = useGlobalLoading();
 
   const handleImport = async (addMissing = false, supplierMap?: Record<string, string>) => {
     if (loading) return;
     setLoading(true);
     setMessage(null);
+    startLoading({ label: "RFQ import", detail: "Dosya isleniyor", progress: 14 });
     try {
       const rows = parseCsv(text);
       if (!rows.length) {
         setMessage("Geçerli CSV yok (satır bulunamadı).");
-        setLoading(false);
         return;
       }
+      updateLoading({ detail: `${rows.length} satir hazirlaniyor`, progress: 36 });
       console.debug("[rfq-import] parsed rows", rows.length);
       const res = await fetch("/api/rfq/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rfq_id: rfqId, rows, add_missing_products: addMissing, supplier_map: supplierMap }),
       });
+      updateLoading({ detail: "Sunucu cevabi aliniyor", progress: 72 });
       const textResp = await res.text();
       let data: any = null;
       try {
@@ -65,12 +69,14 @@ export default function RfqImportModal({ rfqId }: Props) {
         setMessage("İçe aktarma tamamlandı");
         setPendingMissing(null);
         setPendingAmbiguous(null);
+        updateLoading({ detail: "RFQ guncelleniyor", progress: 92 });
       }
     } catch (err: any) {
       setMessage(err?.message ?? "Beklenmeyen hata");
       console.error("[rfq-import] error", err);
     } finally {
       setLoading(false);
+      stopLoading();
     }
   };
 
@@ -115,6 +121,7 @@ export default function RfqImportModal({ rfqId }: Props) {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    startLoading({ label: "RFQ import", detail: "Dosya okunuyor", progress: 12 });
                     setFileName(file.name);
                     const ext = file.name.toLowerCase();
                     if (ext.endsWith(".csv")) {
@@ -122,7 +129,9 @@ export default function RfqImportModal({ rfqId }: Props) {
                       reader.onload = (ev) => {
                         const content = String(ev.target?.result ?? "");
                         setText(content);
+                        stopLoading();
                       };
+                      reader.onerror = () => stopLoading();
                       reader.readAsText(file, "utf-8");
                     } else {
                       const reader = new FileReader();
@@ -133,7 +142,9 @@ export default function RfqImportModal({ rfqId }: Props) {
                         const ws = wb.Sheets[wb.SheetNames[0]];
                         const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";" }); // noktalı virgül ayırıcı
                         setText(csv);
+                        stopLoading();
                       };
+                      reader.onerror = () => stopLoading();
                       reader.readAsArrayBuffer(file);
                     }
                   }}

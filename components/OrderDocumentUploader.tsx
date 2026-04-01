@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ToastProvider";
+import { useGlobalLoading } from "@/components/GlobalLoadingProvider";
 
 type DocumentType = {
   id: string;
@@ -40,6 +41,7 @@ export default function OrderDocumentUploader({
   const [paymentCurrency, setPaymentCurrency] = useState(orderCurrency || "USD");
   const [paymentDate, setPaymentDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const { startLoading, updateLoading, stopLoading } = useGlobalLoading();
 
   const orderTypes = useMemo(
     () => documentTypes.filter((type) => type.applies_to === "order"),
@@ -82,113 +84,117 @@ export default function OrderDocumentUploader({
     }
 
     setLoading(true);
-    const extension = file.name.split(".").pop() ?? "pdf";
-    const uniqueName = `${Date.now()}.${extension}`;
-    const filePath = `orders/${orderId}/${uniqueName}`;
+    startLoading({ label: "Belge yukleniyor", detail: file.name, progress: 10 });
+    try {
+      const extension = file.name.split(".").pop() ?? "pdf";
+      const uniqueName = `${Date.now()}.${extension}`;
+      const filePath = `orders/${orderId}/${uniqueName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(filePath, file);
+      updateLoading({ detail: "Dosya depoya aktariliyor", progress: 30 });
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(filePath, file);
 
-    if (uploadError) {
-      setLoading(false);
-      addToast("Dosya yuklenemedi.", "error");
-      return;
-    }
-
-    const parsedInsurance =
-      insuranceAmount.trim() === ""
-        ? null
-        : Number(insuranceAmount.replace(",", "."));
-    const parsedFreight =
-      freightAmount.trim() === "" ? null : Number(freightAmount.replace(",", "."));
-    const parsedPayment =
-      paymentAmount.trim() === "" ? null : Number(paymentAmount.replace(",", "."));
-
-    if (isInsurance && parsedInsurance !== null && Number.isNaN(parsedInsurance)) {
-      setLoading(false);
-      addToast("Navlun sigortasi tutari gecerli degil.", "error");
-      return;
-    }
-
-    if (isFreightInvoice && parsedFreight !== null && Number.isNaN(parsedFreight)) {
-      setLoading(false);
-      addToast("Navlun fatura tutari gecerli degil.", "error");
-      return;
-    }
-
-    if (isPaymentDoc && parsedPayment !== null && Number.isNaN(parsedPayment)) {
-      setLoading(false);
-      addToast("Ödeme tutari gecerli degil.", "error");
-      return;
-    }
-
-    const { data: insertedDocs, error: insertError } = await supabase
-      .from("order_documents")
-      .insert({
-        order_id: orderId,
-        storage_path: filePath,
-        file_name: file.name,
-        document_type_id: documentTypeId,
-        status,
-        received_at: receivedAt || null,
-        notes: notes || null,
-        insurance_amount: isInsurance ? parsedInsurance : null,
-        insurance_currency: isInsurance ? insuranceCurrency || "USD" : null,
-        freight_amount: isFreightInvoice ? parsedFreight : null,
-        freight_currency: isFreightInvoice ? freightCurrency || "USD" : null,
-      })
-      .select("id, storage_path, file_name")
-      .limit(1);
-
-    setLoading(false);
-
-    if (insertError) {
-      addToast("Belge kaydi olusturulamadi.", "error");
-      return;
-    }
-
-    // Ödeme dokümanı ise otomatik ödeme oluştur
-    const insertedDoc = insertedDocs?.[0];
-
-    if (isPaymentDoc && parsedPayment !== null) {
-      const payDate =
-        paymentDate && paymentDate.trim() !== ""
-          ? paymentDate
-          : new Date().toISOString().slice(0, 10);
-      const { error: payError } = await supabase.from("order_payments").insert({
-        order_id: orderId,
-        amount: parsedPayment,
-        currency: paymentCurrency || "USD",
-        payment_date: payDate,
-        method: "Belge",
-        status: "Odendi",
-        notes: `Belge:${file.name} | doc:${insertedDoc?.id ?? "?"} | path:${insertedDoc?.storage_path ?? filePath}`,
-      });
-      if (payError) {
-        addToast("Ödeme olusturulamadi, sonra tekrar deneyin.", "error");
+      if (uploadError) {
+        addToast("Dosya yuklenemedi.", "error");
+        return;
       }
-    }
 
-    if (isProforma) {
-      await supabase
-        .from("orders")
-        .update({ order_status: "Proforma Geldi" })
-        .eq("id", orderId)
-        .eq("order_status", "Siparis Verildi");
-    }
+      const parsedInsurance =
+        insuranceAmount.trim() === ""
+          ? null
+          : Number(insuranceAmount.replace(",", "."));
+      const parsedFreight =
+        freightAmount.trim() === "" ? null : Number(freightAmount.replace(",", "."));
+      const parsedPayment =
+        paymentAmount.trim() === "" ? null : Number(paymentAmount.replace(",", "."));
 
-    setFile(null);
-    setNotes("");
-    setInsuranceAmount("");
-    setInsuranceCurrency(orderCurrency || "USD");
-    setFreightAmount("");
-    setFreightCurrency(orderCurrency || "USD");
-    setPaymentAmount("");
-    setPaymentCurrency(orderCurrency || "USD");
-    setPaymentDate("");
-    addToast("Belge yuklendi.", "success");
-    router.refresh();
+      if (isInsurance && parsedInsurance !== null && Number.isNaN(parsedInsurance)) {
+        addToast("Navlun sigortasi tutari gecerli degil.", "error");
+        return;
+      }
+
+      if (isFreightInvoice && parsedFreight !== null && Number.isNaN(parsedFreight)) {
+        addToast("Navlun fatura tutari gecerli degil.", "error");
+        return;
+      }
+
+      if (isPaymentDoc && parsedPayment !== null && Number.isNaN(parsedPayment)) {
+        addToast("Ödeme tutari gecerli degil.", "error");
+        return;
+      }
+
+      updateLoading({ detail: "Siparis belgesi kaydediliyor", progress: 60 });
+      const { data: insertedDocs, error: insertError } = await supabase
+        .from("order_documents")
+        .insert({
+          order_id: orderId,
+          storage_path: filePath,
+          file_name: file.name,
+          document_type_id: documentTypeId,
+          status,
+          received_at: receivedAt || null,
+          notes: notes || null,
+          insurance_amount: isInsurance ? parsedInsurance : null,
+          insurance_currency: isInsurance ? insuranceCurrency || "USD" : null,
+          freight_amount: isFreightInvoice ? parsedFreight : null,
+          freight_currency: isFreightInvoice ? freightCurrency || "USD" : null,
+        })
+        .select("id, storage_path, file_name")
+        .limit(1);
+
+      if (insertError) {
+        addToast("Belge kaydi olusturulamadi.", "error");
+        return;
+      }
+
+      const insertedDoc = insertedDocs?.[0];
+
+      if (isPaymentDoc && parsedPayment !== null) {
+        updateLoading({ detail: "Odeme kaydi olusturuluyor", progress: 78 });
+        const payDate =
+          paymentDate && paymentDate.trim() !== ""
+            ? paymentDate
+            : new Date().toISOString().slice(0, 10);
+        const { error: payError } = await supabase.from("order_payments").insert({
+          order_id: orderId,
+          amount: parsedPayment,
+          currency: paymentCurrency || "USD",
+          payment_date: payDate,
+          method: "Belge",
+          status: "Odendi",
+          notes: `Belge:${file.name} | doc:${insertedDoc?.id ?? "?"} | path:${insertedDoc?.storage_path ?? filePath}`,
+        });
+        if (payError) {
+          addToast("Ödeme olusturulamadi, sonra tekrar deneyin.", "error");
+        }
+      }
+
+      if (isProforma) {
+        updateLoading({ detail: "Siparis durumu guncelleniyor", progress: 86 });
+        await supabase
+          .from("orders")
+          .update({ order_status: "Proforma Geldi" })
+          .eq("id", orderId)
+          .eq("order_status", "Siparis Verildi");
+      }
+
+      updateLoading({ detail: "Ekran yenileniyor", progress: 94 });
+      setFile(null);
+      setNotes("");
+      setInsuranceAmount("");
+      setInsuranceCurrency(orderCurrency || "USD");
+      setFreightAmount("");
+      setFreightCurrency(orderCurrency || "USD");
+      setPaymentAmount("");
+      setPaymentCurrency(orderCurrency || "USD");
+      setPaymentDate("");
+      addToast("Belge yuklendi.", "success");
+      router.refresh();
+    } finally {
+      setLoading(false);
+      stopLoading();
+    }
   };
 
   return (

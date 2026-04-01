@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ToastProvider";
+import { useGlobalLoading } from "@/components/GlobalLoadingProvider";
 
 type DocumentType = {
   id: string;
@@ -33,6 +34,7 @@ export default function DocumentUploader({
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
+  const { startLoading, updateLoading, stopLoading } = useGlobalLoading();
 
   const handleUpload = async () => {
     if (!file || !documentTypeId) {
@@ -41,57 +43,63 @@ export default function DocumentUploader({
     }
 
     setLoading(true);
-    const supabase = createSupabaseBrowserClient();
+    startLoading({ label: "Belge yukleniyor", detail: file.name, progress: 12 });
+    try {
+      const supabase = createSupabaseBrowserClient();
 
-    const extension = file.name.split(".").pop() ?? "pdf";
-    const key = shipmentId ?? rfqId ?? "unlinked";
-    const uniqueName = `${key}-${Date.now()}.${extension}`;
-    const filePath = `${key}/${uniqueName}`;
+      const extension = file.name.split(".").pop() ?? "pdf";
+      const key = shipmentId ?? rfqId ?? "unlinked";
+      const uniqueName = `${key}-${Date.now()}.${extension}`;
+      const filePath = `${key}/${uniqueName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(filePath, file);
+      updateLoading({ detail: "Dosya depoya aktariliyor", progress: 38 });
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(filePath, file);
 
-    if (uploadError) {
-      console.error("Document upload failed", uploadError);
+      if (uploadError) {
+        console.error("Document upload failed", uploadError);
+        addToast(
+          uploadError.message
+            ? `Dosya yuklenemedi: ${uploadError.message}`
+            : "Dosya yuklenemedi.",
+          "error"
+        );
+        return;
+      }
+
+      updateLoading({ detail: "Belge kaydi olusturuluyor", progress: 72 });
+      const { error: insertError } = await supabase.from("documents").insert({
+        shipment_id: shipmentId ?? null,
+        document_type_id: documentTypeId,
+        status,
+        received_at: receivedAt || null,
+        notes: rfqId ? `rfq:${rfqId}${notes ? " " + notes : ""}` : notes || null,
+        storage_path: filePath,
+        file_name: file.name,
+      });
+
+      if (insertError) {
+        console.error("Document insert failed", insertError);
+        addToast(
+          insertError.message
+            ? `Belge kaydi olusturulamadi: ${insertError.message}`
+            : "Belge kaydi olusturulamadi.",
+          "error"
+        );
+        return;
+      }
+
+      updateLoading({ detail: "Ekran yenileniyor", progress: 92 });
+      setFile(null);
+      setNotes("");
+      addToast("Belge yuklendi.", "success");
+      onUploaded?.();
+      router.refresh();
+    } finally {
       setLoading(false);
-      addToast(
-        uploadError.message
-          ? `Dosya yuklenemedi: ${uploadError.message}`
-          : "Dosya yuklenemedi.",
-        "error"
-      );
-      return;
+      stopLoading();
     }
-
-    const { error: insertError } = await supabase.from("documents").insert({
-      shipment_id: shipmentId ?? null,
-      document_type_id: documentTypeId,
-      status,
-      received_at: receivedAt || null,
-      notes: rfqId ? `rfq:${rfqId}${notes ? " " + notes : ""}` : notes || null,
-      storage_path: filePath,
-      file_name: file.name,
-    });
-
-    setLoading(false);
-
-    if (insertError) {
-      console.error("Document insert failed", insertError);
-      addToast(
-        insertError.message
-          ? `Belge kaydi olusturulamadi: ${insertError.message}`
-          : "Belge kaydi olusturulamadi.",
-        "error"
-      );
-      return;
-    }
-
-    setFile(null);
-    setNotes("");
-    addToast("Belge yuklendi.", "success");
-    onUploaded?.();
-    router.refresh();
   };
 
   return (

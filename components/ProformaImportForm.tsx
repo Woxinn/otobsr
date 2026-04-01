@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
+import { useGlobalLoading } from "@/components/GlobalLoadingProvider";
 
 type Supplier = { id: string; name: string };
 type ParsedRow = {
@@ -113,6 +114,7 @@ export default function ProformaImportForm({ suppliers }: { suppliers: Supplier[
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const { startLoading, updateLoading, stopLoading } = useGlobalLoading();
 
   const canSubmit = useMemo(
     () => Boolean(!loading && supplierId && proformaNo.trim() && rows.length),
@@ -121,6 +123,7 @@ export default function ProformaImportForm({ suppliers }: { suppliers: Supplier[
 
   const handleFile = async (file?: File) => {
     if (!file) return;
+    startLoading({ label: "Proforma import", detail: "Dosya okunuyor", progress: 16 });
     try {
       const parsed = await parseFile(file);
       setRows(parsed);
@@ -130,6 +133,8 @@ export default function ProformaImportForm({ suppliers }: { suppliers: Supplier[
       setRows([]);
       setFileName("");
       setMessage(err?.message ?? "Dosya okunamadi.");
+    } finally {
+      stopLoading();
     }
   };
 
@@ -137,7 +142,9 @@ export default function ProformaImportForm({ suppliers }: { suppliers: Supplier[
     if (!canSubmit) return;
     setLoading(true);
     setMessage(null);
+    startLoading({ label: "Proforma import", detail: "Kalemler gonderiliyor", progress: 18 });
     try {
+      updateLoading({ detail: `${rows.length} kalem hazirlaniyor`, progress: 38 });
       const res = await fetch("/api/proformas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -157,11 +164,13 @@ export default function ProformaImportForm({ suppliers }: { suppliers: Supplier[
         setMessage(data?.error ?? "Proforma olusturulamadi.");
         return;
       }
+      updateLoading({ detail: "Proforma olusturuldu", progress: 92 });
       router.push(`/proformalar/${data.id}`);
     } catch (err: any) {
       setMessage(err?.message ?? "Beklenmeyen hata.");
     } finally {
       setLoading(false);
+      stopLoading();
     }
   };
 
