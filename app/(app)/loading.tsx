@@ -1,3 +1,5 @@
+import RouteLoadingHold from "@/components/RouteLoadingHold";
+
 export default function AppLoading() {
-  return null;
+  return <RouteLoadingHold detail="Ekran icerigi getiriliyor" />;
 }

@@ -6,6 +6,7 @@ import SignOutButton from "@/components/SignOutButton";
 import TaskPanel from "@/components/TaskPanel";
 import { ToastProvider } from "@/components/ToastProvider";
 import Logo from "@/components/Logo";
+import AppVersionBadge from "@/components/AppVersionBadge";
 
 const roleLabel = (role: string) => {
   if (role === "Yonetim") return "Yönetim";
@@ -41,6 +42,7 @@ export default async function AppLayout({
               <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
                 {roleLabel(role)}
               </span>
+              <AppVersionBadge />
               <SignOutButton />
             </div>
           </div>
@@ -61,6 +63,7 @@ export default async function AppLayout({
               <span className="rounded-full border border-black/10 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
                 {roleLabel(role)}
               </span>
+              <AppVersionBadge />
               <SignOutButton />
             </div>
           </div>

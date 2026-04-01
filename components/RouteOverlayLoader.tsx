@@ -81,6 +81,7 @@ export default function RouteOverlayLoader() {
 
   const currentRouteRef = useRef(currentRoute);
   const pendingRouteRef = useRef<string | null>(null);
+  const holdCountRef = useRef(0);
   const startedAtRef = useRef(0);
   const progressTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -106,6 +107,7 @@ export default function RouteOverlayLoader() {
   };
 
   const scheduleFinish = () => {
+    if (holdCountRef.current > 0) return;
     const elapsed = Date.now() - startedAtRef.current;
     const wait = Math.max(MIN_VISIBLE_MS - elapsed, 0);
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
@@ -175,12 +177,39 @@ export default function RouteOverlayLoader() {
       beginLoading(null);
     };
 
+    const onHold = (event: Event) => {
+      const customEvent = event as CustomEvent<{ label?: string; detail?: string }>;
+      if (!loading && !pendingRouteRef.current) {
+        beginLoading(null);
+      }
+      holdCountRef.current += 1;
+      if (customEvent.detail?.label || customEvent.detail?.detail) {
+        setCopy((prev) => ({
+          label: customEvent.detail?.label ?? prev.label,
+          detail: customEvent.detail?.detail ?? prev.detail,
+        }));
+      }
+    };
+
+    const onRelease = () => {
+      holdCountRef.current = Math.max(holdCountRef.current - 1, 0);
+      if (!loading) return;
+      const pendingRoute = pendingRouteRef.current;
+      if (pendingRoute && (pendingRoute === "__pending__" || pendingRoute === currentRouteRef.current)) {
+        scheduleFinish();
+      }
+    };
+
     document.addEventListener("click", onClickCapture, true);
     window.addEventListener("popstate", onPopState);
+    window.addEventListener("route-loader:hold", onHold as EventListener);
+    window.addEventListener("route-loader:release", onRelease);
 
     return () => {
       document.removeEventListener("click", onClickCapture, true);
       window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("route-loader:hold", onHold as EventListener);
+      window.removeEventListener("route-loader:release", onRelease);
       clearTimers();
     };
   }, [loading]);

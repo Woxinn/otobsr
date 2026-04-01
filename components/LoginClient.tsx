@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import AppVersionBadge from "@/components/AppVersionBadge";
 import Logo from "@/components/Logo";
 
 const highlights = [
@@ -106,12 +107,7 @@ export default function LoginClient() {
                   Panele giriş yapın
                 </h2>
               </div>
-              <div className="rounded-[20px] bg-[#efe7d8] px-3 py-2 text-right">
-                <p className="text-[10px] uppercase tracking-[0.24em] text-[#8e6d36]">
-                  Versiyon
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[#6f5526]">v0.1b</p>
-              </div>
+              <AppVersionBadge className="border-[#d8c7a4] bg-[#efe7d8] text-[#6f5526]" />
             </div>
 
             <p className="mt-4 text-sm leading-6 text-black/58">

@@ -1,3 +1,5 @@
+import RouteLoadingHold from "@/components/RouteLoadingHold";
+
 export default function RootLoading() {
-  return null;
+  return <RouteLoadingHold detail="Sayfa verileri getiriliyor" />;
 }
