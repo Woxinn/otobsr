@@ -809,13 +809,15 @@ export default async function OrderDetailPage({
               <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
                 Adet: {formatNumber(totalsAll.qty, 0)}
               </span>
-              <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                Agirlik: {formatNumber(packingTotals.netWeight)} kg
-              </span>
+              {!isSales ? (
+                <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
+                  Agirlik: {formatNumber(packingTotals.netWeight)} kg
+                </span>
+              ) : null}
               <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
                 Liman varis: {formatDate(orderEta)}
               </span>
-              {insuranceTotals.amount > 0 ? (
+              {!isSales && insuranceTotals.amount > 0 ? (
                 <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
                   Navlun sigortasi: {formatMoney(insuranceTotals.amount, insuranceTotals.currency)}
                 </span>
@@ -825,22 +827,24 @@ export default async function OrderDetailPage({
                   Navlun fatura: {formatMoney(freightTotals.amount, freightTotals.currency)}
                 </span>
               ) : null}
-              <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                <span>Shipment:</span>
-                {linkedShipments.length ? (
-                  linkedShipments.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={`/shipments/${item.id}`}
-                      className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--ocean)] underline-offset-2 hover:underline"
-                    >
-                      {item.file_no ?? "Shipment"}
-                    </Link>
-                  ))
-                ) : (
-                  <span>-</span>
-                )}
-              </span>
+              {!isSales ? (
+                <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
+                  <span>Shipment:</span>
+                  {linkedShipments.length ? (
+                    linkedShipments.map((item) => (
+                      <Link
+                        key={item.id}
+                        href={`/shipments/${item.id}`}
+                        className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--ocean)] underline-offset-2 hover:underline"
+                      >
+                        {item.file_no ?? "Shipment"}
+                      </Link>
+                    ))
+                  ) : (
+                    <span>-</span>
+                  )}
+                </span>
+              ) : null}
                 </div>
               </div>
 
