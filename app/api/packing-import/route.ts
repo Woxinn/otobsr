@@ -136,7 +136,7 @@ export async function POST(request: Request) {
   );
   const productIds = (products ?? []).map((p) => p.id).filter(Boolean) as string[];
 
-  // AğırlıklarÄ± Ã¼rÃ¼n niteliklerinden oku (weight/aÄŸÄ±rlÄ±k iÃ§eren isimler)
+  // Ağırlıkları ürün niteliklerinden oku (weight/ağırlık içeren isimler)
   const weightByProductId = new Map<string, number>();
   if (productIds.length) {
     const { data: attrValues } = await supabase
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
       const attrName = (row as any).attribute?.name?.toLowerCase?.() ?? "";
       if (
         !attrName.includes("weight") &&
-        !attrName.includes("aÄŸÄ±rlÄ±k") &&
+        !attrName.includes("ağırlık") &&
         !attrName.includes("agirlik")
       )
         return;
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
       }
     });
 
-    // Extra attributes'ta da aÄŸÄ±rlÄ±k varsa al
+    // Extra attributes'ta da ağırlık varsa al
     const { data: extraValues } = await supabase
       .from("product_extra_attributes")
       .select("product_id, name, value_text, value_number")
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
       const attrName = row.name?.toLowerCase?.() ?? "";
       if (
         !attrName.includes("weight") &&
-        !attrName.includes("aÄŸÄ±rlÄ±k") &&
+        !attrName.includes("ağırlık") &&
         !attrName.includes("agirlik")
       )
         return;

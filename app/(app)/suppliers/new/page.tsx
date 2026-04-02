@@ -8,17 +8,17 @@ export default function SupplierCreatePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Tedarikçi olustur
+            Tedarikçi oluştur
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Yeni tedarikci
+            Yeni tedarikçi
           </h2>
         </div>
         <Link
           href="/suppliers"
           className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
         >
-          Listeye don
+          Listeye dön
         </Link>
       </div>
 
@@ -28,18 +28,18 @@ export default function SupplierCreatePage() {
       >
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="text-sm font-medium">
-            Tedarikçi adi
+            Tedarikçi adı
             <input
               name="name"
-              placeholder="Tedarikçi adi"
+              placeholder="Tedarikçi adı"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="text-sm font-medium">
-            Yetkili kisi
+            Yetkili kişi
             <input
               name="contact_name"
-              placeholder="Yetkili kisi"
+              placeholder="Yetkili kişi"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>
@@ -60,18 +60,18 @@ export default function SupplierCreatePage() {
             />
           </label>
           <label className="text-sm font-medium">
-            Ulke
+            Ülke
             <CountrySelect
               name="country"
-              placeholder="Ãœlke seÃ§ veya yaz"
+              placeholder="Ülke seç veya yaz"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="text-sm font-medium">
-            Sehir
+            Şehir
             <input
               name="city"
-              placeholder="Sehir"
+              placeholder="Şehir"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>

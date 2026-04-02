@@ -158,12 +158,12 @@ export default async function DashboardPage() {
   const normalizeStatus = (value: string | null | undefined) =>
     (value ?? "")
       .toLowerCase()
-      .replaceAll("Ä±", "i")
-      .replaceAll("ÄŸ", "g")
-      .replaceAll("ÅŸ", "s")
-      .replaceAll("Ã¶", "o")
-      .replaceAll("Ã¼", "u")
-      .replaceAll("Ã§", "c")
+      .replaceAll("ı", "i")
+      .replaceAll("ğ", "g")
+      .replaceAll("ş", "s")
+      .replaceAll("ö", "o")
+      .replaceAll("ü", "u")
+      .replaceAll("ç", "c")
       .trim();
 
   const shipmentStatusCounts = (shipments ?? []).reduce(

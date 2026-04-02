@@ -114,13 +114,13 @@ export default function AiInvoiceImportClient({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Deneme Modulu
+            Deneme Modülü
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            AI Fatura Import (Deneysel)
+            Yapay Zeka Fatura Aktarımı (Deneysel)
           </h2>
           <p className="mt-2 text-sm text-black/60">
-            Excel dosyasini yukle, satirlari eslet ve onaylayip siparise aktar.
+            Excel dosyasını yükle, satırları eşleştir ve onaylayıp siparişe aktar.
           </p>
         </div>
       </div>
@@ -128,9 +128,9 @@ export default function AiInvoiceImportClient({
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm space-y-5">
           <div>
-            <h3 className="text-lg font-semibold">Dosya yukle</h3>
+            <h3 className="text-lg font-semibold">Dosya yükle</h3>
             <p className="text-xs text-black/55">
-              Excel formatinda fatura dosyasi.
+              Excel formatında fatura dosyası.
             </p>
           </div>
           <div className="grid gap-3">
@@ -156,19 +156,19 @@ export default function AiInvoiceImportClient({
               disabled={!canParse || loading}
               onClick={handleParse}
             >
-              {loading ? "Isleniyor..." : "Dosyayi tara"}
+              {loading ? "İşleniyor..." : "Dosyayı tara"}
             </button>
           </div>
         </div>
 
         <div className="rounded-3xl border border-black/10 bg-[var(--sky)] p-6 shadow-sm space-y-4">
-          <h3 className="text-lg font-semibold">Eslestirme ozeti</h3>
+          <h3 className="text-lg font-semibold">Eşleştirme özeti</h3>
           <div className="grid gap-3 text-sm">
             <div className="rounded-2xl border border-black/10 bg-white px-4 py-3">
               {rows.length} satir okundu
             </div>
             <div className="rounded-2xl border border-black/10 bg-white px-4 py-3">
-              {matchedCount} satir otomatik eslesti
+              {matchedCount} satır otomatik eşleşti
             </div>
           </div>
           <button
@@ -184,9 +184,9 @@ export default function AiInvoiceImportClient({
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold">Onizleme</h3>
+            <h3 className="text-lg font-semibold">Önizleme</h3>
             <p className="text-xs text-black/55">
-              Eslestirmeleri onaylamadan siparise yazilmaz.
+              Eşleştirmeleri onaylamadan siparişe yazılmaz.
             </p>
           </div>
         </div>
@@ -194,7 +194,7 @@ export default function AiInvoiceImportClient({
         {rawPreview.length ? (
           <div className="rounded-2xl border border-black/10 bg-[var(--sand)] p-3 text-xs text-black/70">
             <p className="mb-1 text-[10px] uppercase tracking-[0.3em] text-black/45">
-              Okunan basliklar
+              Okunan başlıklar
             </p>
             {rawPreview.join(" | ")}
           </div>
@@ -206,10 +206,10 @@ export default function AiInvoiceImportClient({
               <tr className="text-left text-[11px] uppercase tracking-[0.25em] text-black/45">
                 <th className="px-4">Satir</th>
                 <th className="px-4">Ürün Kodu</th>
-                <th className="px-4">Fatura Adi</th>
+                <th className="px-4">Fatura Adı</th>
                 <th className="px-4">Adet</th>
                 <th className="px-4">Birim Fiyat</th>
-                <th className="px-4">Eslesme</th>
+                <th className="px-4">Eşleşme</th>
               </tr>
             </thead>
             <tbody>
@@ -229,7 +229,7 @@ export default function AiInvoiceImportClient({
                         row.matched ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
                       }`}
                     >
-                      {row.matched ? "Eslesti" : "Eslmedi"}
+                      {row.matched ? "Eşleşti" : "Eşleşmedi"}
                     </span>
                   </td>
                 </tr>

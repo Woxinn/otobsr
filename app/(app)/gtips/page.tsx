@@ -13,7 +13,7 @@ export default async function GtipListPage() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">GTIP listesi</p>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">GTİP listesi</p>
           <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">GTİP yönetimi</h1>
           <p className="text-sm text-black/60">Kodlar, oranlar ve ürün bağlantıları</p>
         </div>

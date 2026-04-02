@@ -30,7 +30,7 @@ export default function RfqImportModal({ rfqId }: Props) {
     if (loading) return;
     setLoading(true);
     setMessage(null);
-    startLoading({ label: "RFQ import", detail: "Dosya isleniyor", progress: 14 });
+    startLoading({ label: "Teklif aktarımı", detail: "Dosya işleniyor", progress: 14 });
     try {
       const rows = parseCsv(text);
       if (!rows.length) {
@@ -50,7 +50,7 @@ export default function RfqImportModal({ rfqId }: Props) {
           supplier_map: supplierMap,
         }),
       });
-      updateLoading({ detail: "Sunucu cevabi aliniyor", progress: 72 });
+      updateLoading({ detail: "Sunucu cevabı alınıyor", progress: 72 });
       const textResp = await res.text();
       let data: any = null;
       try {
@@ -107,13 +107,13 @@ export default function RfqImportModal({ rfqId }: Props) {
         onClick={() => setOpen(true)}
         className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 hover:bg-black/5"
       >
-        Import / Belge
+        İçe Aktar / Belge
       </button>
       {open ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">RFQ Import</h2>
+              <h2 className="text-lg font-semibold">Teklif Aktarımı</h2>
               <button
                 className="rounded-full px-3 py-1 text-sm text-black/60 hover:bg-black/5"
                 onClick={() => setOpen(false)}
@@ -142,7 +142,7 @@ export default function RfqImportModal({ rfqId }: Props) {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    startLoading({ label: "RFQ import", detail: "Dosya okunuyor", progress: 12 });
+                    startLoading({ label: "Teklif aktarımı", detail: "Dosya okunuyor", progress: 12 });
                     setFileName(file.name);
                     const ext = file.name.toLowerCase();
                     if (ext.endsWith(".csv")) {

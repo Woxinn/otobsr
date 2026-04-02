@@ -74,7 +74,7 @@ export default async function SupplierProformaReportPage({
   const { role } = await getCurrentUserRole();
   const isPriv = role === "Admin" || role === "Yonetim";
   if (!isPriv) {
-    return <div className="p-6 text-sm text-red-600">Erisim yok.</div>;
+    return <div className="p-6 text-sm text-red-600">Erişim yok.</div>;
   }
 
   const { data: supplier } = await supabase.from("suppliers").select("id, name").eq("id", supplierId).maybeSingle();
@@ -125,7 +125,7 @@ export default async function SupplierProformaReportPage({
   if (proformaTo) proformaQuery = proformaQuery.lte("proforma_date", proformaTo);
   const { data: proformas, error: proformasErr } = await proformaQuery;
   if (proformasErr) {
-    return <div className="p-6 text-sm text-red-600">Proformalar okunamadi: {proformasErr.message}</div>;
+    return <div className="p-6 text-sm text-red-600">Proformalar okunamadı: {proformasErr.message}</div>;
   }
 
   let ordersQuery = supabase
@@ -138,7 +138,7 @@ export default async function SupplierProformaReportPage({
   if (orderTo) ordersQuery = ordersQuery.lte("created_at", `${orderTo}T23:59:59`);
   const { data: orders, error: ordersErr } = await ordersQuery;
   if (ordersErr) {
-    return <div className="p-6 text-sm text-red-600">Siparisler okunamadi: {ordersErr.message}</div>;
+    return <div className="p-6 text-sm text-red-600">Siparişler okunamadı: {ordersErr.message}</div>;
   }
 
   const proformaIds = (proformas ?? []).map((p) => p.id);
@@ -212,7 +212,7 @@ export default async function SupplierProformaReportPage({
       "id, order_id, product_id, name, quantity, unit_price, total_amount"
     );
   } catch (err: any) {
-    return <div className="p-6 text-sm text-red-600">Kalemler okunamadi: {err?.message ?? "bilinmeyen hata"}</div>;
+    return <div className="p-6 text-sm text-red-600">Kalemler okunamadı: {err?.message ?? "bilinmeyen hata"}</div>;
   }
 
   const allProductIds = Array.from(
@@ -232,7 +232,7 @@ export default async function SupplierProformaReportPage({
         .select("id, code, name")
         .in("id", chunk);
       if (error) {
-        return <div className="p-6 text-sm text-red-600">Urunler okunamadi: {error.message}</div>;
+        return <div className="p-6 text-sm text-red-600">Ürünler okunamadı: {error.message}</div>;
       }
       (products ?? []).forEach((p) => {
         productsById.set(String(p.id), {
@@ -243,7 +243,7 @@ export default async function SupplierProformaReportPage({
     }
   }
 
-  // SipariÅŸ kaleminde product_id boÅŸ olan satÄ±rlar iÃ§in ad->kod fallback (yalnÄ±zca tekil eÅŸleÅŸme).
+  // Sipariş kaleminde product_id boş olan satırlar için ad->kod fallback (yalnızca tekil eşleşme).
   const uniqueCodeByName = new Map<string, string>();
   const codeByCode = new Map<string, string>();
   const codeByNetsis = new Map<string, string>();
@@ -449,7 +449,7 @@ export default async function SupplierProformaReportPage({
     return fallbackCode === "-" ? row : { ...row, product_code: fallbackCode };
   });
 
-  // id/code farkindan kaynakli parcali satirlari tek urunde birlestir.
+  // id/code farkından kaynaklı parçalı satırları tek üründe birleştir.
   const mergedByCanonical = new Map<string, (typeof rows)[number]>();
   const mergeDocDetails = (left: any[], right: any[]) => {
     const docMap = new Map<string, any>();
@@ -568,21 +568,21 @@ export default async function SupplierProformaReportPage({
     <section className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-black/40">Detayli Karsilastirma Raporu</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-black/40">Detaylı Karşılaştırma Raporu</p>
           <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">{supplier.name}</h1>
         </div>
         <Link
           href={`/suppliers/${supplierId}`}
           className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70"
         >
-          Tedarikci detayina don
+          Tedarikçi detayına dön
         </Link>
       </div>
 
       <form className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <label className="text-sm font-medium text-black/70">
-            Proforma tarih baÅŸlangÄ±Ã§
+            Proforma tarih başlangıç
             <input
               type="date"
               name="proformaFrom"
@@ -591,7 +591,7 @@ export default async function SupplierProformaReportPage({
             />
           </label>
           <label className="text-sm font-medium text-black/70">
-            Proforma tarih bitiÅŸ
+            Proforma tarih bitiş
             <input
               type="date"
               name="proformaTo"
@@ -600,7 +600,7 @@ export default async function SupplierProformaReportPage({
             />
           </label>
           <label className="text-sm font-medium text-black/70">
-            SipariÅŸ tarih baÅŸlangÄ±Ã§
+            Sipariş tarih başlangıç
             <input
               type="date"
               name="orderFrom"
@@ -609,7 +609,7 @@ export default async function SupplierProformaReportPage({
             />
           </label>
           <label className="text-sm font-medium text-black/70">
-            SipariÅŸ tarih bitiÅŸ
+            Sipariş tarih bitiş
             <input
               type="date"
               name="orderTo"
@@ -618,7 +618,7 @@ export default async function SupplierProformaReportPage({
             />
           </label>
           <label className="text-sm font-medium text-black/70">
-            ÃœrÃ¼n arama
+            Ürün arama
             <input
               name="q"
               defaultValue={resolved.q ?? ""}
@@ -640,28 +640,28 @@ export default async function SupplierProformaReportPage({
               <option value="all">Hepsi</option>
               <option value="missing">Sadece eksik olanlar</option>
               <option value="excess">Sadece fazla olanlar</option>
-              <option value="equal">Sadece esit olanlar</option>
+              <option value="equal">Sadece eşit olanlar</option>
             </select>
           </label>
           <label className="text-sm font-medium text-black/70">
-            Sirala
+            Sırala
             <select
               name="sortBy"
               defaultValue={sortBy}
               className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
             >
-              <option value="product_code">Urun kodu</option>
-              <option value="product_name">Urun adi</option>
+              <option value="product_code">Ürün kodu</option>
+              <option value="product_name">Ürün adı</option>
               <option value="proforma_qty">Proforma adet</option>
-              <option value="order_qty">Siparis adet</option>
+              <option value="order_qty">Sipariş adet</option>
               <option value="diff_qty">Fark adet</option>
               <option value="proforma_amount">Proforma tutar</option>
-              <option value="order_amount">Siparis tutar</option>
+              <option value="order_amount">Sipariş tutar</option>
               <option value="diff_amount">Fark tutar</option>
             </select>
           </label>
           <label className="text-sm font-medium text-black/70">
-            Sira yonu
+            Sıra yönü
             <select
               name="sortDir"
               defaultValue={sortDir}
@@ -675,7 +675,7 @@ export default async function SupplierProformaReportPage({
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium text-black/70">
-            Proformalar (Ã§oklu)
+            Proformalar (çoklu)
             <select
               name="proformas"
               multiple
@@ -690,7 +690,7 @@ export default async function SupplierProformaReportPage({
             </select>
           </label>
           <label className="text-sm font-medium text-black/70">
-            SipariÅŸler (Ã§oklu)
+            Siparişler (çoklu)
             <select
               name="orders"
               multiple
@@ -708,7 +708,7 @@ export default async function SupplierProformaReportPage({
 
         <div className="mt-4 flex gap-2">
           <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
-            Raporu gÃ¼ncelle
+            Raporu güncelle
           </button>
           <button
             formAction={`/api/suppliers/${supplierId}/proforma-rapor/export`}
@@ -720,7 +720,7 @@ export default async function SupplierProformaReportPage({
             href={`/suppliers/${supplierId}/proforma-rapor`}
             className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold text-black/70"
           >
-            SÄ±fÄ±rla
+            Sıfırla
           </Link>
         </div>
       </form>
@@ -731,7 +731,7 @@ export default async function SupplierProformaReportPage({
           <div className="mt-2 text-xl font-semibold">{fmtNum(filteredSummary.proformaQty)}</div>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-[0.2em] text-black/40">SipariÅŸ adet</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-black/40">Sipariş adet</div>
           <div className="mt-2 text-xl font-semibold">{fmtNum(filteredSummary.orderQty)}</div>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
@@ -745,7 +745,7 @@ export default async function SupplierProformaReportPage({
           <div className="mt-2 text-xl font-semibold">{fmtMoney(filteredSummary.proformaAmount)} {reportCurrency}</div>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-[0.2em] text-black/40">SipariÅŸ tutar</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-black/40">Sipariş tutar</div>
           <div className="mt-2 text-xl font-semibold">{fmtMoney(filteredSummary.orderAmount)} {reportCurrency}</div>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">

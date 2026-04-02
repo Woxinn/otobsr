@@ -15,18 +15,18 @@ function getRouteLoadingCopy(route: string | null | undefined) {
     .replace(/\/+$/, "") || "/";
   const parts = clean.split("/").filter(Boolean);
 
-  if (clean === "/") return { label: "Yükleniyor", detail: "Dashboard hazırlanıyor" };
+  if (clean === "/") return { label: "Yükleniyor", detail: "Gösterge paneli hazırlanıyor" };
 
   if (parts[0] === "orders") {
     if (parts.length === 1) return { label: "Siparişler yükleniyor", detail: "Sipariş kayıtları hazırlanıyor" };
-    if (parts[2] === "packing-import") return { label: "Packing açılıyor", detail: "Koli ve ağırlık verileri hazırlanıyor" };
+    if (parts[2] === "packing-import") return { label: "Paketleme açılıyor", detail: "Koli ve ağırlık verileri hazırlanıyor" };
     if (parts[2] === "beyanname") return { label: "Beyanname açılıyor", detail: "Masraf ve vergi hesapları hazırlanıyor" };
     return { label: "Sipariş açılıyor", detail: "Sipariş detayları ve belgeler getiriliyor" };
   }
 
   if (parts[0] === "products") {
     if (parts.length === 1) return { label: "Ürünler yükleniyor", detail: "Ürün listesi hazırlanıyor" };
-    if (parts[1] === "import-update") return { label: "Ürün aktarımı açılıyor", detail: "Import ekranı hazırlanıyor" };
+    if (parts[1] === "import-update") return { label: "Ürün aktarımı açılıyor", detail: "İçe aktarma ekranı hazırlanıyor" };
     if (parts[1] === "netsis-import") return { label: "Stok kodu aktarımı açılıyor", detail: "Eşleme verileri hazırlanıyor" };
     return { label: "Ürün açılıyor", detail: "Kart ve canlı veriler getiriliyor" };
   }
@@ -37,8 +37,8 @@ function getRouteLoadingCopy(route: string | null | undefined) {
   }
 
   if (parts[0] === "rfqs") {
-    if (parts.length === 1) return { label: "RFQ'lar yükleniyor", detail: "Teklif listesi hazırlanıyor" };
-    return { label: "RFQ açılıyor", detail: "Teklif karşılaştırmaları hazırlanıyor" };
+    if (parts.length === 1) return { label: "Teklif talepleri yükleniyor", detail: "Teklif listesi hazırlanıyor" };
+    return { label: "Teklif talebi açılıyor", detail: "Teklif karşılaştırmaları hazırlanıyor" };
   }
 
   if (parts[0] === "proformalar") {

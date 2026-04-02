@@ -35,13 +35,13 @@ export default async function SuppliersPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-black/60">
-          Tedarikçileri tablo uzerinden guncelleyebilir, detaya gidebilirsiniz.
+          Tedarikçileri tablo üzerinden güncelleyebilir, detaya gidebilirsiniz.
         </p>
         <Link
           href="/suppliers/new"
           className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
         >
-          Yeni tedarikci
+          Yeni tedarikçi
         </Link>
       </div>
 
@@ -51,10 +51,10 @@ export default async function SuppliersPage() {
             <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">
               Tedarikçi panosu
             </p>
-            <h3 className="text-lg font-semibold">Mevcut tedarikciler</h3>
+            <h3 className="text-lg font-semibold">Mevcut tedarikçiler</h3>
           </div>
           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/70 shadow-sm">
-            {suppliers?.length ?? 0} kayit
+            {suppliers?.length ?? 0} kayıt
           </span>
         </div>
         <div className="mt-4 space-y-3 text-sm">
@@ -68,10 +68,10 @@ export default async function SuppliersPage() {
                       <th className="px-4 pt-2">Yetkili</th>
                       <th className="px-4 pt-2">E-posta</th>
                       <th className="px-4 pt-2">Telefon</th>
-                      <th className="px-4 pt-2">Sehir</th>
-                      <th className="px-4 pt-2">Ulke</th>
+                      <th className="px-4 pt-2">Şehir</th>
+                      <th className="px-4 pt-2">Ülke</th>
                       <th className="px-4 pt-2">Not</th>
-                      <th className="px-4 pt-2 text-right">Islem</th>
+                      <th className="px-4 pt-2 text-right">İşlem</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -123,7 +123,7 @@ export default async function SuppliersPage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henüz tedarikci yok.
+              Henüz tedarikçi yok.
             </div>
           )}
         </div>

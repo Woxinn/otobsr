@@ -72,12 +72,12 @@ export default async function TaskPanel() {
       .replaceAll("ö", "o")
       .replaceAll("ü", "u")
       .replaceAll("ç", "c")
-      .replaceAll("Ä±", "i")
-      .replaceAll("ÄŸ", "g")
-      .replaceAll("ÅŸ", "ş")
-      .replaceAll("Ã¶", "o")
-      .replaceAll("Ã¼", "u")
-      .replaceAll("Ã§", "c")
+      .replaceAll("ı", "i")
+      .replaceAll("ğ", "g")
+      .replaceAll("ş", "s")
+      .replaceAll("ö", "o")
+      .replaceAll("ü", "u")
+      .replaceAll("ç", "c")
       .trim();
   const producedStatuses = ["hazir", "uretildi"];
   const productionStatuses = ["uretimde"];

@@ -2,6 +2,18 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.455 - 2026-04-02
+
+- Kalan sayfalardaki mojibake ve yazım hataları temizlendi
+- Tedarikçi, GTİP, ürün tipi ve sipariş planı ekranlarında görünen metinler düzeltildi
+- Bazı normalize/packing akışlarındaki bozuk Türkçe karakter eşleştirmeleri doğru karakterlerle güncellendi
+
+## v0.3.456 - 2026-04-02
+
+- Görünen İngilizce arayüz terimleri yerelleştirildi
+- Menüde Dashboard, Shipments ve Forwarders gibi başlıklar yaygın Türkçe karşılıklarına çevrildi
+- RFQ ve AI fatura aktarımı ekranlarındaki import başlıkları ve yardımcı metinler Türkçeleştirildi
+
 ## v0.3.454 - 2026-04-02
 
 - Görünen metinlerdeki Türkçe karakter ve bozuk encoding sorunları temizlendi

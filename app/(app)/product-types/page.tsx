@@ -43,7 +43,7 @@ export default async function ProductTypesPage() {
     )
     .order("name");
 
-  // AlgÄ±lanan tip deÄŸerleri (nitelikler + ekstra nitelikler)
+  // Algılanan tip değerleri (nitelikler + ekstra nitelikler)
   const detectedAttrRows = await fetchAll(
     "product_attribute_values",
     "product_id, value_text, value_number, attribute:product_attributes(name)"
@@ -56,18 +56,18 @@ export default async function ProductTypesPage() {
   const normalize = (s: string) =>
     s
       .toLowerCase()
-      .replace(/Ã¼/g, "u")
-      .replace(/Ã¶/g, "o")
-      .replace(/Ä±/g, "i")
-      .replace(/ÅŸ/g, "s")
-      .replace(/ÄŸ/g, "g")
-      .replace(/Ã§/g, "c");
+      .replace(/ü/g, "u")
+      .replace(/ö/g, "o")
+      .replace(/ı/g, "i")
+      .replace(/ş/g, "s")
+      .replace(/ğ/g, "g")
+      .replace(/ç/g, "c");
 
   const tipSet = new Map<string, string>(); // lower -> display
   const collectTip = (name: string | null, val: string | null) => {
     if (!name || !val) return;
     const normName = normalize(name);
-    // YalnÄ±zca tip/type iÃ§eren alanlar; uzunluk/boy/geniÅŸlik vs. olanlarÄ± alma
+    // Yalnızca tip/type içeren alanlar; uzunluk/boy/genişlik vs. olanları alma
     if (!normName.includes("tip") && !normName.includes("type")) return;
     if (
       normName.includes("uzun") ||
@@ -76,7 +76,7 @@ export default async function ProductTypesPage() {
       normName.includes("genis") ||
       normName.includes("eni") ||
       normName.includes("agir") ||
-      normName.includes("aÄŸÄ±rlÄ±k") ||
+      normName.includes("ağırlık") ||
       normName.includes("weight") ||
       normName.includes("kg")
     )
@@ -104,7 +104,7 @@ export default async function ProductTypesPage() {
     collectTip(row.name ?? "", val);
   });
 
-  // Mevcut product_types iÃ§indeki adlarÄ± da ekle (tekrar yok)
+  // Mevcut product_types içindeki adları da ekle (tekrar yok)
   (types ?? []).forEach((t: any) => {
     if (!t?.name) return;
     const trimmed = String(t.name).trim();
@@ -131,7 +131,7 @@ export default async function ProductTypesPage() {
           href="/products"
           className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
         >
-          Ürünlere dÃ¶n
+          Ürünlere dön
         </Link>
       </div>
 
@@ -141,7 +141,7 @@ export default async function ProductTypesPage() {
           <form action={createProductType} className="mt-3 space-y-3">
             <input
               name="name"
-              placeholder="Tip adÄ± (Ã¶rn. Rulman)"
+              placeholder="Tip adı (örn. Rulman)"
               className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
               required
             />
@@ -151,22 +151,22 @@ export default async function ProductTypesPage() {
           </form>
           <form action={syncTypesFromAttributes} className="mt-4 space-y-2">
             <p className="text-xs text-black/60">
-              Ürün niteliklerinde adÄ± &quot;tip&quot; geÃ§en deÄŸerleri otomatik tip olarak ekler
-              ve tipi boÅŸ Ã¼rÃ¼nleri bu deÄŸerlere baÄŸlar.
+              Ürün niteliklerinde adı &quot;tip&quot; geçen değerleri otomatik tip olarak ekler
+              ve tipi boş ürünleri bu değerlere bağlar.
             </p>
             <button className="w-full rounded-full border border-black/20 px-4 py-2 text-xs font-semibold transition hover:border-black/40">
-              Niteliklerden tipleri Ã§ek
+              Niteliklerden tipleri çek
             </button>
           </form>
 
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)]/60 p-3">
             <p className="text-xs font-semibold text-black/70 mb-2">
-              Niteliklerden algÄ±lanan tip deÄŸerleri
+              Niteliklerden algılanan tip değerleri
             </p>
             {detectedTips.length ? (
               <details className="space-y-2" open>
                 <summary className="cursor-pointer text-sm font-semibold text-black/70">
-                  {detectedTips.length} tip bulundu (listeyi aÃ§/kapat)
+                  {detectedTips.length} tip bulundu (listeyi aç/kapat)
                 </summary>
                 <form action={upsertTypeFromTipValue} className="space-y-2 text-sm">
                   <div className="flex flex-wrap gap-2">
@@ -187,16 +187,16 @@ export default async function ProductTypesPage() {
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">
-                      SeÃ§ ve ekle
+                      Seç ve ekle
                     </p>
                     <button className="rounded-full border border-black/20 px-4 py-2 text-xs font-semibold transition hover:border-black/40">
-                      SeÃ§ilen tipleri ekle ve Ã¼rÃ¼nleri baÄŸla
+                      Seçilen tipleri ekle ve ürünleri bağla
                     </button>
                   </div>
                 </form>
               </details>
             ) : (
-              <p className="text-xs text-black/50">AlgÄ±lanan tip deÄŸeri yok.</p>
+              <p className="text-xs text-black/50">Algılanan tip değeri yok.</p>
             )}
 
             <div className="mt-4">
@@ -217,7 +217,7 @@ export default async function ProductTypesPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold">{type.name}</span>
                     <span className="rounded-full border border-black/10 bg-white px-2 py-1 text-[11px] font-semibold text-black/60">
-                      {type.product_type_compliance?.length ?? 0} kayÄ±t
+                      {type.product_type_compliance?.length ?? 0} kayıt
                     </span>
                   </div>
                   <ConfirmActionForm
@@ -231,18 +231,18 @@ export default async function ProductTypesPage() {
                 </div>
 
                 <div className="rounded-xl border border-black/10 bg-white p-3">
-                  <p className="text-xs font-semibold text-black/60">Uyumluluk kayÄ±tlarÄ±</p>
+                  <p className="text-xs font-semibold text-black/60">Uyumluluk kayıtları</p>
                   <div className="overflow-auto">
                     <table className="mt-2 w-full min-w-[600px] text-xs text-black/70">
                       <thead>
                         <tr className="text-left text-[11px] uppercase tracking-[0.2em] text-black/50">
-                          <th className="px-2 py-1">Ãœlke</th>
+                          <th className="px-2 py-1">Ülke</th>
                           <th className="px-2 py-1">TSE</th>
                           <th className="px-2 py-1">Analiz</th>
                           <th className="px-2 py-1">TAREKS</th>
                           <th className="px-2 py-1">Rapor</th>
-                          <th className="px-2 py-1">GeÃ§erlilik</th>
-                          <th className="px-2 py-1 text-right">Ä°ÅŸlem</th>
+                          <th className="px-2 py-1">Geçerlilik</th>
+                          <th className="px-2 py-1 text-right">İşlem</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -254,12 +254,12 @@ export default async function ProductTypesPage() {
                             <td className="px-2 py-1">{c.tareks_no ?? ""}</td>
                             <td className="px-2 py-1">{c.rapor_no ?? ""}</td>
                             <td className="px-2 py-1">
-                              {[c.valid_from, c.valid_to].filter(Boolean).join(" â€” ")}
+                              {[c.valid_from, c.valid_to].filter(Boolean).join(" — ")}
                             </td>
                             <td className="px-2 py-1 text-right">
                                 <ConfirmActionForm
                                   action={deleteCompliance}
-                                  confirmText="Uyumluluk kaydi silinsin mi?"
+                                  confirmText="Uyumluluk kaydı silinsin mi?"
                                   buttonText="Sil"
                                   className="inline"
                                 >
@@ -274,7 +274,7 @@ export default async function ProductTypesPage() {
                               className="px-2 py-2 text-black/50"
                               colSpan={7}
                             >
-                              KayÄ±t yok
+                              Kayıt yok
                             </td>
                           </tr>
                         ) : null}
@@ -286,7 +286,7 @@ export default async function ProductTypesPage() {
                     <input type="hidden" name="product_type_id" value={type.id} />
                     <input
                       name="country"
-                      placeholder="Ãœlke (boÅŸ = genel)"
+                      placeholder="Ülke (boş = genel)"
                       className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                     />
                     <input

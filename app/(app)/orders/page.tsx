@@ -71,7 +71,7 @@ export default async function OrdersPage({
     .from("order_documents")
     .select("order_id, document_type_id, status");
 
-  // Order -> Shipment eÅŸleÅŸmeleri
+  // Order -> Shipment eşleşmeleri
   const orderIds = (orders ?? []).map((o) => o.id);
   const { data: packingSummaries } = orderIds.length
     ? await supabase
@@ -178,12 +178,12 @@ export default async function OrdersPage({
   const normalizeStatus = (value: string | null | undefined) =>
     (value ?? "")
       .toLowerCase()
-      .replaceAll("Ã„Â±", "i")
-      .replaceAll("Ã„Å¸", "g")
-      .replaceAll("Ã…Å¸", "s")
-      .replaceAll("ÃƒÂ¶", "o")
-      .replaceAll("ÃƒÂ¼", "u")
-      .replaceAll("ÃƒÂ§", "c")
+      .replaceAll("ı", "i")
+      .replaceAll("ğ", "g")
+      .replaceAll("ş", "s")
+      .replaceAll("ö", "o")
+      .replaceAll("ü", "u")
+      .replaceAll("ç", "c")
       .trim();
   const statusToken = (value: string | null | undefined) =>
     normalizeStatus(value).replaceAll(" ", "-");
