@@ -144,7 +144,7 @@ export default function ProformaImportForm({ suppliers }: { suppliers: Supplier[
     setMessage(null);
     startLoading({ label: "Proforma import", detail: "Kalemler gonderiliyor", progress: 18 });
     try {
-      updateLoading({ detail: `${rows.length} kalem hazirlaniyor`, progress: 38 });
+      updateLoading({ detail: `${rows.length} kalem hazırlanıyor`, progress: 38 });
       const res = await fetch("/api/proformas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

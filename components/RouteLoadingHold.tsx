@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 export default function RouteLoadingHold({
-  label = "Yukleniyor",
+  label = "Yükleniyor",
   detail = "Ekran verileri getiriliyor",
 }: {
   label?: string;

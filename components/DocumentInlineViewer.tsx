@@ -27,7 +27,7 @@ export default function DocumentInlineViewer({
         .createSignedUrl(storagePath, 60 * 5);
       if (!mounted) return;
       if (err || !data?.signedUrl) {
-        setError("Dosya icin gecici baglanti olusturulamadi.");
+        setError("Dosya için geçici bağlantı oluşturulamadı.");
       } else {
         setUrl(data.signedUrl);
       }
@@ -42,7 +42,7 @@ export default function DocumentInlineViewer({
   if (loading) {
     return (
       <div className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-black/70">
-        Dokuman yukleniyor...
+        Doküman yükleniyor...
       </div>
     );
   }
@@ -50,8 +50,8 @@ export default function DocumentInlineViewer({
   if (error || !url) {
     return (
       <div className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-black/70">
-        {error ?? "Dokuman gosterilemedi."}{" "}
-        <span className="text-black/60">Indirerek acmayi deneyin.</span>
+        {error ?? "Doküman gösterilemedi."}{" "}
+        <span className="text-black/60">İndirerek açmayı deneyin.</span>
       </div>
     );
   }
@@ -65,8 +65,8 @@ export default function DocumentInlineViewer({
   return (
     <div className="overflow-hidden rounded-2xl border border-black/10 bg-white">
       <div className="flex items-center justify-between bg-black/5 px-3 py-2 text-xs text-black/60">
-        <span>{fileName ?? "Dokuman"}</span>
-        <span>Otomatik onizleme (PDF/Office)</span>
+        <span>{fileName ?? "Doküman"}</span>
+        <span>Otomatik önizleme (PDF/Office)</span>
       </div>
       {isPdf ? (
         <object
@@ -75,12 +75,12 @@ export default function DocumentInlineViewer({
           style={{ width: "100%", height }}
           className="bg-white"
         >
-          <iframe src={url ?? undefined} title={fileName ?? "Dokuman"} className="h-full w-full" />
+          <iframe src={url ?? undefined} title={fileName ?? "Doküman"} className="h-full w-full" />
         </object>
       ) : (
         <iframe
           src={officeUrl ?? undefined}
-          title={fileName ?? "Dokuman"}
+          title={fileName ?? "Doküman"}
           style={{ width: "100%", height }}
           className="bg-white"
         />

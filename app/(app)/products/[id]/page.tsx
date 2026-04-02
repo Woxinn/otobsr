@@ -87,7 +87,7 @@ export default async function ProductDetailPage({
   if (!product) {
     return (
       <section className="rounded-3xl border border-black/10 bg-white p-8 text-sm text-black/60">
-        Ürün bulunamadi.
+        Ürün bulunamadı.
       </section>
     );
   }
@@ -341,7 +341,7 @@ export default async function ProductDetailPage({
 
         return {
           id: order.id,
-          name: order.name ?? "Siparis",
+          name: order.name ?? "Sipariş",
           created_at: order.created_at,
           shipment_eta: orderEtaByOrder.get(order.id) ?? null,
           country,
@@ -369,8 +369,8 @@ export default async function ProductDetailPage({
   });
 
   const warnings: string[] = [];
-  if (!product.gtip_id) warnings.push("GTIP bagli degil");
-  if (weightKg === null) warnings.push("Agirlik bulunamadi (niteliklerden)");
+  if (!product.gtip_id) warnings.push("GTİP bağlı değil");
+  if (weightKg === null) warnings.push("Ağırlık bulunamadı (niteliklerden)");
 
   return (
     <section className="space-y-8">
@@ -379,7 +379,7 @@ export default async function ProductDetailPage({
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.15),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.12),transparent_30%)]" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-[0.35em] text-white/70">Ürün detayi</p>
+            <p className="text-[11px] uppercase tracking-[0.35em] text-white/70">Ürün detayı</p>
             <h1 className="text-3xl font-semibold leading-tight [font-family:var(--font-display)]">{product.name}</h1>
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">Kod: {product.code}</span>
@@ -395,7 +395,7 @@ export default async function ProductDetailPage({
             </div>
             <div className="mt-3 inline-flex items-center gap-3 rounded-2xl border border-white/25 bg-white/15 px-4 py-3 text-sm backdrop-blur shadow-[0_14px_38px_-26px_rgba(15,61,62,0.8)]">
               <div className="flex flex-col leading-tight">
-                <span className="text-[11px] uppercase tracking-[0.2em] text-white/70">Canli stok</span>
+                <span className="text-[11px] uppercase tracking-[0.2em] text-white/70">Canlı stok</span>
                 <span className="text-2xl font-semibold text-white">{fmtInt(stockResult.value)}</span>
               </div>
               {stockResult.error ? (
@@ -437,7 +437,7 @@ export default async function ProductDetailPage({
               href="/products"
               className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
             >
-              Listeye don
+              Listeye dön
             </Link>
           </div>
         </div>
@@ -449,11 +449,11 @@ export default async function ProductDetailPage({
                     label: "Birim fiyat",
                     value: product.unit_price ? `${fmtUnitPrice(product.unit_price)} USD` : "-",
                   },
-                  { label: "Yurtici masraf %", value: fmt(product.domestic_cost_percent ?? 0) },
+                  { label: "Yurtiçi masraf %", value: fmt(product.domestic_cost_percent ?? 0) },
                 ]
               : []),
-            { label: "Agirlik (kg)", value: weightKg !== null ? fmt(weightKg) : "-" },
-            { label: "GTIP ulke sayisi", value: (countryRates ?? []).length },
+            { label: "Ağırlık (kg)", value: weightKg !== null ? fmt(weightKg) : "-" },
+            { label: "GTİP ülke sayısı", value: (countryRates ?? []).length },
           ].map((item) => (
             <div
               key={item.label}
@@ -495,7 +495,7 @@ export default async function ProductDetailPage({
           </div>
         ) : (
           <div className="mt-3 rounded-xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-            Kategori secilmedi veya nitelik yok.
+            Kategori seçilmedi veya nitelik yok.
           </div>
         )}
       </div>
@@ -503,20 +503,20 @@ export default async function ProductDetailPage({
       {/* Linked orders */}
       <div className="rounded-[30px] border border-black/10 bg-white/95 p-6 shadow-sm backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Bagli siparisler</p>
-          <span className="text-xs text-black/50">{linkedOrders.length} siparis</span>
+          <p className="text-sm font-semibold">Bağlı siparişler</p>
+          <span className="text-xs text-black/50">{linkedOrders.length} sipariş</span>
         </div>
         {linkedOrders.length ? (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
                 <tr>
-                  <th className="px-3 py-2">Siparis</th>
+                  <th className="px-3 py-2">Sipariş</th>
                   <th className="px-3 py-2">Tarih</th>
                   {canSeeFinance ? <th className="px-3 py-2 text-right">Birim fiyat</th> : null}
                   <th className="px-3 py-2 text-right">Adet</th>
                       {role !== "Satis" ? <th className="px-3 py-2">Tedarikçi</th> : null}
-                    <th className="px-3 py-2 text-right">Ulke</th>
+                    <th className="px-3 py-2 text-right">Ülke</th>
                     {canSeeFinance ? (
                       <th className="px-3 py-2 text-right">Ekstra masraf (%)</th>
                     ) : null}
@@ -524,7 +524,7 @@ export default async function ProductDetailPage({
                   {canSeeFinance ? (
                     <th className="px-3 py-2 text-right">Önceki sip. fark (%)</th>
                   ) : null}
-                  <th className="px-3 py-2 text-right">Islem</th>
+                  <th className="px-3 py-2 text-right">İşlem</th>
                 </tr>
               </thead>
               <tbody className="text-black/70">
@@ -537,7 +537,7 @@ export default async function ProductDetailPage({
                   >
                     <td className="px-3 py-3 text-sm font-semibold text-black">
                       <Link href={`/orders/${linked.id}`} className="text-black transition hover:text-[var(--ocean)]">
-                        {linked.name ?? "Siparis"}
+                        {linked.name ?? "Sipariş"}
                       </Link>
                     </td>
                     <td className="px-3 py-3">{fmtDate(linked.shipment_eta)}</td>
@@ -583,12 +583,12 @@ export default async function ProductDetailPage({
               </tbody>
             </table>
             <p className="mt-2 text-[11px] text-black/50">
-              *Birim maliyet: siparis birim fiyati + tedarikci ulkesine ozel GTIP oranlari ile KDVsiz tahmini maliyet. Fark: bir onceki siparise gore yuzde degisim.
+              *Birim maliyet: sipariş birim fiyatı + tedarikçi ülkesine özel GTİP oranları ile KDV'siz tahmini maliyet. Fark: bir önceki siparişe göre yüzde değişim.
             </p>
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
-            Henüz bu urune bagli siparis yok.
+            Henüz bu ürüne bağlı sipariş yok.
           </div>
         )}
       </div>

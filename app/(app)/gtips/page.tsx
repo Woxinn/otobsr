@@ -14,8 +14,8 @@ export default async function GtipListPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">GTIP listesi</p>
-          <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">GTIP yÃ¶netimi</h1>
-          <p className="text-sm text-black/60">Kodlar, oranlar ve Ã¼rÃ¼n baÄŸlantÄ±larÄ±</p>
+          <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">GTİP yönetimi</h1>
+          <p className="text-sm text-black/60">Kodlar, oranlar ve ürün bağlantıları</p>
         </div>
         <Link
           href="/gtips/new"
@@ -30,9 +30,9 @@ export default async function GtipListPage() {
           <thead className="bg-[var(--sand)] text-left text-xs uppercase tracking-[0.15em] text-black/60">
             <tr>
               <th className="px-4 py-3">Kod</th>
-              <th className="px-4 py-3">AÃ§Ä±klama</th>
+              <th className="px-4 py-3">Açıklama</th>
               <th className="px-4 py-3 text-right">GV %</th>
-              <th className="px-4 py-3 text-right">Ä°lave GV %</th>
+              <th className="px-4 py-3 text-right">İlave GV %</th>
               <th className="px-4 py-3 text-right">KDV %</th>
               <th className="px-4 py-3 text-right">Ürün adedi</th>
               <th className="px-4 py-3 text-right">Detay</th>
@@ -57,7 +57,7 @@ export default async function GtipListPage() {
                         href={`/gtips/${g.id}`}
                         className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70"
                       >
-                        GÃ¶r
+                        Gör
                       </Link>
                     </td>
                   </tr>
@@ -66,7 +66,7 @@ export default async function GtipListPage() {
             ) : (
               <tr>
                 <td className="px-4 py-4 text-sm text-black/60" colSpan={7}>
-                  HenÃ¼z GTIP eklenmemiÅŸ.
+                  Henüz GTİP eklenmemiş.
                 </td>
               </tr>
             )}

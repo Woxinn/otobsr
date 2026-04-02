@@ -38,12 +38,12 @@ export default function DocumentUploader({
 
   const handleUpload = async () => {
     if (!file || !documentTypeId) {
-      addToast("Dosya ve evrak tipi secmelisiniz.", "error");
+      addToast("Dosya ve evrak tipi seçmelisiniz.", "error");
       return;
     }
 
     setLoading(true);
-    startLoading({ label: "Belge yukleniyor", detail: file.name, progress: 12 });
+    startLoading({ label: "Belge yükleniyor", detail: file.name, progress: 12 });
     try {
       const supabase = createSupabaseBrowserClient();
 
@@ -52,7 +52,7 @@ export default function DocumentUploader({
       const uniqueName = `${key}-${Date.now()}.${extension}`;
       const filePath = `${key}/${uniqueName}`;
 
-      updateLoading({ detail: "Dosya depoya aktariliyor", progress: 38 });
+      updateLoading({ detail: "Dosya depoya aktarılıyor", progress: 38 });
       const { error: uploadError } = await supabase.storage
         .from("documents")
         .upload(filePath, file);
@@ -61,14 +61,14 @@ export default function DocumentUploader({
         console.error("Document upload failed", uploadError);
         addToast(
           uploadError.message
-            ? `Dosya yuklenemedi: ${uploadError.message}`
-            : "Dosya yuklenemedi.",
+            ? `Dosya yüklenemedi: ${uploadError.message}`
+            : "Dosya yüklenemedi.",
           "error"
         );
         return;
       }
 
-      updateLoading({ detail: "Belge kaydi olusturuluyor", progress: 72 });
+      updateLoading({ detail: "Belge kaydı oluşturuluyor", progress: 72 });
       const { error: insertError } = await supabase.from("documents").insert({
         shipment_id: shipmentId ?? null,
         document_type_id: documentTypeId,
@@ -83,8 +83,8 @@ export default function DocumentUploader({
         console.error("Document insert failed", insertError);
         addToast(
           insertError.message
-            ? `Belge kaydi olusturulamadi: ${insertError.message}`
-            : "Belge kaydi olusturulamadi.",
+            ? `Belge kaydı oluşturulamadı: ${insertError.message}`
+            : "Belge kaydı oluşturulamadı.",
           "error"
         );
         return;
@@ -93,7 +93,7 @@ export default function DocumentUploader({
       updateLoading({ detail: "Ekran yenileniyor", progress: 92 });
       setFile(null);
       setNotes("");
-      addToast("Belge yuklendi.", "success");
+      addToast("Belge yüklendi.", "success");
       onUploaded?.();
       router.refresh();
     } finally {
@@ -104,7 +104,7 @@ export default function DocumentUploader({
 
   return (
     <div className="rounded-2xl border border-black/10 bg-[var(--sky)] p-4 text-sm">
-      <p className="font-semibold">Belge yukle</p>
+      <p className="font-semibold">Belge yükle</p>
       <div className="mt-3 grid gap-3">
         <input
           type="file"
@@ -149,7 +149,7 @@ export default function DocumentUploader({
         disabled={loading}
         className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-70"
       >
-        {loading ? "Yukleniyor..." : "Belgeyi kaydet"}
+        {loading ? "Yükleniyor..." : "Belgeyi kaydet"}
       </button>
     </div>
   );

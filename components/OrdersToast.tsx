@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
 
 const toastMessages: Record<string, string> = {
-  created: "Siparis olusturuldu.",
-  updated: "Siparis guncellendi.",
-  deleted: "Siparis silindi.",
+  created: "Sipariş oluşturuldu.",
+  updated: "Sipariş güncellendi.",
+  deleted: "Sipariş silindi.",
 };
 
 export default function OrdersToast() {

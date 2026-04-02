@@ -184,7 +184,7 @@ export default async function OrderPlanPage({
   const supabase = await createSupabaseServerClient();
   const { role } = await getCurrentUserRole();
   if (!canViewModule(role, "order-plan")) {
-    return <div className="p-6 text-sm text-red-600">EriÅŸim yok.</div>;
+    return <div className="p-6 text-sm text-red-600">Erişim yok.</div>;
   }
 
   const { data: groups } = await supabase
@@ -511,11 +511,11 @@ export default async function OrderPlanPage({
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-black/40">Ürün istatistikleri</p>
             <p className="text-lg font-semibold text-black">
-              Toplam Ã¼rÃ¼n: {totalProductsCount ?? 0}
+              Toplam ürün: {totalProductsCount ?? 0}
             </p>
           </div>
           <div className="text-xs text-black/60">
-            GÃ¶sterilen: {totalCount ? `${startIndex + 1}-${endIndex}` : "0"} / {` ${totalCount}`}
+            Gösterilen: {totalCount ? `${startIndex + 1}-${endIndex}` : "0"} / {` ${totalCount}`}
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-black/70">
@@ -552,7 +552,7 @@ export default async function OrderPlanPage({
               >
                 {groups?.find((g) => g.id === gid)?.name ?? gid}
                 <span className="rounded-full bg-[var(--ocean)]/20 px-2 py-[2px] text-[10px] font-bold text-[var(--ocean)]/80 group-hover:bg-[var(--ocean)]/30">
-                  Ã—
+                  ×
                 </span>
               </Link>
             ))}
@@ -574,7 +574,7 @@ export default async function OrderPlanPage({
             <input
               name="q"
               defaultValue={resolvedParams.q ?? ""}
-              placeholder="Ürün kodu, adÄ±, marka"
+              placeholder="Ürün kodu, adı, marka"
             className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
           />
         </label>
@@ -594,7 +594,7 @@ export default async function OrderPlanPage({
             </select>
           </label>
           <label className="text-sm font-medium text-black/70">
-            TedarikÃ§i
+            Tedarikçi
             <select
               name="supplier"
               defaultValue={resolvedParams.supplier ?? ""}
@@ -646,7 +646,7 @@ export default async function OrderPlanPage({
             >
               {perPageOptions.map((opt) => (
                 <option key={opt} value={opt}>
-                  {opt} Ã¼rÃ¼n
+                  {opt} ürün
                 </option>
               ))}
             </select>
@@ -813,7 +813,7 @@ export default async function OrderPlanPage({
                     : "border border-black/20 text-black/70"
                 }`}
               >
-                Ã–nceki
+                Önceki
               </Link>
               <Link
                 href={`/siparis-plani${buildQuery({ page: String(currentPage + 1) })}`}

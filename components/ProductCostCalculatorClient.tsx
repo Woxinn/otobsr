@@ -123,7 +123,7 @@ export default function ProductCostCalculatorClient({
 
   const warnings: string[] = [];
   if (!product.gtip_id) warnings.push("GTIP bagli degil");
-  if (weightKg === null) warnings.push("Agirlik bulunamadi (niteliklerden)");
+  if (weightKg === null) warnings.push("Ağırlık bulunamadı (niteliklerden)");
   if (basePrice === null) warnings.push("Birim fiyat yok (son siparis veya urun karti)");
   if (!selectedCountry) warnings.push("Maliyet ulkesi belirlenemedi");
 

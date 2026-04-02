@@ -17,20 +17,20 @@ export default function ProductsListToast() {
       const updated = searchParams.get("updated");
       const missing = searchParams.get("missing");
       addToast(
-        `Stok kodu import: ${updated ?? "-"} gÃ¼ncellendi, ${missing ?? "0"} bulunamadÄ±.`,
+        `Stok kodu import: ${updated ?? "-"} güncellendi, ${missing ?? "0"} bulunamadı.`,
         "info"
       );
     } else if (toastKey === "products-import-ok") {
       const updated = searchParams.get("updated");
       const missing = searchParams.get("missing");
       addToast(
-        `Ürün import: ${updated ?? "-"} gÃ¼ncellendi, ${missing ?? "0"} bulunamadÄ±.`,
+        `Ürün import: ${updated ?? "-"} güncellendi, ${missing ?? "0"} bulunamadı.`,
         "info"
       );
     } else if (toastKey === "delete-blocked") {
-      addToast("Ürün silinemedi. Sipariste kullaniliyor.", "error");
+      addToast("Ürün silinemedi. Siparişte kullanılıyor.", "error");
     } else if (toastKey === "delete-blocked-all") {
-      addToast("Tum urunler silinemedi. Sipariste kullanilan urunler var.", "error");
+      addToast("Tüm ürünler silinemedi. Siparişte kullanılan ürünler var.", "error");
     }
 
     const nextParams = new URLSearchParams(searchParams.toString());

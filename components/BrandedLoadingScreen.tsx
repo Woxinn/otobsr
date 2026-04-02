@@ -3,8 +3,8 @@ import Logo from "@/components/Logo";
 export default function BrandedLoadingScreen({
   fullscreen = true,
   overlay = false,
-  label = "Yukleniyor",
-  detail = "Veriler hazirlaniyor",
+  label = "Yükleniyor",
+  detail = "Veriler hazırlanıyor",
   progress,
 }: {
   fullscreen?: boolean;

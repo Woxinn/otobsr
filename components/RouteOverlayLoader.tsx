@@ -15,56 +15,56 @@ function getRouteLoadingCopy(route: string | null | undefined) {
     .replace(/\/+$/, "") || "/";
   const parts = clean.split("/").filter(Boolean);
 
-  if (clean === "/") return { label: "Yukleniyor", detail: "Dashboard hazirlaniyor" };
+  if (clean === "/") return { label: "Yükleniyor", detail: "Dashboard hazırlanıyor" };
 
   if (parts[0] === "orders") {
-    if (parts.length === 1) return { label: "Siparisler yukleniyor", detail: "Siparis kayitlari hazirlaniyor" };
-    if (parts[2] === "packing-import") return { label: "Packing aciliyor", detail: "Koli ve agirlik verileri hazirlaniyor" };
-    if (parts[2] === "beyanname") return { label: "Beyanname aciliyor", detail: "Masraf ve vergi hesaplari hazirlaniyor" };
-    return { label: "Siparis aciliyor", detail: "Siparis detaylari ve belgeler getiriliyor" };
+    if (parts.length === 1) return { label: "Siparişler yükleniyor", detail: "Sipariş kayıtları hazırlanıyor" };
+    if (parts[2] === "packing-import") return { label: "Packing açılıyor", detail: "Koli ve ağırlık verileri hazırlanıyor" };
+    if (parts[2] === "beyanname") return { label: "Beyanname açılıyor", detail: "Masraf ve vergi hesapları hazırlanıyor" };
+    return { label: "Sipariş açılıyor", detail: "Sipariş detayları ve belgeler getiriliyor" };
   }
 
   if (parts[0] === "products") {
-    if (parts.length === 1) return { label: "Urunler yukleniyor", detail: "Urun listesi hazirlaniyor" };
-    if (parts[1] === "import-update") return { label: "Urun aktarimi aciliyor", detail: "Import ekrani hazirlaniyor" };
-    if (parts[1] === "netsis-import") return { label: "Stok kodu aktarimi aciliyor", detail: "Esleme verileri hazirlaniyor" };
-    return { label: "Urun aciliyor", detail: "Kart ve canli veriler getiriliyor" };
+    if (parts.length === 1) return { label: "Ürünler yükleniyor", detail: "Ürün listesi hazırlanıyor" };
+    if (parts[1] === "import-update") return { label: "Ürün aktarımı açılıyor", detail: "Import ekranı hazırlanıyor" };
+    if (parts[1] === "netsis-import") return { label: "Stok kodu aktarımı açılıyor", detail: "Eşleme verileri hazırlanıyor" };
+    return { label: "Ürün açılıyor", detail: "Kart ve canlı veriler getiriliyor" };
   }
 
   if (parts[0] === "shipments") {
-    if (parts.length === 1) return { label: "Sevkiyatlar yukleniyor", detail: "ETA ve operasyon kayitlari hazirlaniyor" };
-    return { label: "Sevkiyat aciliyor", detail: "Rota ve belge detaylari getiriliyor" };
+    if (parts.length === 1) return { label: "Sevkiyatlar yükleniyor", detail: "ETA ve operasyon kayıtları hazırlanıyor" };
+    return { label: "Sevkiyat açılıyor", detail: "Rota ve belge detayları getiriliyor" };
   }
 
   if (parts[0] === "rfqs") {
-    if (parts.length === 1) return { label: "RFQ'lar yukleniyor", detail: "Teklif listesi hazirlaniyor" };
-    return { label: "RFQ aciliyor", detail: "Teklif karsilastirmalari hazirlaniyor" };
+    if (parts.length === 1) return { label: "RFQ'lar yükleniyor", detail: "Teklif listesi hazırlanıyor" };
+    return { label: "RFQ açılıyor", detail: "Teklif karşılaştırmaları hazırlanıyor" };
   }
 
   if (parts[0] === "proformalar") {
-    if (parts.length === 1) return { label: "Proformalar yukleniyor", detail: "Kayitlar hazirlaniyor" };
-    return { label: "Proforma aciliyor", detail: "Kalemler ve tedarikci bilgileri getiriliyor" };
+    if (parts.length === 1) return { label: "Proformalar yükleniyor", detail: "Kayıtlar hazırlanıyor" };
+    return { label: "Proforma açılıyor", detail: "Kalemler ve tedarikçi bilgileri getiriliyor" };
   }
 
   if (parts[0] === "siparis-plani") {
-    return { label: "Siparis plani yukleniyor", detail: "Stok ve satis verileri hesapaniyor" };
+    return { label: "Sipariş planı yükleniyor", detail: "Stok ve satış verileri hesaplanıyor" };
   }
 
   if (parts[0] === "suppliers") {
     return parts.length === 1
-      ? { label: "Tedarikciler yukleniyor", detail: "Tedarikci kayitlari hazirlaniyor" }
-      : { label: "Tedarikci aciliyor", detail: "Siparis ve rapor verileri getiriliyor" };
+      ? { label: "Tedarikçiler yükleniyor", detail: "Tedarikçi kayıtları hazırlanıyor" }
+      : { label: "Tedarikçi açılıyor", detail: "Sipariş ve rapor verileri getiriliyor" };
   }
 
   if (parts[0] === "documents") {
-    return { label: "Belgeler yukleniyor", detail: "Evrak kayitlari hazirlaniyor" };
+    return { label: "Belgeler yükleniyor", detail: "Evrak kayıtları hazırlanıyor" };
   }
 
   if (parts[0] === "gtips") {
-    return { label: "GTIP ekrani aciliyor", detail: "Vergi ve oran verileri getiriliyor" };
+    return { label: "GTİP ekranı açılıyor", detail: "Vergi ve oran verileri getiriliyor" };
   }
 
-  return { label: "Yukleniyor", detail: "Yeni ekran hazirlaniyor" };
+  return { label: "Yükleniyor", detail: "Yeni ekran hazırlanıyor" };
 }
 
 export default function RouteOverlayLoader() {

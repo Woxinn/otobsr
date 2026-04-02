@@ -18,17 +18,17 @@ export default async function OrderCreatePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Siparis olustur
+            Sipariş oluştur
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Yeni siparis
+            Yeni sipariş
           </h2>
         </div>
         <Link
           href="/orders"
           className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
         >
-          Listeye don
+          Listeye dön
         </Link>
       </div>
 
@@ -39,15 +39,15 @@ export default async function OrderCreatePage() {
         <input type="hidden" name="return_to" value="/orders" />
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="text-sm font-medium">
-            Siparis adi
+            Sipariş adı
             <input
               name="name"
-              placeholder="Orn: 2026 Mart siparisi"
+              placeholder="Örn: 2026 Mart siparişi"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="text-sm font-medium">
-            KonÅŸimento No
+            Konşimento No
             <input
               name="consignment_no"
               placeholder="Orn: BL-2026-001"
@@ -69,20 +69,20 @@ export default async function OrderCreatePage() {
             </select>
           </label>
           <label className="text-sm font-medium">
-            Odeme yontemi
+            Ödeme yöntemi
             <select
               name="payment_method"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
-              <option value="">Seciniz</option>
+              <option value="">Seçiniz</option>
               <option value="TT">TT</option>
               <option value="LC">LC</option>
-              <option value="Diger">Diger</option>
+              <option value="Diger">Diğer</option>
             </select>
           </label>
           <div className="rounded-2xl border border-dashed border-black/10 bg-[var(--sand)]/40 px-4 py-3 text-xs text-black/60 lg:col-span-3">
-            Ürün adedi, agirlik ve toplam tutar urun kalemlerinden otomatik
-            hesaplanir.
+            Ürün adedi, ağırlık ve toplam tutar ürün kalemlerinden otomatik
+            hesaplanır.
           </div>
           <label className="text-sm font-medium">
             Para birimi
@@ -109,7 +109,7 @@ export default async function OrderCreatePage() {
             />
           </label>
           <label className="text-sm font-medium">
-            Hazir olus tarihi
+            Hazır oluş tarihi
             <input
               type="date"
               name="expected_ready_date"

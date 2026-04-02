@@ -36,8 +36,8 @@ export default function GlobalLoadingProvider({
   const hideTimerRef = useRef<number | null>(null);
   const [state, setState] = useState<LoadingState>({
     visible: false,
-    label: "Yukleniyor",
-    detail: "Islem suruyor",
+    label: "Yükleniyor",
+    detail: "İşlem sürüyor",
     progress: null,
   });
 
@@ -54,8 +54,8 @@ export default function GlobalLoadingProvider({
         clearHideTimer();
         setState({
           visible: true,
-          label: options?.label ?? "Yukleniyor",
-          detail: options?.detail ?? "Islem suruyor",
+          label: options?.label ?? "Yükleniyor",
+          detail: options?.detail ?? "İşlem sürüyor",
           progress: options?.progress ?? 8,
         });
       },

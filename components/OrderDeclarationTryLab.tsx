@@ -322,7 +322,7 @@ export default function OrderDeclarationTryLab({
                 inputMode="decimal"
                 className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
               />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(freightTotal * rate)} karsiligi</p>
+              <p className="mt-2 text-[11px] text-black/45">{formatTry(freightTotal * rate)} karşılığı</p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
               <span className="text-xs text-black/50">Sigorta ({orderCurrency})</span>
@@ -332,7 +332,7 @@ export default function OrderDeclarationTryLab({
                 inputMode="decimal"
                 className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
               />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(insuranceTotal * rate)} karsiligi</p>
+              <p className="mt-2 text-[11px] text-black/45">{formatTry(insuranceTotal * rate)} karşılığı</p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
               <span className="text-xs text-black/50">Kullanilan kur</span>
@@ -342,7 +342,7 @@ export default function OrderDeclarationTryLab({
                 inputMode="decimal"
                 className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
               />
-              <p className="mt-2 text-[11px] text-black/45">Deger degistikce tablodaki TL tutarlari anlik guncellenir.</p>
+              <p className="mt-2 text-[11px] text-black/45">Değer değiştikçe tablodaki TL tutarları anlık güncellenir.</p>
             </label>
             <div className="rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3 text-xs text-black/60">
               <p>TCMB otomatik deger: {formatNumber(initialRate, 4)}</p>

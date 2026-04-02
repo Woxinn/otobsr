@@ -24,7 +24,7 @@ export default async function EditProductPage({
   if (!product) {
     return (
       <section className="rounded-3xl border border-black/10 bg-white p-8 text-sm text-black/60">
-        Ürün bulunamadi.
+        Ürün bulunamadı.
       </section>
     );
   }
@@ -77,7 +77,7 @@ export default async function EditProductPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Ürün duzenle
+            Ürün düzenle
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
             {product.name}
@@ -88,7 +88,7 @@ export default async function EditProductPage({
             href={`/products/${product.id}`}
             className="rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-semibold"
           >
-            Detaya don
+            Detaya dön
           </Link>
         </div>
       </div>

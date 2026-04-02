@@ -37,7 +37,7 @@ export default function RfqImportModal({ rfqId }: Props) {
         setMessage("Geçerli CSV yok (satır bulunamadı).");
         return;
       }
-      updateLoading({ detail: `${rows.length} satir hazirlaniyor`, progress: 36 });
+      updateLoading({ detail: `${rows.length} satır hazırlanıyor`, progress: 36 });
       console.debug("[rfq-import] parsed rows", rows.length);
       const res = await fetch("/api/rfq/import", {
         method: "POST",
@@ -89,7 +89,7 @@ export default function RfqImportModal({ rfqId }: Props) {
         setPendingMissing(null);
         setPendingAmbiguous(null);
         setMissingCatalogProducts(null);
-        updateLoading({ detail: "RFQ guncelleniyor", progress: 92 });
+        updateLoading({ detail: "RFQ güncelleniyor", progress: 92 });
       }
     } catch (err: any) {
       setMessage(err?.message ?? "Beklenmeyen hata");

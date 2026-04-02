@@ -746,7 +746,7 @@ export default async function OrderDetailPage({
             <ConfirmActionForm
               action={deleteOrder}
               confirmText="Bu siparis silinsin mi? Bu islem geri alinamaz."
-              buttonText="Siparisi sil"
+              buttonText="Siparişi sil"
             >
               <input type="hidden" name="order_id" value={order.id} />
             </ConfirmActionForm>
@@ -756,7 +756,7 @@ export default async function OrderDetailPage({
           href="/orders"
           className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
         >
-          Listeye don
+          Listeye dön
         </Link>
         {!isSales ? (
           <Link
@@ -778,8 +778,8 @@ export default async function OrderDetailPage({
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-black/40">Siparis ozeti</p>
-            <h3 className="text-2xl font-semibold">{order.name ?? "Siparis"}</h3>
+            <p className="text-xs uppercase tracking-[0.3em] text-black/40">Sipariş özeti</p>
+            <h3 className="text-2xl font-semibold">{order.name ?? "Sipariş"}</h3>
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
@@ -819,7 +819,7 @@ export default async function OrderDetailPage({
               </span>
               {!isSales && insuranceTotals.amount > 0 ? (
                 <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                  Navlun sigortasi: {formatMoney(insuranceTotals.amount, insuranceTotals.currency)}
+                  Navlun sigortası: {formatMoney(insuranceTotals.amount, insuranceTotals.currency)}
                 </span>
               ) : null}
               {freightTotals.amount > 0 ? (
@@ -895,7 +895,7 @@ export default async function OrderDetailPage({
               {/* Sağ: Siparis durumu */}
               <div className="rounded-2xl border border-black/10 bg-white px-3 py-3 text-xs space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Siparis durumu</p>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Sipariş durumu</p>
                   <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-[10px] font-semibold text-black/70">
                     {orderStatusLabel}
                   </span>
@@ -931,7 +931,7 @@ export default async function OrderDetailPage({
 
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
-          <h3 className="text-lg font-semibold">Siparis detaylari</h3>
+          <h3 className="text-lg font-semibold">Sipariş detayları</h3>
           <div className="flex flex-wrap gap-2 text-sm">
             {(isSales
               ? [{ key: "products", label: "Ürünler" }]
@@ -992,7 +992,7 @@ export default async function OrderDetailPage({
                       <p className="mt-1 text-xs text-black/60">
                         Excel (.xlsx) veya UTF-8 CSV kullanabilirsiniz. Ürün kodu
                         kullanabilirsiniz. Nitelikler urun kartindan gelir, dosyada
-                        verilen fiyat ve nitelikler urun kartini da gunceller.
+                        verilen fiyat ve nitelikler ürün kartını da günceller.
                       </p>
                     </>
                   ) : (
@@ -1067,12 +1067,14 @@ export default async function OrderDetailPage({
                         Toplam: {formatNumber(totalsPage.qty, 0)} adet
                         {canSeeFinance ? ` | ${formatMoney(totalsPage.amount, order.currency)}` : ""}
                       </div>
-                    <a
-                      href={`/api/orders/${order.id}/items-export?format=xlsx`}
-                      className="flex items-center gap-2 rounded-full border border-black/15 bg-white px-3 py-2 font-semibold text-black hover:bg-[var(--mint)]/50"
-                    >
-                      <Download size={14} /> Ürünleri dışa aktar (Excel)
-                    </a>
+                    {!isSales ? (
+                      <a
+                        href={`/api/orders/${order.id}/items-export?format=xlsx`}
+                        className="flex items-center gap-2 rounded-full border border-black/15 bg-white px-3 py-2 font-semibold text-black hover:bg-[var(--mint)]/50"
+                      >
+                        <Download size={14} /> Ürünleri dışa aktar (Excel)
+                      </a>
+                    ) : null}
                   </div>
                 </div>
                 <table className="mt-4 w-full min-w-[1100px]">
@@ -1084,7 +1086,7 @@ export default async function OrderDetailPage({
                       {canSeeFinance ? <th className="py-3">Total</th> : null}
                       <th className="py-3">Nitelikler</th>
                       <th className="py-3">Not</th>
-                      {canEditPage ? <th className="py-3 text-right">Islem</th> : null}
+                      {canEditPage ? <th className="py-3 text-right">İşlem</th> : null}
                     </tr>
                   </thead>
                   <tbody className="text-sm">
@@ -1203,7 +1205,7 @@ export default async function OrderDetailPage({
               </div>
             ) : (
               <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Ürün kalemi bulunamadi. Ilk urunu ekleyin.
+                Ürün kalemi bulunamadı. İlk ürünü ekleyin.
               </div>
             )}
 
@@ -1293,7 +1295,7 @@ export default async function OrderDetailPage({
                 <p className="mt-2 text-2xl font-semibold leading-tight text-black">
                   {formatNumber(packingTotals.netWeight)}
                 </p>
-                <p className="text-xs text-black/60">Toplam net agirlik</p>
+                <p className="text-xs text-black/60">Toplam net ağırlık</p>
               </div>
               <div className="flex-1 min-w-[180px] rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
@@ -1302,7 +1304,7 @@ export default async function OrderDetailPage({
                 <p className="mt-2 text-2xl font-semibold leading-tight text-black">
                   {formatNumber(packingTotals.grossWeight)}
                 </p>
-                <p className="text-xs text-black/60">Toplam brut agirlik</p>
+                <p className="text-xs text-black/60">Toplam brüt ağırlık</p>
               </div>
               <div className="flex-1 min-w-[180px] rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
@@ -1317,7 +1319,7 @@ export default async function OrderDetailPage({
 
             <details className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <summary className="cursor-pointer text-sm font-semibold">
-                Toplamlari duzenle
+                Toplamları düzenle
               </summary>
               <form
                 action={saveOrderPackingListSummary}
@@ -1374,7 +1376,7 @@ export default async function OrderDetailPage({
                     name="notes"
                     defaultValue={packingSummaryResolved?.notes ?? ""}
                     className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                    placeholder="Tedarikçiden gelen ozet / aciklama"
+                    placeholder="Tedarikçiden gelen özet / açıklama"
                     rows={3}
                   />
                 </label>
@@ -1393,12 +1395,12 @@ export default async function OrderDetailPage({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
-                    Packing list dokumani
+                    Packing list dokümanı
                   </p>
-                  <p className="text-sm font-semibold">Belgeyi yukle ve goruntule</p>
+                  <p className="text-sm font-semibold">Belgeyi yükle ve görüntüle</p>
                   <p className="mt-1 text-xs text-black/60">
-                    Ürün ekleme/CSV yok; sadece tedarikcinin gonderdigi dokumani ve ozet
-                    toplamlarini takip ediyoruz.
+                    Ürün ekleme/CSV yok; sadece tedarikçinin gönderdiği dokümanı ve özet
+                    toplamlarını takip ediyoruz.
                   </p>
                 </div>
               </div>
@@ -1435,7 +1437,7 @@ export default async function OrderDetailPage({
                 </div>
               ) : (
                 <div className="mt-3 rounded-xl border border-dashed border-black/10 bg-[var(--peach)] px-3 py-2 text-xs text-black/70">
-                  Packing dokumani henuz yuklenmedi.
+                  Packing dokümanı henüz yüklenmedi.
                 </div>
               )}
 
@@ -1464,6 +1466,7 @@ export default async function OrderDetailPage({
             </div>
           </div>
 
+          {!isSales ? (
           <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -1520,7 +1523,7 @@ export default async function OrderDetailPage({
                         <th className="px-3 py-2">Brüt</th>
                         <th className="px-3 py-2">Koli</th>
                         <th className="px-3 py-2">Tarih</th>
-                        <th className="px-3 py-2 text-right">Islem</th>
+                        <th className="px-3 py-2 text-right">İşlem</th>
                       </tr>
                     </thead>
                     <tbody className="text-black/70">
@@ -1589,6 +1592,7 @@ export default async function OrderDetailPage({
               </div>
             )}
           </div>
+          ) : null}
         </>
       ) : null}
 
@@ -1622,7 +1626,7 @@ export default async function OrderDetailPage({
                       <th className="py-3">Yontem</th>
                       <th className="py-3">Durum</th>
                       <th className="py-3">Not</th>
-                      <th className="py-3 text-right">Islem</th>
+                      <th className="py-3 text-right">İşlem</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm">
@@ -1682,7 +1686,7 @@ export default async function OrderDetailPage({
               </div>
             ) : (
               <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Odeme kaydi bulunamadi.
+                Ödeme kaydı bulunamadı.
               </div>
             )}
 
@@ -1758,7 +1762,7 @@ export default async function OrderDetailPage({
                       <th className="px-3 py-2">Navlun tutari</th>
                       <th className="px-3 py-2">Not</th>
                       <th className="px-3 py-2">Tarih</th>
-                      <th className="px-3 py-2 text-right">Islem</th>
+                      <th className="px-3 py-2 text-right">İşlem</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1840,7 +1844,7 @@ export default async function OrderDetailPage({
               </div>
             ) : (
               <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Belge bulunamadi.
+                Belge bulunamadı.
               </div>
             )}
 

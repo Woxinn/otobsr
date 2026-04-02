@@ -33,17 +33,17 @@ export default async function NewProductPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Yeni urun
+            Yeni ürün
           </p>
           <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Ürün olustur
+            Ürün oluştur
           </h2>
         </div>
         <Link
           href="/products"
           className="rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold"
         >
-          Listeye don
+          Listeye dön
         </Link>
       </div>
 
@@ -59,14 +59,14 @@ export default async function NewProductPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-black/40">
-              Toplu urun import
+              Toplu ürün import
             </p>
             <p className="text-sm font-semibold">
-              Nitelikleri ile birlikte CSV yukleyin
+              Nitelikleri ile birlikte CSV yükleyin
             </p>
             <p className="mt-1 text-xs text-black/60">
-              CSV UTF-8 (virgul) ya da Excel (.xlsx) kullanin. Nitelikler icin
-              attr_name_1, attr_value_1 gibi kolonlari kullanin.
+              CSV UTF-8 (virgül) ya da Excel (.xlsx) kullanın. Nitelikler için
+              attr_name_1, attr_value_1 gibi kolonları kullanın.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

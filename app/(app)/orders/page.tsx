@@ -368,10 +368,10 @@ export default async function OrdersPage({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_20%,rgba(255,255,255,0.28),transparent_35%),radial-gradient(circle_at_80%_12%,rgba(255,255,255,0.22),transparent_40%)]" />
           <div className="relative flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.32em] text-white/85">Siparisler</p>
-              <h1 className="text-3xl font-semibold [font-family:var(--font-display)]">Order List</h1>
+              <p className="text-[11px] uppercase tracking-[0.32em] text-white/85">Siparişler</p>
+              <h1 className="text-3xl font-semibold [font-family:var(--font-display)]">Sipariş Listesi</h1>
               <p className="mt-2 text-sm text-white/85">
-                Siparisleri filtreleyin, izleyin veya yeni siparis olusturun.
+                Siparişleri filtreleyin, izleyin veya yeni sipariş oluşturun.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -380,18 +380,20 @@ export default async function OrdersPage({
                 <p className="text-2xl font-bold">{orders?.length ?? 0}</p>
                 <div className="absolute inset-0 rounded-full border border-white/30" />
               </div>
-              <Link
-                href="/api/orders/items-export"
-                className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-semibold text-[var(--ocean)] shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:shadow-xl"
-              >
-                <Download size={16} /> Tüm sipariş kalemleri (Excel)
-              </Link>
+              {!isSales ? (
+                <Link
+                  href="/api/orders/items-export"
+                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-semibold text-[var(--ocean)] shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:shadow-xl"
+                >
+                  <Download size={16} /> Tüm sipariş kalemleri (Excel)
+                </Link>
+              ) : null}
               {canEditPage ? (
                 <Link
                   href="/orders/new"
                   className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:shadow-xl"
                 >
-                  + New Order
+                  + Yeni Sipariş
                 </Link>
               ) : null}
             </div>

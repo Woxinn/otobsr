@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Fraunces, Space_Grotesk } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   description: "Çin deniz ithalat operasyon takibi için web tabanlı sistem",
   icons: {
     icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   },
 };
 
@@ -45,3 +47,4 @@ export default function RootLayout({
     </html>
   );
 }
+

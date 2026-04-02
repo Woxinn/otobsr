@@ -79,24 +79,24 @@ export default function OrderDocumentUploader({
 
   const handleUpload = async () => {
     if (!file || !documentTypeId) {
-      addToast("Dosya ve evrak tipi secmelisiniz.", "error");
+      addToast("Dosya ve evrak tipi seçmelisiniz.", "error");
       return;
     }
 
     setLoading(true);
-    startLoading({ label: "Belge yukleniyor", detail: file.name, progress: 10 });
+    startLoading({ label: "Belge yükleniyor", detail: file.name, progress: 10 });
     try {
       const extension = file.name.split(".").pop() ?? "pdf";
       const uniqueName = `${Date.now()}.${extension}`;
       const filePath = `orders/${orderId}/${uniqueName}`;
 
-      updateLoading({ detail: "Dosya depoya aktariliyor", progress: 30 });
+      updateLoading({ detail: "Dosya depoya aktarılıyor", progress: 30 });
       const { error: uploadError } = await supabase.storage
         .from("documents")
         .upload(filePath, file);
 
       if (uploadError) {
-        addToast("Dosya yuklenemedi.", "error");
+        addToast("Dosya yüklenemedi.", "error");
         return;
       }
 
@@ -110,21 +110,21 @@ export default function OrderDocumentUploader({
         paymentAmount.trim() === "" ? null : Number(paymentAmount.replace(",", "."));
 
       if (isInsurance && parsedInsurance !== null && Number.isNaN(parsedInsurance)) {
-        addToast("Navlun sigortasi tutari gecerli degil.", "error");
+        addToast("Navlun sigortası tutarı geçerli değil.", "error");
         return;
       }
 
       if (isFreightInvoice && parsedFreight !== null && Number.isNaN(parsedFreight)) {
-        addToast("Navlun fatura tutari gecerli degil.", "error");
+        addToast("Navlun fatura tutarı geçerli değil.", "error");
         return;
       }
 
       if (isPaymentDoc && parsedPayment !== null && Number.isNaN(parsedPayment)) {
-        addToast("Ödeme tutari gecerli degil.", "error");
+        addToast("Ödeme tutarı geçerli değil.", "error");
         return;
       }
 
-      updateLoading({ detail: "Siparis belgesi kaydediliyor", progress: 60 });
+      updateLoading({ detail: "Sipariş belgesi kaydediliyor", progress: 60 });
       const { data: insertedDocs, error: insertError } = await supabase
         .from("order_documents")
         .insert({
@@ -144,14 +144,14 @@ export default function OrderDocumentUploader({
         .limit(1);
 
       if (insertError) {
-        addToast("Belge kaydi olusturulamadi.", "error");
+        addToast("Belge kaydı oluşturulamadı.", "error");
         return;
       }
 
       const insertedDoc = insertedDocs?.[0];
 
       if (isPaymentDoc && parsedPayment !== null) {
-        updateLoading({ detail: "Odeme kaydi olusturuluyor", progress: 78 });
+        updateLoading({ detail: "Ödeme kaydı oluşturuluyor", progress: 78 });
         const payDate =
           paymentDate && paymentDate.trim() !== ""
             ? paymentDate
@@ -166,12 +166,12 @@ export default function OrderDocumentUploader({
           notes: `Belge:${file.name} | doc:${insertedDoc?.id ?? "?"} | path:${insertedDoc?.storage_path ?? filePath}`,
         });
         if (payError) {
-          addToast("Ödeme olusturulamadi, sonra tekrar deneyin.", "error");
+          addToast("Ödeme oluşturulamadı, sonra tekrar deneyin.", "error");
         }
       }
 
       if (isProforma) {
-        updateLoading({ detail: "Siparis durumu guncelleniyor", progress: 86 });
+        updateLoading({ detail: "Sipariş durumu güncelleniyor", progress: 86 });
         await supabase
           .from("orders")
           .update({ order_status: "Proforma Geldi" })
@@ -189,7 +189,7 @@ export default function OrderDocumentUploader({
       setPaymentAmount("");
       setPaymentCurrency(orderCurrency || "USD");
       setPaymentDate("");
-      addToast("Belge yuklendi.", "success");
+      addToast("Belge yüklendi.", "success");
       router.refresh();
     } finally {
       setLoading(false);
@@ -199,7 +199,7 @@ export default function OrderDocumentUploader({
 
   return (
     <div className="rounded-2xl border border-black/10 bg-[var(--sky)] p-4 text-sm">
-      <p className="font-semibold">Belge yukle</p>
+      <p className="font-semibold">Belge yükle</p>
       <div className="mt-3 grid gap-3">
         <input
           type="file"
@@ -241,12 +241,12 @@ export default function OrderDocumentUploader({
         {isInsurance ? (
           <div className="grid gap-2 rounded-xl border border-black/10 bg-white p-3 text-sm">
             <p className="text-xs font-semibold text-black/70">
-              Navlun sigortasi tutari
+              Navlun sigortası tutarı
             </p>
             <input
               value={insuranceAmount}
               onChange={(event) => setInsuranceAmount(event.target.value)}
-              placeholder="Orn: 1250"
+              placeholder="Örn: 1250"
               className="rounded-xl border border-black/10 bg-white p-2 text-sm"
             />
             <input
@@ -259,11 +259,11 @@ export default function OrderDocumentUploader({
         ) : null}
         {isFreightInvoice ? (
           <div className="grid gap-2 rounded-xl border border-black/10 bg-white p-3 text-sm">
-            <p className="text-xs font-semibold text-black/70">Navlun fatura tutari</p>
+            <p className="text-xs font-semibold text-black/70">Navlun fatura tutarı</p>
             <input
               value={freightAmount}
               onChange={(event) => setFreightAmount(event.target.value)}
-              placeholder="Orn: 1250"
+              placeholder="Örn: 1250"
               className="rounded-xl border border-black/10 bg-white p-2 text-sm"
             />
             <input
@@ -276,7 +276,7 @@ export default function OrderDocumentUploader({
         ) : null}
         {isPaymentDoc ? (
           <div className="grid gap-2 rounded-xl border border-black/10 bg-white p-3 text-sm">
-            <p className="text-xs font-semibold text-black/70">Ödeme tutari (manuel)</p>
+            <p className="text-xs font-semibold text-black/70">Ödeme tutarı (manuel)</p>
             <input
               value={paymentAmount}
               onChange={(event) => setPaymentAmount(event.target.value)}
@@ -306,7 +306,7 @@ export default function OrderDocumentUploader({
         disabled={loading}
         className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-70"
       >
-        {loading ? "Yukleniyor..." : "Belgeyi kaydet"}
+        {loading ? "Yükleniyor..." : "Belgeyi kaydet"}
       </button>
     </div>
   );
