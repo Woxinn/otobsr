@@ -1,5 +1,7 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canEdit, getCurrentUserRole } from "@/lib/roles";
 import { updateProduct } from "@/app/actions/products";
 import ProductForm from "@/components/ProductForm";
 
@@ -9,6 +11,8 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { role } = await getCurrentUserRole();
+  if (!canEdit(role)) redirect(`/products/${id}`);
   const supabase = await createSupabaseServerClient();
 
   const { data: product } = await supabase
@@ -102,4 +106,6 @@ export default async function EditProductPage({
     </section>
   );
 }
+
+
 

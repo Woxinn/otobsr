@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUserRole } from "@/lib/roles";
 
 type AttrRow = {
   product_id: string;
@@ -31,6 +32,10 @@ type ComplianceRow = {
 };
 
 export async function GET(req: NextRequest) {
+  const { role } = await getCurrentUserRole();
+  if (role === "Satis") {
+    return NextResponse.json({ error: "Yetki yok" }, { status: 403 });
+  }
   const url = new URL(req.url);
   const orderId = url.searchParams.get("orderId");
   if (!orderId) {

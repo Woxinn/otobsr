@@ -1,10 +1,14 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canEdit, getCurrentUserRole } from "@/lib/roles";
 import { createProduct, importProducts } from "@/app/actions/products";
 import ProductForm from "@/components/ProductForm";
 import ProductsToast from "@/components/ProductsToast";
 
 export default async function NewProductPage() {
+  const { role } = await getCurrentUserRole();
+  if (!canEdit(role)) redirect("/products");
   const supabase = await createSupabaseServerClient();
 
   const { data: groups } = await supabase
@@ -98,4 +102,6 @@ export default async function NewProductPage() {
     </section>
   );
 }
+
+
 

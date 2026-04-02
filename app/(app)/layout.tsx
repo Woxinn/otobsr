@@ -19,12 +19,14 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await syncTasks();
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   const { role } = await getCurrentUserRole();
+  if (role !== "Satis") {
+    await syncTasks();
+  }
 
   return (
     <div className="min-h-screen text-[var(--ink)]">
@@ -104,8 +106,7 @@ export default async function AppLayout({
           <main>{children}</main>
         </ToastProvider>
       </div>
-
-      <TaskPanel />
+      {role !== "Satis" ? <TaskPanel /> : null}
     </div>
   );
 }

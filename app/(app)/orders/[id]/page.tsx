@@ -735,31 +735,37 @@ export default async function OrderDetailPage({
     <section className="space-y-6">
       <OrderItemsToast orderId={order.id} />
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Link
-          href={`/orders/${order.id}/edit`}
-          className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
-        >
-          Düzenle
-        </Link>
-        <ConfirmActionForm
-          action={deleteOrder}
-          confirmText="Bu siparis silinsin mi? Bu islem geri alinamaz."
-          buttonText="Siparisi sil"
-        >
-          <input type="hidden" name="order_id" value={order.id} />
-        </ConfirmActionForm>
+        {canEditPage ? (
+          <>
+            <Link
+              href={`/orders/${order.id}/edit`}
+              className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Düzenle
+            </Link>
+            <ConfirmActionForm
+              action={deleteOrder}
+              confirmText="Bu siparis silinsin mi? Bu islem geri alinamaz."
+              buttonText="Siparisi sil"
+            >
+              <input type="hidden" name="order_id" value={order.id} />
+            </ConfirmActionForm>
+          </>
+        ) : null}
         <Link
           href="/orders"
           className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
         >
           Listeye don
         </Link>
-        <Link
-          href={`/api/export-gumruk?orderId=${order.id}`}
-          className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-md"
-        >
-          Gümrük Excel&apos;i indir
-        </Link>
+        {!isSales ? (
+          <Link
+            href={`/api/export-gumruk?orderId=${order.id}`}
+            className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            Gümrük Excel&apos;i indir
+          </Link>
+        ) : null}
         {canSeeFinance ? (
           <Link
             href={`/orders/${order.id}/beyanname`}
@@ -971,17 +977,23 @@ export default async function OrderDetailPage({
               <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-[0.2em] text-black/40">
-                    Fatura import
-                  </p>
-                  <p className="text-sm font-semibold">
-                    Uzun faturalar icin Excel/CSV import kullanin
-                  </p>
-                  <p className="mt-1 text-xs text-black/60">
-                    Excel (.xlsx) veya UTF-8 CSV kullanabilirsiniz. Ürün kodu
-                    kullanabilirsiniz. Nitelikler urun kartindan gelir, dosyada
-                    verilen fiyat ve nitelikler urun kartini da gunceller.
-                  </p>
+                  {!isSales ? (
+                    <>
+                      <p className="text-xs uppercase tracking-[0.2em] text-black/40">
+                        Fatura import
+                      </p>
+                      <p className="text-sm font-semibold">
+                        Uzun faturalar icin Excel/CSV import kullanin
+                      </p>
+                      <p className="mt-1 text-xs text-black/60">
+                        Excel (.xlsx) veya UTF-8 CSV kullanabilirsiniz. Ürün kodu
+                        kullanabilirsiniz. Nitelikler urun kartindan gelir, dosyada
+                        verilen fiyat ve nitelikler urun kartini da gunceller.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold">Ürün kalemlerinde ara</p>
+                  )}
                   <form className="mt-2 flex flex-wrap items-center gap-2 text-xs" method="get">
                     <input type="hidden" name="tab" value="products" />
                     <input
@@ -1002,22 +1014,24 @@ export default async function OrderDetailPage({
                     </Link>
                   </form>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    href="/templates/order-items-template.csv"
-                    className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
-                  >
-                    Ürün CSV
-                  </Link>
-                  <Link
-                    href="/api/order-items/template"
-                    className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
-                  >
-                    Ürün Excel (Guncel)
-                  </Link>
-                </div>
+                {!isSales ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href="/templates/order-items-template.csv"
+                      className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
+                    >
+                      Ürün CSV
+                    </Link>
+                    <Link
+                      href="/api/order-items/template"
+                      className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
+                    >
+                      Ürün Excel (Guncel)
+                    </Link>
+                  </div>
+                ) : null}
               </div>
-              {canEditPage ? (
+              {canEditPage && !isSales ? (
                 <form
                   action={importOrderItems}
                   className="mt-4 flex flex-wrap items-center gap-3"

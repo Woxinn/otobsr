@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAdminRole } from "@/lib/roles";
 
 const nullIfEmpty = (value: FormDataEntryValue | null) => {
   if (value === null) return null;
@@ -68,6 +69,7 @@ const resolveHeaderIndex = (headers: string[], options: string[]) => {
 };
 
 export async function importOrderPackingList(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -236,6 +238,7 @@ export async function importOrderPackingList(formData: FormData) {
 }
 
 export async function saveOrderPackingListSummary(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -274,6 +277,7 @@ export async function saveOrderPackingListSummary(formData: FormData) {
 }
 
 export async function createOrderPackingListItem(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -335,6 +339,7 @@ export async function createOrderPackingListItem(formData: FormData) {
 }
 
 export async function deleteOrderPackingListItem(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   const itemId = String(formData.get("item_id") ?? "");
@@ -355,6 +360,7 @@ export async function deleteOrderPackingListItem(formData: FormData) {
 }
 
 export async function deleteAllOrderPackingListItems(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;

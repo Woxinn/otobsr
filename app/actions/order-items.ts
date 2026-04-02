@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import * as XLSX from "xlsx";
+import { requireAdminRole } from "@/lib/roles";
 
 const nullIfEmpty = (value: FormDataEntryValue | null) => {
   if (value === null) return null;
@@ -381,6 +382,7 @@ const updateOrderTotals = async (
 };
 
 export async function createOrderItem(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -453,6 +455,7 @@ export async function createOrderItem(formData: FormData) {
 }
 
 export async function updateOrderItem(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   const orderItemId = String(formData.get("order_item_id") ?? "");
@@ -516,6 +519,7 @@ export async function updateOrderItem(formData: FormData) {
 }
 
 export async function deleteOrderItem(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   const itemId = String(formData.get("item_id") ?? "");
@@ -538,6 +542,7 @@ export async function deleteOrderItem(formData: FormData) {
 }
 
 export async function deleteAllOrderItems(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -558,6 +563,7 @@ export async function deleteAllOrderItems(formData: FormData) {
 }
 
 export async function importOrderItems(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -1046,6 +1052,7 @@ export async function importOrderItems(formData: FormData) {
 }
 
 export async function completeMissingOrderProducts(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const stagingId = String(formData.get("staging_id") ?? "");
   const orderId = String(formData.get("order_id") ?? "");
@@ -1357,6 +1364,7 @@ export async function completeMissingOrderProducts(formData: FormData) {
 
 // Tek satırlık gelişmiş form (sipariş detayında inline kullanılır)
 export async function completeSingleMissingProduct(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) redirect("/orders?toast=missing-products-error");
@@ -1510,6 +1518,7 @@ export async function completeSingleMissingProduct(formData: FormData) {
 
 // Tek satırlık gelişmiş ürün ekleme formunu açmak için (sipariş detay altından)
 export async function startManualMissingProduct(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) {

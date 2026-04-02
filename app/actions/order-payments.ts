@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAdminRole } from "@/lib/roles";
 
 const nullIfEmpty = (value: FormDataEntryValue | null) => {
   if (value === null) return null;
@@ -17,6 +18,7 @@ const normalizeNumber = (value: FormDataEntryValue | null) => {
 };
 
 export async function createOrderPayment(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -41,6 +43,7 @@ export async function createOrderPayment(formData: FormData) {
 }
 
 export async function deleteOrderPayment(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const paymentId = String(formData.get("payment_id") ?? "");
   const orderId = String(formData.get("order_id") ?? "");

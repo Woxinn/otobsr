@@ -466,7 +466,7 @@ export default async function ProductDetailPage({
         </div>
       </div>
 
-      {warnings.length ? (
+      {!isSales && warnings.length ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
           Eksikler: {warnings.join(", ")}
         </div>

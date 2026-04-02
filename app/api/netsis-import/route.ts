@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUserRole } from "@/lib/roles";
 
 type IncomingRow = {
   code?: string;
@@ -10,6 +11,10 @@ type IncomingRow = {
 };
 
 export async function POST(req: NextRequest) {
+  const { role } = await getCurrentUserRole();
+  if (role === "Satis") {
+    return NextResponse.json({ error: "Yetki yok" }, { status: 403 });
+  }
   const { rows } = await req.json();
   if (!Array.isArray(rows) || !rows.length) {
     return NextResponse.json({ error: "rows bos" }, { status: 400 });
@@ -73,4 +78,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, updated: updates.length, missing });
 }
+
+
 

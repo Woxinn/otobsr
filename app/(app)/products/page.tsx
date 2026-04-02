@@ -66,6 +66,7 @@ export default async function ProductsPage({
   const isSales = role === "Satis";
   const canSeeFinance = canViewFinance(role);
   const canEdit = role === "Admin";
+  const effectiveSupplierFilter = isSales ? undefined : resolvedParams.supplier;
 
   const [
     { data: groups, error: groupsError },
@@ -110,7 +111,7 @@ export default async function ProductsPage({
   const buildProductsQuery = (forCount: boolean) => {
     const baseSelect =
       "id, code, name, brand, group_id, description, notes, created_at, gtip_id, domestic_cost_percent, netsis_stok_kodu, gtips:gtip_id(code, customs_duty_rate, additional_duty_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value)";
-    const select = resolvedParams.supplier
+    const select = effectiveSupplierFilter
       ? `${baseSelect}, supplier_product_aliases!inner(supplier_id)`
       : baseSelect;
     let queryBuilder = supabase
@@ -118,10 +119,10 @@ export default async function ProductsPage({
       .select(select, { count: "exact", head: forCount })
       .order("created_at", { ascending: false });
 
-    if (resolvedParams.supplier) {
+    if (effectiveSupplierFilter) {
       queryBuilder = queryBuilder.eq(
         "supplier_product_aliases.supplier_id",
-        resolvedParams.supplier
+        effectiveSupplierFilter
       );
     }
     if (resolvedParams.netsis === "none") {
@@ -457,7 +458,7 @@ export default async function ProductsPage({
       : groupOverride
       ? groupOverride.split(",").filter(Boolean)
       : [];
-    const supplier = overrides.supplier ?? resolvedParams.supplier;
+    const supplier = isSales ? undefined : overrides.supplier ?? effectiveSupplierFilter;
     const gtip = overrides.gtip ?? resolvedParams.gtip;
     const netsis = overrides.netsis ?? resolvedParams.netsis;
     const perPageValue = overrides.perPage ?? String(perPage);
@@ -574,21 +575,23 @@ export default async function ProductsPage({
               ))}
             </select>
           </label>
-          <label className="text-sm font-medium">
-            Tedarikçi
-            <select
-              name="supplier"
-              defaultValue={resolvedParams.supplier ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              {suppliers?.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!isSales ? (
+            <label className="text-sm font-medium">
+              Tedarikçi
+              <select
+                name="supplier"
+                defaultValue={effectiveSupplierFilter ?? ""}
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Hepsi</option>
+                {suppliers?.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="text-sm font-medium">
             GTIP
             <select

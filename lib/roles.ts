@@ -29,6 +29,15 @@ export async function getCurrentUserRole() {
 export const canEdit = (role: UserRole) => role === "Admin";
 export const canViewFinance = (role: UserRole) => role === "Admin" || role === "Yonetim";
 export const canViewCostInputs = (role: UserRole) => role === "Admin" || role === "Yonetim";
+export const canManageOrdersAndProducts = (role: UserRole) => role === "Admin";
+
+export async function requireAdminRole() {
+  const { role, userId } = await getCurrentUserRole();
+  if (role !== "Admin") {
+    throw new Error("Yetki yok");
+  }
+  return { role, userId };
+}
 
 export const canViewModule = (role: UserRole, moduleKey: string) => {
   if (role === "Satis") {

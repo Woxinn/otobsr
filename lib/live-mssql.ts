@@ -22,6 +22,7 @@ const BRIDGE_POLL_MS = Math.max(250, Number(process.env.MSSQL_BRIDGE_POLL_MS ?? 
 const STOCK_CACHE_TTL_MS = Math.max(0, Number(process.env.MSSQL_STOCK_CACHE_TTL_MS ?? "15000"));
 
 const stockCache = new Map<string, { expiresAt: number; result: Map<string, number> }>();
+type DirectPool = InstanceType<typeof sql.ConnectionPool>;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -54,7 +55,7 @@ const writeStockCache = (codes: string[], matchMode: StockMatchMode, result: Map
 };
 
 async function fetchDirectStockMapChunk(
-  pool: sql.ConnectionPool,
+  pool: DirectPool,
   codes: string[],
   matchMode: StockMatchMode
 ) {

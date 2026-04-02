@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUserRole } from "@/lib/roles";
 
 type CodeRow = {
   old_code?: string;
@@ -9,6 +10,10 @@ type CodeRow = {
 const clean = (value: unknown) => String(value ?? "").trim();
 
 export async function POST(req: NextRequest) {
+  const { role } = await getCurrentUserRole();
+  if (role === "Satis") {
+    return NextResponse.json({ error: "Yetki yok" }, { status: 403 });
+  }
   const body = await req.json().catch(() => null);
   const rows = Array.isArray(body?.rows) ? (body.rows as CodeRow[]) : [];
   if (!rows.length) {
@@ -136,3 +141,5 @@ export async function POST(req: NextRequest) {
     not_found: Array.from(new Set(notFound)),
   });
 }
+
+

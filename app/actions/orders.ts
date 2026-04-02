@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAdminRole } from "@/lib/roles";
 
 const nullIfEmpty = (value: FormDataEntryValue | null) => {
   if (value === null) return null;
@@ -17,6 +18,7 @@ const normalizeNumber = (value: FormDataEntryValue | null) => {
 };
 
 export async function createOrder(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("orders").insert({
     name: nullIfEmpty(formData.get("name")),
@@ -45,6 +47,7 @@ export async function createOrder(formData: FormData) {
 }
 
 export async function updateOrder(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -85,6 +88,7 @@ export async function updateOrder(formData: FormData) {
 }
 
 export async function deleteOrder(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -100,6 +104,7 @@ export async function deleteOrder(formData: FormData) {
 }
 
 export async function updateOrderProductionStatus(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -126,6 +131,7 @@ export async function updateOrderProductionStatus(formData: FormData) {
 }
 
 export async function updateOrderStatus(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const orderId = String(formData.get("order_id") ?? "");
   if (!orderId) return;
@@ -154,6 +160,7 @@ export async function updateOrderStatus(formData: FormData) {
 }
 
 export async function archiveOrder(orderId: string) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   if (!orderId) return;
   await supabase
@@ -165,6 +172,7 @@ export async function archiveOrder(orderId: string) {
 }
 
 export async function unarchiveOrder(orderId: string) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   if (!orderId) return;
   await supabase
@@ -177,6 +185,7 @@ export async function unarchiveOrder(orderId: string) {
 
 export async function bulkUpdateOrders(formData: FormData) {
   "use server";
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const ids = formData.getAll("selected").map(String).filter(Boolean);
   if (!ids.length) return;

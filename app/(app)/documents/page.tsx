@@ -14,8 +14,9 @@ type SearchParams = {
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await createSupabaseServerClient();
   const { data: documentTypes } = await supabase
     .from("document_types")
@@ -45,21 +46,21 @@ export default async function DocumentsPage({
 
   let filtered = allDocuments;
 
-  if (searchParams.type) {
+  if (resolvedSearchParams.type) {
     filtered = filtered.filter(
-      (doc) => doc.document_type_id === searchParams.type
+      (doc) => doc.document_type_id === resolvedSearchParams.type
     );
   }
-  if (searchParams.status) {
-    filtered = filtered.filter((doc) => doc.status === searchParams.status);
+  if (resolvedSearchParams.status) {
+    filtered = filtered.filter((doc) => doc.status === resolvedSearchParams.status);
   }
-  if (searchParams.shipment) {
-    filtered = filtered.filter((doc) => doc.shipment_id === searchParams.shipment);
+  if (resolvedSearchParams.shipment) {
+    filtered = filtered.filter((doc) => doc.shipment_id === resolvedSearchParams.shipment);
   }
-  if (searchParams.order) {
-    filtered = filtered.filter((doc) => doc.order_id === searchParams.order);
+  if (resolvedSearchParams.order) {
+    filtered = filtered.filter((doc) => doc.order_id === resolvedSearchParams.order);
   }
-  if (searchParams.unlinked === "1") {
+  if (resolvedSearchParams.unlinked === "1") {
     filtered = filtered.filter((doc) => !doc.shipment_id);
   }
 
@@ -80,7 +81,7 @@ export default async function DocumentsPage({
             Evrak tipi
             <select
               name="type"
-              defaultValue={searchParams.type ?? ""}
+              defaultValue={resolvedSearchParams.type ?? ""}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
@@ -95,7 +96,7 @@ export default async function DocumentsPage({
             Durum
             <select
               name="status"
-              defaultValue={searchParams.status ?? ""}
+              defaultValue={resolvedSearchParams.status ?? ""}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
@@ -108,7 +109,7 @@ export default async function DocumentsPage({
             Shipment
             <select
               name="shipment"
-              defaultValue={searchParams.shipment ?? ""}
+              defaultValue={resolvedSearchParams.shipment ?? ""}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
@@ -123,7 +124,7 @@ export default async function DocumentsPage({
             Siparis
             <select
               name="order"
-              defaultValue={searchParams.order ?? ""}
+              defaultValue={resolvedSearchParams.order ?? ""}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
@@ -139,7 +140,7 @@ export default async function DocumentsPage({
               type="checkbox"
               name="unlinked"
               value="1"
-              defaultChecked={searchParams.unlinked === "1"}
+              defaultChecked={resolvedSearchParams.unlinked === "1"}
             />
             Baglanmamis belgeler
           </label>

@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAdminRole } from "@/lib/roles";
 
 export async function deleteOrderDocument(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const documentId = String(formData.get("document_id") ?? "");
   const orderId = String(formData.get("order_id") ?? "");

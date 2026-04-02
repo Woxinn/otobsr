@@ -44,6 +44,10 @@ export default async function OrdersPage({
   const { role } = await getCurrentUserRole();
   const canEditPage = canEdit(role);
   const canSeeFinance = canViewFinance(role);
+  const isSales = role === "Satis";
+  const effectiveSupplierFilter = isSales ? undefined : resolvedParams.supplier;
+  const effectivePaymentFilter = isSales ? undefined : resolvedParams.payment;
+  const effectiveIncotermFilter = isSales ? undefined : resolvedParams.incoterm;
   const { data: suppliers } = await supabase
     .from("suppliers")
     .select("id, name")
@@ -202,21 +206,21 @@ export default async function OrdersPage({
     });
   }
 
-  if (resolvedParams.supplier) {
+  if (effectiveSupplierFilter) {
     filtered = filtered.filter(
-      (order) => order.supplier_id === resolvedParams.supplier
+      (order) => order.supplier_id === effectiveSupplierFilter
     );
   }
 
-  if (resolvedParams.payment) {
+  if (effectivePaymentFilter) {
     filtered = filtered.filter(
-      (order) => order.payment_method === resolvedParams.payment
+      (order) => order.payment_method === effectivePaymentFilter
     );
   }
 
-  if (resolvedParams.incoterm) {
+  if (effectiveIncotermFilter) {
     filtered = filtered.filter((order) =>
-      (order.incoterm ?? "").toLowerCase().includes(resolvedParams.incoterm!.toLowerCase())
+      (order.incoterm ?? "").toLowerCase().includes(effectiveIncotermFilter.toLowerCase())
     );
   }
 
@@ -425,45 +429,51 @@ export default async function OrdersPage({
               />
             </label>
 
-            <label className="text-sm font-semibold text-slate-800">
-              Tedarikçi
-              <select
-                name="supplier"
-                defaultValue={resolvedParams.supplier ?? ""}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
-              >
-                <option value="">Hepsi</option>
-                {suppliers?.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {!isSales ? (
+              <label className="text-sm font-semibold text-slate-800">
+                Tedarikçi
+                <select
+                  name="supplier"
+                  defaultValue={effectiveSupplierFilter ?? ""}
+                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                >
+                  <option value="">Hepsi</option>
+                  {suppliers?.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
 
-            <label className="text-sm font-semibold text-slate-800">
-              Odeme
-              <select
-                name="payment"
-                defaultValue={resolvedParams.payment ?? ""}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
-              >
-                <option value="">Hepsi</option>
-                <option value="TT">TT</option>
-                <option value="LC">LC</option>
-                <option value="Diger">Diger</option>
-              </select>
-            </label>
+            {!isSales ? (
+              <label className="text-sm font-semibold text-slate-800">
+                Odeme
+                <select
+                  name="payment"
+                  defaultValue={effectivePaymentFilter ?? ""}
+                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                >
+                  <option value="">Hepsi</option>
+                  <option value="TT">TT</option>
+                  <option value="LC">LC</option>
+                  <option value="Diger">Diger</option>
+                </select>
+              </label>
+            ) : null}
 
-            <label className="text-sm font-semibold text-slate-800">
-              Incoterm
-              <input
-                name="incoterm"
-                defaultValue={resolvedParams.incoterm ?? ""}
-                placeholder="FOB, CIF"
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
-              />
-            </label>
+            {!isSales ? (
+              <label className="text-sm font-semibold text-slate-800">
+                Incoterm
+                <input
+                  name="incoterm"
+                  defaultValue={effectiveIncotermFilter ?? ""}
+                  placeholder="FOB, CIF"
+                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                />
+              </label>
+            ) : null}
 
             <label className="text-sm font-semibold text-slate-800">
               Arşiv
@@ -573,7 +583,9 @@ export default async function OrdersPage({
         </div>
         <div className="mt-4 space-y-3 text-sm">
           {pageItems.length ? (
-            <form action={bulkUpdateOrders} className="overflow-x-auto">
+            <div className="overflow-x-auto">
+              {canEditPage ? (
+            <form action={bulkUpdateOrders}>
               <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-black/70">
                 <span>Toplu işlem:</span>
                 <select
@@ -685,10 +697,10 @@ export default async function OrdersPage({
                                     2
                                   )}{" "}
                                   kg
-                                  {role === "Satis" ? "" : ` | ${order.incoterm ?? "-"}`}
+                                  {isSales ? "" : ` | ${order.incoterm ?? "-"}`}
                                 </div>
                                 <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>
-                                {missingDocs.length && role !== "Satis" ? (
+                                {missingDocs.length && !isSales ? (
                                   <div className="group/tooltip mt-2 inline-flex flex-col items-start gap-2">
                                     <span className="rounded-full border border-red-200/70 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700/80">
                                       {missingDocs.length} eksik evrak
@@ -766,6 +778,86 @@ export default async function OrdersPage({
                   </table>
               </div>
             </form>
+              ) : (
+              <div className="w-full rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
+                <table className="w-full table-fixed border-separate border-spacing-y-3 text-[13px]">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
+                      <th className="w-[110px] px-3 pt-2">Order ID</th>
+                      <th className="w-[220px] px-3 pt-2">Siparis</th>
+                      <th className="w-[110px] px-3 pt-2">ETA</th>
+                      <th className="w-[130px] px-3 pt-2">Shipment</th>
+                      {canSeeFinance ? <th className="w-[150px] px-3 pt-2">Toplam</th> : null}
+                      {canSeeFinance ? <th className="w-[140px] px-3 pt-2">Kalan</th> : null}
+                      <th className="w-[170px] px-2 pt-2 text-right">Aksiyon</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((order, index) => {
+                      const detailHref = `/orders/${order.id}`;
+                      const paid = paidTotals[order.id] ?? 0;
+                      const total = Number(order.total_amount ?? 0);
+                      const remaining = Math.max(0, total - paid);
+                      const missingDocs = canSeeFinance ? missingOrderDocsByOrder.get(order.id) ?? [] : [];
+                      const rowColors = rowColorsFromId(order.id);
+                      const eta = (() => {
+                        const list = shipmentsByOrder.get(order.id) ?? [];
+                        const dates = list.map((s) => s.eta_current).filter((v): v is string => Boolean(v)).map((v) => new Date(v)).filter((d) => !Number.isNaN(d.getTime()));
+                        if (!dates.length) return null;
+                        return new Date(Math.min(...dates.map((d) => d.getTime())));
+                      })();
+                      const isArchived = Boolean(order.archived);
+                      return (
+                        <tr
+                          key={order.id}
+                          className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/10 [&>td]:bg-[var(--row-bg)] [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl hover:[&>td]:bg-[linear-gradient(120deg,rgba(11,47,54,0.06),rgba(242,166,90,0.14))]"
+                          style={
+                            {
+                              animationDelay: `${index * 45}ms`,
+                              ["--row-bg" as string]: rowColors.bg,
+                              ["--row-accent" as string]: rowColors.accent,
+                            } as CSSProperties
+                          }
+                        >
+                          <td className="px-4 py-4 text-xs font-semibold text-black/80">
+                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                              <div className="flex items-center gap-3">
+                                <span className="h-9 w-1.5 rounded-full" style={{ backgroundColor: "var(--row-accent)" }} />
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-[0.25em] text-black/40">Order</p>
+                                  <p className="text-sm font-semibold">#{order.id.slice(0, 6).toUpperCase()}</p>
+                                </div>
+                              </div>
+                            </Link>
+                          </td>
+                          <td className="px-4 py-4">
+                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                              <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
+                              {isArchived ? <span className="mt-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">Arşivde</span> : null}
+                              <div className="mt-1 text-xs text-black/55">
+                                {formatNumber(qtyByOrder.get(order.id) ?? order.packages, 0)} adet | {formatNumber(packingSummaryByOrder.get(order.id)?.total_net_weight_kg ?? order.weight_kg, 2)} kg
+                              </div>
+                              <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>
+                              {missingDocs.length && !isSales ? (
+                                <div className="group/tooltip mt-2 inline-flex flex-col items-start gap-2">
+                                  <span className="rounded-full border border-red-200/70 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700/80">{missingDocs.length} eksik evrak</span>
+                                </div>
+                              ) : null}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-black/70"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">{eta ? eta.toISOString().slice(0, 10) : "-"}</Link></td>
+                          <td className="px-4 py-4 text-sm text-black/70"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">{(shipmentsByOrder.get(order.id) ?? []).length ? <div className="flex flex-wrap gap-2">{(shipmentsByOrder.get(order.id) ?? []).map((s) => <span key={s.id} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-[#1f3c88] shadow-sm">{s.file_no ?? s.id.slice(0, 6).toUpperCase()}</span>)}</div> : <span className="text-black/40">-</span>}</Link></td>
+                          {canSeeFinance ? <td className="px-4 py-4 text-sm font-semibold text-black"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4"><span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">{formatMoney(total, order.currency)}</span></Link></td> : null}
+                          {canSeeFinance ? <td className="px-4 py-4 font-semibold text-black"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4"><span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-[#edf3ff] px-3 py-1 text-xs font-semibold text-[#2b4f9e]">{formatMoney(remaining, order.currency)}</span></Link></td> : null}
+                          <td className="px-2 py-4 text-right"><div className="flex justify-end gap-2"><Link href={detailHref} className="rounded-full border border-black/20 px-3 py-1.5 text-xs font-semibold text-black/70 transition group-hover:border-black/40">Detay</Link></div></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              )}
+            </div>
           ) : (
             <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
               Henüz siparis yok.

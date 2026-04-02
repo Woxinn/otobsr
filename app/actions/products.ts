@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import * as XLSX from "xlsx";
+import { requireAdminRole } from "@/lib/roles";
 
 const nullIfEmpty = (value: FormDataEntryValue | null) => {
   if (value === null) return null;
@@ -171,6 +172,7 @@ const parseExtraAttributes = (formData: FormData) => {
 };
 
 export async function createProductGroup(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const name = nullIfEmpty(formData.get("name"));
   if (!name) return;
@@ -182,6 +184,7 @@ export async function createProductGroup(formData: FormData) {
 }
 
 export async function deleteProductGroup(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("group_id") ?? "");
   if (!id) return;
@@ -191,6 +194,7 @@ export async function deleteProductGroup(formData: FormData) {
 }
 
 export async function deleteProductGroupsBulk(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const ids = formData.getAll("group_ids").map(String).filter(Boolean);
   if (!ids.length) return;
@@ -219,6 +223,7 @@ export async function deleteProductGroupsBulk(formData: FormData) {
 }
 
 export async function updateProductGroup(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -238,6 +243,7 @@ export async function updateProductGroup(formData: FormData) {
 }
 
 export async function createProductAttribute(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const groupId = String(formData.get("group_id") ?? "");
   const name = nullIfEmpty(formData.get("name"));
@@ -254,6 +260,7 @@ export async function createProductAttribute(formData: FormData) {
 }
 
 export async function updateProductAttribute(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("id") ?? "");
   const groupId = String(formData.get("group_id") ?? "");
@@ -272,6 +279,7 @@ export async function updateProductAttribute(formData: FormData) {
 }
 
 export async function deleteProductAttribute(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("id") ?? "");
   const groupId = String(formData.get("group_id") ?? "");
@@ -281,6 +289,7 @@ export async function deleteProductAttribute(formData: FormData) {
 }
 
 export async function createProduct(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const code = nullIfEmpty(formData.get("code"));
   const name = nullIfEmpty(formData.get("name"));
@@ -343,6 +352,7 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function updateProduct(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -405,6 +415,7 @@ export async function updateProduct(formData: FormData) {
 }
 
 export async function createSupplierProductAlias(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const productId = String(formData.get("product_id") ?? "");
   const supplierId = String(formData.get("supplier_id") ?? "");
@@ -419,6 +430,7 @@ export async function createSupplierProductAlias(formData: FormData) {
 }
 
 export async function deleteSupplierProductAlias(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("id") ?? "");
   const productId = String(formData.get("product_id") ?? "");
@@ -428,6 +440,7 @@ export async function deleteSupplierProductAlias(formData: FormData) {
 }
 
 export async function deleteSelectedProducts(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const ids = formData
     .getAll("product_ids")
@@ -456,6 +469,7 @@ export async function deleteSelectedProducts(formData: FormData) {
 }
 
 export async function deleteProduct(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const id = String(formData.get("product_id") ?? "");
   if (!id) return;
@@ -481,6 +495,7 @@ export async function deleteProduct(formData: FormData) {
 }
 
 export async function deleteAllProducts() {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const { data: inUse } = await supabase
     .from("order_items")
@@ -501,6 +516,7 @@ export async function deleteAllProducts() {
 }
 
 export async function importProducts(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const file = formData.get("file");
   if (!file || typeof file === "string" || !("text" in file)) {
@@ -859,6 +875,7 @@ export async function importProducts(formData: FormData) {
 }
 
 export async function updateGroupDomesticCost(formData: FormData) {
+  await requireAdminRole();
   const supabase = await createSupabaseServerClient();
   const groupId = String(formData.get("group_id") ?? "");
   if (!groupId) return;

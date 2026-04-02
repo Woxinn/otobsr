@@ -1,8 +1,12 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createOrder } from "@/app/actions/orders";
+import { canEdit, getCurrentUserRole } from "@/lib/roles";
 
 export default async function OrderCreatePage() {
+  const { role } = await getCurrentUserRole();
+  if (!canEdit(role)) redirect("/orders");
   const supabase = await createSupabaseServerClient();
   const { data: suppliers } = await supabase
     .from("suppliers")
@@ -127,4 +131,6 @@ export default async function OrderCreatePage() {
     </section>
   );
 }
+
+
 

@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canEdit, getCurrentUserRole } from "@/lib/roles";
 import { updateOrder } from "@/app/actions/orders";
 
 export default async function OrderEditPage({
@@ -9,6 +10,8 @@ export default async function OrderEditPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
+  const { role } = await getCurrentUserRole();
+  if (!canEdit(role)) redirect(`/orders/${resolvedParams.id}`);
   const supabase = await createSupabaseServerClient();
 
   const { data: order } = await supabase
@@ -157,4 +160,6 @@ export default async function OrderEditPage({
     </section>
   );
 }
+
+
 
