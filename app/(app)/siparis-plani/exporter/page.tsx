@@ -107,6 +107,7 @@ export default function OrderPlanExporterPage() {
         </button>
         <a
           href={`/api/order-plan-export-bydb${query}`}
+          data-skip-route-loader
           className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70"
         >
           Direkt indir (progresssiz)

@@ -44,6 +44,8 @@ export default function RfqQuoteGrid({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [value, setValue] = useState<string>("");
   const [saving, setSaving] = useState<string | null>(null);
+  const [costOverrides, setCostOverrides] = useState<Record<string, string>>({});
+  const [marginOverrides, setMarginOverrides] = useState<Record<string, string>>({});
   const { addToast } = useToast();
 
   const formatNumber = (value: number | null | undefined, digits = 2) => {
@@ -106,6 +108,25 @@ export default function RfqQuoteGrid({
     return qi?.unit_price ?? null;
   };
 
+  const parsePercentInput = (raw: string): number | null => {
+    const normalized = raw.trim().replace(",", ".");
+    if (!normalized) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const getEffectiveDomesticCostPercent = (item: QuoteItem) => {
+    const override = costOverrides[item.id];
+    const parsed = override != null ? parsePercentInput(override) : null;
+    return parsed ?? item.domestic_cost_percent ?? null;
+  };
+
+  const getEffectiveMarginPercent = (item: QuoteItem) => {
+    const override = marginOverrides[item.id];
+    const parsed = override != null ? parsePercentInput(override) : null;
+    return parsed ?? 0;
+  };
+
   const isComparableCurrency = (sup: QuoteSupplier) =>
     !currency || !sup.currency || String(sup.currency) === String(currency);
 
@@ -116,7 +137,7 @@ export default function RfqQuoteGrid({
       current != null
         ? calculateDisplayedNetCost({
             basePrice: current,
-            domesticCostPercent: item.domestic_cost_percent ?? null,
+            domesticCostPercent: getEffectiveDomesticCostPercent(item),
             weightKg: item.weight_kg ?? null,
             gtipBase: gtip,
             countryRates: item.country_rates ?? [],
@@ -194,6 +215,8 @@ export default function RfqQuoteGrid({
     const key = `${sup.id}-${item.id}`;
     const isEditing = editingKey === key;
     const { netCost, hasGtip } = getNetCost(sup, item);
+    const marginPct = getEffectiveMarginPercent(item);
+    const sellingPrice = netCost != null ? netCost * (1 + marginPct / 100) : null;
 
     if (isEditing) {
       return (
@@ -238,6 +261,10 @@ export default function RfqQuoteGrid({
           <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">KDV'siz maliyet</div>
           <div className={`mt-1 text-xs font-semibold ${netCost != null ? "text-black/75" : "text-black/35"}`}>
             {netCost != null ? netCost.toFixed(3) : "-"}
+          </div>
+          <div className="mt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">Satış fiyatı</div>
+          <div className={`mt-1 text-xs font-semibold ${sellingPrice != null ? "text-[var(--ocean)]" : "text-black/35"}`}>
+            {sellingPrice != null ? sellingPrice.toFixed(3) : "-"}
           </div>
           {netCost == null && !hasGtip ? <div className="mt-1 text-[9px] text-red-500">GTIP yok</div> : null}
         </div>
@@ -372,8 +399,44 @@ export default function RfqQuoteGrid({
             return (
             <tr key={it.id} className={rowBgClass}>
               <td className={`sticky left-0 z-20 border-t border-r border-black/10 px-4 py-4 align-top shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)] ${rowBgClass}`}>
-                <div className="font-semibold text-black">{it.product_code ?? "-"}</div>
-                <div className="mt-1 text-xs text-black/60">{it.product_name ?? "-"}</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-black">{it.product_code ?? "-"}</div>
+                  <div className="mt-1 text-xs text-black/60">{it.product_name ?? "-"}</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <label className="text-right">
+                      <span className="text-[9px] uppercase tracking-[0.14em] text-black/35">Masraf %</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={costOverrides[it.id] ?? String(it.domestic_cost_percent ?? "")}
+                        onChange={(e) =>
+                          setCostOverrides((prev) => ({
+                            ...prev,
+                            [it.id]: e.target.value,
+                          }))
+                        }
+                        className="mt-1 w-20 rounded-lg border border-black/10 bg-white px-2 py-1 text-right text-xs font-semibold text-black/75 outline-none transition focus:border-[var(--ocean)]/40 focus:ring-2 focus:ring-[var(--ocean)]/10"
+                      />
+                    </label>
+                    <label className="text-right">
+                      <span className="text-[9px] uppercase tracking-[0.14em] text-black/35">Kar %</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={marginOverrides[it.id] ?? "0"}
+                        onChange={(e) =>
+                          setMarginOverrides((prev) => ({
+                            ...prev,
+                            [it.id]: e.target.value,
+                          }))
+                        }
+                        className="mt-1 w-20 rounded-lg border border-black/10 bg-white px-2 py-1 text-right text-xs font-semibold text-black/75 outline-none transition focus:border-[var(--ocean)]/40 focus:ring-2 focus:ring-[var(--ocean)]/10"
+                      />
+                    </label>
+                  </div>
+                </div>
               </td>
               <td className="border-t border-r border-black/10 px-3 py-4 text-right align-top">
                 <span className="inline-flex rounded-full bg-black/5 px-3 py-1 font-semibold text-black/70">

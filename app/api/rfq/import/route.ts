@@ -69,6 +69,8 @@ export async function POST(req: Request) {
 
   const rfqId = body?.rfq_id as string | undefined;
   const rows: ImportRow[] = Array.isArray(body?.rows) ? body.rows : [];
+  const wantCreateMissing = body?.add_missing_products === true;
+  const wantCreateCatalogProducts = body?.create_missing_catalog_products === true;
   if (!rfqId || !rows.length) {
     return NextResponse.json({ error: "rfq_id veya satır yok" }, { status: 400 });
   }
@@ -142,26 +144,18 @@ export async function POST(req: Request) {
   }));
 
   const missingProducts: Set<string> = new Set();
+  const missingCatalogProducts: Set<string> = new Set();
   const missingSuppliers: Set<string> = new Set();
   const ambiguousSuppliers: Array<{ input: string; options: { id: string; name: string }[] }> = [];
+  const sourceCodeByKey = new Map<string, string>();
 
-  const newItemsByCode = new Map<
-    string,
-    {
-      rfq_id: string;
-      product_id: string | null;
-      product_code: string;
-      product_name: string;
-      quantity: number;
-      target_unit_price: number | null;
-    }
-  >();
   const quantityByCode = new Map<string, number>();
   const targetPriceByCode = new Map<string, number | null>();
   rows.forEach((r) => {
     const code = (r.product_code ?? "").trim();
     if (!code) return;
     const key = code.toLowerCase();
+    sourceCodeByKey.set(key, sourceCodeByKey.get(key) ?? code);
     const targetPrice = toNumber(r.target_unit_price);
     const parsedQty = toNumber(r.quantity);
     if (parsedQty !== null) quantityByCode.set(key, Math.max(quantityByCode.get(key) ?? 0, Math.max(0, parsedQty)));
@@ -170,26 +164,62 @@ export async function POST(req: Request) {
 
     missingProducts.add(code); // RFQ'ye eklenecek her yeni satırı kullanıcıya sor
     const prod = productByCode.get(key);
-    const qtyNum = Math.max(0, parsedQty ?? 0);
-    const existing = newItemsByCode.get(key);
-    if (existing) {
-      existing.quantity = Math.max(existing.quantity, qtyNum);
-      if (targetPrice !== null) existing.target_unit_price = targetPrice;
-      newItemsByCode.set(key, existing);
-      return;
+    if (!prod?.id) {
+      missingCatalogProducts.add(code);
     }
-    newItemsByCode.set(key, {
-      rfq_id: rfqId,
-      product_id: prod?.id ?? null,
-      product_code: prod?.code ?? code,
-      product_name: prod?.name ?? code,
-      quantity: qtyNum,
-      target_unit_price: targetPrice,
-    });
   });
-  const newItemsPayload = Array.from(newItemsByCode.values());
 
-  const wantCreateMissing = body?.add_missing_products === true;
+  if (missingCatalogProducts.size) {
+    if (!wantCreateCatalogProducts) {
+      return NextResponse.json(
+        {
+          ok: false,
+          missing_catalog_products: Array.from(missingCatalogProducts),
+          error: `Urun karti bulunamayan kodlar var: ${Array.from(missingCatalogProducts).join(", ")}`,
+        },
+        { status: 422 }
+      );
+    }
+
+    const draftProductsPayload = Array.from(missingCatalogProducts).map((code) => ({
+      code,
+      name: code,
+      notes: "RFQ import sırasında taslak ürün olarak oluşturuldu.",
+    }));
+
+    const { error: draftInsertErr } = await supabase.from("products").insert(draftProductsPayload);
+    if (draftInsertErr && draftInsertErr.code !== "23505") {
+      console.error("[rfq-import] draft products insert err", draftInsertErr);
+      return NextResponse.json({ error: draftInsertErr.message, debug }, { status: 500 });
+    }
+
+    const missingCatalogCodeChunks = chunkArray(Array.from(missingCatalogProducts), 400);
+    for (const codeChunk of missingCatalogCodeChunks) {
+      const { data, error } = await supabase.from("products").select("id, code, name").in("code", codeChunk);
+      if (error) {
+        console.error("[rfq-import] draft products refetch err", error);
+        return NextResponse.json({ error: error.message, debug }, { status: 500 });
+      }
+      (data ?? []).forEach((product) => {
+        productByCode.set((product.code ?? "").toLowerCase(), product);
+      });
+    }
+
+    const unresolvedCatalogCodes = Array.from(missingCatalogProducts).filter(
+      (code) => !productByCode.get(code.toLowerCase())?.id
+    );
+    if (unresolvedCatalogCodes.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          missing_catalog_products: unresolvedCatalogCodes,
+          error: `Taslak ürün oluşturulamadı: ${unresolvedCatalogCodes.join(", ")}`,
+        },
+        { status: 422 }
+      );
+    }
+  }
+
   if (missingProducts.size && !wantCreateMissing) {
     return NextResponse.json(
       {
@@ -212,6 +242,34 @@ export async function POST(req: Request) {
       { status: 422 }
     );
   }
+
+  const newItemsPayload = Array.from(
+    new Set(
+      Array.from(missingProducts)
+        .map((code) => code.toLowerCase())
+        .filter((code) => !rfqItemsByCode.has(code))
+    )
+  )
+    .map((key) => {
+      const prod = productByCode.get(key);
+      if (!prod?.id) return null;
+      return {
+        rfq_id: rfqId,
+        product_id: prod.id,
+        product_code: prod.code ?? sourceCodeByKey.get(key) ?? key,
+        product_name: prod.name ?? prod.code ?? sourceCodeByKey.get(key) ?? key,
+        quantity: Math.max(0, quantityByCode.get(key) ?? 0),
+        target_unit_price: targetPriceByCode.get(key) ?? null,
+      };
+    })
+    .filter(Boolean) as {
+    rfq_id: string;
+    product_id: string;
+    product_code: string;
+    product_name: string;
+    quantity: number;
+    target_unit_price: number | null;
+  }[];
 
   if (newItemsPayload.length) {
     const createdItems: any[] = [];

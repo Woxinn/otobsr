@@ -169,13 +169,20 @@ export default function RouteOverlayLoader() {
       const target = event.target as HTMLElement | null;
       const anchor = target?.closest("a");
       if (!anchor) return;
-      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      if (
+        anchor.target === "_blank" ||
+        anchor.hasAttribute("download") ||
+        anchor.hasAttribute("data-skip-route-loader")
+      ) {
+        return;
+      }
 
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
 
       const url = new URL(href, window.location.origin);
       if (url.origin !== window.location.origin) return;
+      if (url.pathname.startsWith("/api/")) return;
 
       beginLoading(`${url.pathname}${url.search}`);
     };

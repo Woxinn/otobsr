@@ -16,12 +16,17 @@ export default function RfqImportModal({ rfqId }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [pendingMissing, setPendingMissing] = useState<string[] | null>(null);
+  const [missingCatalogProducts, setMissingCatalogProducts] = useState<string[] | null>(null);
   const [pendingAmbiguous, setPendingAmbiguous] = useState<
     { input: string; options: { id: string; name: string }[]; chosen?: string }[] | null
   >(null);
   const { startLoading, updateLoading, stopLoading } = useGlobalLoading();
 
-  const handleImport = async (addMissing = false, supplierMap?: Record<string, string>) => {
+  const handleImport = async (
+    addMissing = false,
+    supplierMap?: Record<string, string>,
+    createDraftProducts = false
+  ) => {
     if (loading) return;
     setLoading(true);
     setMessage(null);
@@ -37,7 +42,13 @@ export default function RfqImportModal({ rfqId }: Props) {
       const res = await fetch("/api/rfq/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rfq_id: rfqId, rows, add_missing_products: addMissing, supplier_map: supplierMap }),
+        body: JSON.stringify({
+          rfq_id: rfqId,
+          rows,
+          add_missing_products: addMissing,
+          create_missing_catalog_products: createDraftProducts,
+          supplier_map: supplierMap,
+        }),
       });
       updateLoading({ detail: "Sunucu cevabi aliniyor", progress: 72 });
       const textResp = await res.text();
@@ -50,7 +61,13 @@ export default function RfqImportModal({ rfqId }: Props) {
       console.debug("[rfq-import] api response", res.status, textResp);
       if (res.status === 422 && data?.need_confirmation) {
         setPendingMissing(data?.missing_products ?? []);
+        setMissingCatalogProducts(null);
         setMessage(data?.message ?? "Eksik ürünler var");
+      } else if (res.status === 422 && data?.missing_catalog_products?.length) {
+        setMissingCatalogProducts(data.missing_catalog_products ?? []);
+        setPendingMissing(null);
+        setPendingAmbiguous(null);
+        setMessage(data?.error ?? "Sistemde ürün kartı bulunamayan kodlar var");
       } else if (res.status === 422 && data?.need_supplier_choice) {
         setPendingAmbiguous(
           (data?.ambiguous_suppliers ?? []).map((a: any) => ({
@@ -59,16 +76,19 @@ export default function RfqImportModal({ rfqId }: Props) {
             chosen: undefined,
           }))
         );
+        setMissingCatalogProducts(null);
         setMessage(data?.message ?? "Tedarikçi seçin");
       } else if (!res.ok) {
         setMessage(data?.error ?? textResp ?? "İçe aktarılamadı");
         setPendingMissing(null);
         setPendingAmbiguous(null);
+        setMissingCatalogProducts(null);
       } else {
         setResult(data);
         setMessage("İçe aktarma tamamlandı");
         setPendingMissing(null);
         setPendingAmbiguous(null);
+        setMissingCatalogProducts(null);
         updateLoading({ detail: "RFQ guncelleniyor", progress: 92 });
       }
     } catch (err: any) {
@@ -107,6 +127,7 @@ export default function RfqImportModal({ rfqId }: Props) {
               </span>
               <a
                 href={`/api/rfq/import/template?rfq_id=${encodeURIComponent(rfqId)}`}
+                data-skip-route-loader
                 className="rounded-full border border-black/15 px-3 py-1 text-[11px] font-semibold text-black/70 hover:bg-black/5"
               >
                 Şablon indir (XLSX)
@@ -210,6 +231,47 @@ export default function RfqImportModal({ rfqId }: Props) {
                     onClick={() => setPendingMissing(null)}
                   >
                     Vazgeç
+                  </button>
+                </div>
+              </div>
+            )}
+            {missingCatalogProducts && (
+              <div className="mt-3 rounded-2xl border border-red-300 bg-red-50 p-3 text-sm text-black/80">
+                <div className="font-semibold">Ürün kartı bulunamayan kodlar</div>
+                <div className="mt-1 text-xs text-black/60">
+                  Bu kodlar sistemde ürün olarak kayıtlı değil. İstersen taslak ürün kartları otomatik oluşturulup import devam edebilir.
+                </div>
+                <div className="mt-3 rounded-xl border border-black/10 bg-white px-3 py-2 font-mono text-xs text-black/75">
+                  {missingCatalogProducts.join(", ")}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-xl bg-[var(--ocean)] px-3 py-1 text-xs font-semibold text-white"
+                    onClick={() => handleImport(true, pendingAmbiguousMap(), true)}
+                  >
+                    Taslak ürünleri oluştur ve devam et
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-black/15 px-3 py-1 text-xs font-semibold text-black/70"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(missingCatalogProducts.join("\n"));
+                        setMessage("Eksik kodlar panoya kopyalandı");
+                      } catch {
+                        setMessage("Kodlar kopyalanamadı");
+                      }
+                    }}
+                  >
+                    Kodları kopyala
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-black/15 px-3 py-1 text-xs font-semibold text-black/70"
+                    onClick={() => setMissingCatalogProducts(null)}
+                  >
+                    Kapat
                   </button>
                 </div>
               </div>
