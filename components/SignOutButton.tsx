@@ -14,7 +14,12 @@ export default function SignOutButton() {
       .split(";")
       .map((c) => c.trim())
       .forEach((cookie) => {
-        if (cookie.toLowerCase().startsWith("sb-")) {
+        const lower = cookie.toLowerCase();
+        if (
+          lower.startsWith("sb-") ||
+          lower.startsWith("trusted_device=") ||
+          lower.startsWith("pending_device=")
+        ) {
           const name = cookie.split("=")[0];
           document.cookie = `${name}=; Max-Age=0; path=/;`;
         }

@@ -17,7 +17,7 @@ const badges = ["RFQ", "Sipariş", "Maliyet", "Belge", "Stok", "Plan"];
 export default function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/";
+  const redirectTo = searchParams.get("returnTo") ?? searchParams.get("redirect") ?? "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

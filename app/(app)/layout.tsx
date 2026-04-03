@@ -100,6 +100,20 @@ export default async function AppLayout({
               {item.label}
             </Link>
           ))}
+          {role === "Admin" ? (
+            <Link
+              href="/device-requests"
+              className="rounded-full border border-black/10 bg-white px-4 py-2 transition hover:-translate-y-0.5 hover:bg-[var(--sand)]"
+            >
+              Cihaz Onayları
+            </Link>
+          ) : null}
+          <Link
+            href="/account"
+            className="rounded-full border border-black/10 bg-white px-4 py-2 transition hover:-translate-y-0.5 hover:bg-[var(--sand)]"
+          >
+            Hesap Ayarları
+          </Link>
         </nav>
 
         <ToastProvider>

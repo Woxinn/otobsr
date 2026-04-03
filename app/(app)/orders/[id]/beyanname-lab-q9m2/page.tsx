@@ -22,6 +22,8 @@ type DeclarationLine = {
   fobTotal: number;
   freightShare: number;
   insuranceShare: number;
+  extraCostShare: number;
+  stampTaxShare: number;
   surveillanceUnitValue: number;
   surveillanceApplicable: boolean;
   antiDumpingRate: number;
@@ -388,6 +390,8 @@ export default async function OrderDeclarationLabPage({
       fobTotal: line.fobTotal,
       freightShare,
       insuranceShare,
+      extraCostShare: 0,
+      stampTaxShare: 0,
       surveillanceUnitValue: toNumber(gtip?.surveillance_unit_value),
       surveillanceApplicable: Boolean(gtip?.surveillance_applicable),
       antiDumpingRate: toNumber(gtip?.anti_dumping_rate),

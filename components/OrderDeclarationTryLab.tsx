@@ -14,6 +14,8 @@ type DeclarationLine = {
   fobTotal: number;
   freightShare: number;
   insuranceShare: number;
+  extraCostShare: number;
+  stampTaxShare: number;
   surveillanceUnitValue: number;
   surveillanceApplicable: boolean;
   antiDumpingRate: number;
@@ -42,9 +44,12 @@ type Totals = {
   fobTotal: number;
   freightShare: number;
   insuranceShare: number;
+  extraCostShare: number;
+  stampTaxShare: number;
   cif: number;
   surveillanceBase: number;
   customsBase: number;
+  vatBase: number;
   customsDuty: number;
   additionalDuty: number;
   antiDumping: number;
@@ -61,6 +66,11 @@ type Props = {
   initialInsuranceTotal: number;
   tcmbDate: string | null;
   tcmbError: string | null;
+};
+
+const parseDecimalInput = (value: string) => {
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const formatNumber = (value: number, digits = 2) =>
@@ -87,21 +97,47 @@ export default function OrderDeclarationTryLab({
   const [rateInput, setRateInput] = useState(String(initialRate || 1));
   const [freightInput, setFreightInput] = useState(String(initialFreightTotal || 0));
   const [insuranceInput, setInsuranceInput] = useState(String(initialInsuranceTotal || 0));
+  const [stampTaxInput, setStampTaxInput] = useState("0");
+  const [warehouseInput, setWarehouseInput] = useState("0");
+  const [bankInput, setBankInput] = useState("0");
+  const [otherInput, setOtherInput] = useState("0");
 
   const rate = useMemo(() => {
-    const parsed = Number(String(rateInput).replace(",", "."));
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    const parsed = parseDecimalInput(rateInput);
+    return parsed !== null && parsed > 0 ? parsed : 0;
   }, [rateInput]);
 
   const freightTotal = useMemo(() => {
-    const parsed = Number(String(freightInput).replace(",", "."));
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    const parsed = parseDecimalInput(freightInput);
+    return parsed !== null && parsed >= 0 ? parsed : 0;
   }, [freightInput]);
 
   const insuranceTotal = useMemo(() => {
-    const parsed = Number(String(insuranceInput).replace(",", "."));
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    const parsed = parseDecimalInput(insuranceInput);
+    return parsed !== null && parsed >= 0 ? parsed : 0;
   }, [insuranceInput]);
+
+  const stampTaxTotal = useMemo(() => {
+    const parsed = parseDecimalInput(stampTaxInput);
+    return parsed !== null && parsed >= 0 ? parsed : 0;
+  }, [stampTaxInput]);
+
+  const warehouseTotal = useMemo(() => {
+    const parsed = parseDecimalInput(warehouseInput);
+    return parsed !== null && parsed >= 0 ? parsed : 0;
+  }, [warehouseInput]);
+
+  const bankTotal = useMemo(() => {
+    const parsed = parseDecimalInput(bankInput);
+    return parsed !== null && parsed >= 0 ? parsed : 0;
+  }, [bankInput]);
+
+  const otherTotal = useMemo(() => {
+    const parsed = parseDecimalInput(otherInput);
+    return parsed !== null && parsed >= 0 ? parsed : 0;
+  }, [otherInput]);
+
+  const ancillaryCostsTotal = warehouseTotal + bankTotal + otherTotal;
 
   const baseTotals = useMemo(
     () =>
@@ -120,9 +156,12 @@ export default function OrderDeclarationTryLab({
           fobTotal: 0,
           freightShare: 0,
           insuranceShare: 0,
+          extraCostShare: 0,
+          stampTaxShare: 0,
           cif: 0,
           surveillanceBase: 0,
           customsBase: 0,
+          vatBase: 0,
           customsDuty: 0,
           additionalDuty: 0,
           antiDumping: 0,
@@ -136,6 +175,7 @@ export default function OrderDeclarationTryLab({
 
   const computed = useMemo(() => {
     const freightBase = baseTotals.netKg > 0 ? baseTotals.netKg : baseTotals.fobTotal;
+    const extraCostBase = baseTotals.fobTotal;
 
     const nextLines = lines.map((line) => {
       const freightShare =
@@ -150,6 +190,10 @@ export default function OrderDeclarationTryLab({
         insuranceTotal > 0 && baseTotals.fobTotal > 0
           ? insuranceTotal * (line.fobTotal / baseTotals.fobTotal)
           : 0;
+      const extraCostShare =
+        ancillaryCostsTotal > 0 && extraCostBase > 0 ? ancillaryCostsTotal * (line.fobTotal / extraCostBase) : 0;
+      const stampTaxShare =
+        stampTaxTotal > 0 && extraCostBase > 0 ? stampTaxTotal * (line.fobTotal / extraCostBase) : 0;
 
       const cif = line.fobTotal + freightShare + insuranceShare;
       const surveillanceBase =
@@ -159,16 +203,18 @@ export default function OrderDeclarationTryLab({
       const additionalDuty = customsBase * (line.additionalDutyRate / 100);
       const antiDumping =
         line.antiDumpingApplicable && line.netKg > 0 ? line.antiDumpingRate * line.netKg : 0;
-      const vatBase = customsBase + customsDuty + additionalDuty + antiDumping;
+      const vatBase = customsBase + customsDuty + additionalDuty + antiDumping + extraCostShare + stampTaxShare;
       const vat = vatBase * (line.vatRate / 100);
-      const totalTaxes = customsDuty + additionalDuty + antiDumping + vat;
-      const landedTotal = cif + totalTaxes;
+      const totalTaxes = customsDuty + additionalDuty + antiDumping + vat + stampTaxShare;
+      const landedTotal = cif + extraCostShare + totalTaxes;
       const landedUnit = line.quantity > 0 ? landedTotal / line.quantity : 0;
 
       return {
         ...line,
         freightShare,
         insuranceShare,
+        extraCostShare,
+        stampTaxShare,
         cif,
         surveillanceBase,
         customsBase,
@@ -184,6 +230,8 @@ export default function OrderDeclarationTryLab({
         fobTotalTry: line.fobTotal * rate,
         freightShareTry: freightShare * rate,
         insuranceShareTry: insuranceShare * rate,
+        extraCostShareTry: extraCostShare * rate,
+        stampTaxShareTry: stampTaxShare * rate,
         cifTry: cif * rate,
         surveillanceBaseTry: surveillanceBase * rate,
         customsBaseTry: customsBase * rate,
@@ -206,9 +254,12 @@ export default function OrderDeclarationTryLab({
         acc.fobTotal += line.fobTotal;
         acc.freightShare += line.freightShare;
         acc.insuranceShare += line.insuranceShare;
+        acc.extraCostShare += line.extraCostShare;
+        acc.stampTaxShare += line.stampTaxShare;
         acc.cif += line.cif;
         acc.surveillanceBase += line.surveillanceBase;
         acc.customsBase += line.customsBase;
+        acc.vatBase += line.vatBase;
         acc.customsDuty += line.customsDuty;
         acc.additionalDuty += line.additionalDuty;
         acc.antiDumping += line.antiDumping;
@@ -224,9 +275,12 @@ export default function OrderDeclarationTryLab({
         fobTotal: 0,
         freightShare: 0,
         insuranceShare: 0,
+        extraCostShare: 0,
+        stampTaxShare: 0,
         cif: 0,
         surveillanceBase: 0,
         customsBase: 0,
+        vatBase: 0,
         customsDuty: 0,
         additionalDuty: 0,
         antiDumping: 0,
@@ -237,15 +291,19 @@ export default function OrderDeclarationTryLab({
     );
 
     return { lines: nextLines, totals };
-  }, [baseTotals.fobTotal, baseTotals.netKg, freightTotal, insuranceTotal, lines, rate]);
+  }, [ancillaryCostsTotal, baseTotals.fobTotal, baseTotals.netKg, freightTotal, insuranceTotal, lines, rate, stampTaxTotal]);
 
   const totalsTry = useMemo(
     () => ({
       fobTotal: computed.totals.fobTotal * rate,
       freightShare: computed.totals.freightShare * rate,
       insuranceShare: computed.totals.insuranceShare * rate,
+      extraCostShare: computed.totals.extraCostShare * rate,
+      stampTaxShare: computed.totals.stampTaxShare * rate,
       cif: computed.totals.cif * rate,
+      surveillanceBase: computed.totals.surveillanceBase * rate,
       customsBase: computed.totals.customsBase * rate,
+      vatBase: computed.totals.vatBase * rate,
       customsDuty: computed.totals.customsDuty * rate,
       additionalDuty: computed.totals.additionalDuty * rate,
       antiDumping: computed.totals.antiDumping * rate,
@@ -272,12 +330,22 @@ export default function OrderDeclarationTryLab({
     {
       label: "Sigorta",
       value: formatTry(totalsTry.insuranceShare),
-      hint: "Anlik dagitim",
+      hint: "Anlık dağıtım",
+    },
+    {
+      label: "Ek giderler",
+      value: formatTry(totalsTry.extraCostShare),
+      hint: "Depo + banka + diğer",
+    },
+    {
+      label: "KDV matrahı",
+      value: formatTry(totalsTry.vatBase),
+      hint: "Damga ve ek giderler dahil",
     },
     {
       label: "CIF / matrah",
       value: formatTry(totalsTry.customsBase),
-      hint: "Gozetim varsa max(CIF, gozetim)",
+      hint: "Gözetim varsa max(CIF, gözetim)",
     },
     {
       label: "Toplam vergi",
@@ -291,10 +359,43 @@ export default function OrderDeclarationTryLab({
     },
   ];
 
+  const taxBreakdownCards = [
+    {
+      label: "Toplam gözetim değeri",
+      value: formatTry(totalsTry.surveillanceBase),
+      hint: "Kalem bazlı gözetim tabanları",
+    },
+    {
+      label: "Toplam damga vergisi",
+      value: formatTry(totalsTry.stampTaxShare),
+      hint: "Ödenecek vergi toplamına dahil",
+    },
+    {
+      label: "Toplam gümrük vergisi",
+      value: formatTry(totalsTry.customsDuty),
+      hint: "GV toplamı",
+    },
+    {
+      label: "Toplam ilave gümrük vergisi",
+      value: formatTry(totalsTry.additionalDuty),
+      hint: "İGV toplamı",
+    },
+    {
+      label: "Toplam damping",
+      value: formatTry(totalsTry.antiDumping),
+      hint: "Anti-damping toplamı",
+    },
+    {
+      label: "Toplam KDV",
+      value: formatTry(totalsTry.vat),
+      hint: "Ek giderler dahil KDV",
+    },
+  ];
+
   return (
     <>
       <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid gap-3 lg:grid-cols-4">
           {summaryCards.map((card) => (
             <div
               key={card.label}
@@ -335,7 +436,47 @@ export default function OrderDeclarationTryLab({
               <p className="mt-2 text-[11px] text-black/45">{formatTry(insuranceTotal * rate)} karşılığı</p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
-              <span className="text-xs text-black/50">Kullanilan kur</span>
+              <span className="text-xs text-black/50">Damga vergisi ({orderCurrency})</span>
+              <input
+                value={stampTaxInput}
+                onChange={(e) => setStampTaxInput(e.target.value)}
+                inputMode="decimal"
+                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+              />
+              <p className="mt-2 text-[11px] text-black/45">{formatTry(stampTaxTotal * rate)} karşılığı</p>
+            </label>
+            <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+              <span className="text-xs text-black/50">Depo masrafı ({orderCurrency})</span>
+              <input
+                value={warehouseInput}
+                onChange={(e) => setWarehouseInput(e.target.value)}
+                inputMode="decimal"
+                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+              />
+              <p className="mt-2 text-[11px] text-black/45">{formatTry(warehouseTotal * rate)} karşılığı</p>
+            </label>
+            <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+              <span className="text-xs text-black/50">Banka masrafı ({orderCurrency})</span>
+              <input
+                value={bankInput}
+                onChange={(e) => setBankInput(e.target.value)}
+                inputMode="decimal"
+                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+              />
+              <p className="mt-2 text-[11px] text-black/45">{formatTry(bankTotal * rate)} karşılığı</p>
+            </label>
+            <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+              <span className="text-xs text-black/50">Diğer ({orderCurrency})</span>
+              <input
+                value={otherInput}
+                onChange={(e) => setOtherInput(e.target.value)}
+                inputMode="decimal"
+                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+              />
+              <p className="mt-2 text-[11px] text-black/45">{formatTry(otherTotal * rate)} karşılığı</p>
+            </label>
+            <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+              <span className="text-xs text-black/50">Kullanılan kur</span>
               <input
                 value={rateInput}
                 onChange={(e) => setRateInput(e.target.value)}
@@ -345,22 +486,35 @@ export default function OrderDeclarationTryLab({
               <p className="mt-2 text-[11px] text-black/45">Değer değiştikçe tablodaki TL tutarları anlık güncellenir.</p>
             </label>
             <div className="rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3 text-xs text-black/60">
-              <p>TCMB otomatik deger: {formatNumber(initialRate, 4)}</p>
+              <p>TCMB otomatik değer: {formatNumber(initialRate, 4)}</p>
               <p>Tarih: {tcmbDate ?? "-"}</p>
               <p className="mt-1 break-all">Kaynak: https://www.tcmb.gov.tr/kurlar/today.xml</p>
-              {tcmbError ? <p className="mt-2 text-amber-700">Uyari: {tcmbError}</p> : null}
+              {tcmbError ? <p className="mt-2 text-amber-700">Uyarı: {tcmbError}</p> : null}
             </div>
           </div>
         </div>
       </div>
 
+      <div className="mt-3 grid gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        {taxBreakdownCards.map((card) => (
+          <div
+            key={card.label}
+            className="rounded-3xl border border-black/10 bg-white/90 p-4 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.18)]"
+          >
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/40">{card.label}</p>
+            <p className="mt-3 text-lg font-semibold text-black">{card.value}</p>
+            <p className="mt-2 text-xs text-black/55">{card.hint}</p>
+          </div>
+        ))}
+      </div>
+
       <div className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
         <div className="border-b border-black/8 px-5 py-4">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">Kalem bazli hesap</p>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">Kalem bazlı hesap</p>
           <h2 className="mt-2 text-lg font-semibold text-black">Beyanname kalemleri (TL)</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-[1800px] table-fixed text-sm">
+          <table className="min-w-[2080px] table-fixed text-sm">
             <thead className="bg-[var(--paper)]/80 text-left text-[11px] uppercase tracking-[0.18em] text-black/45">
               <tr>
                 <th className="sticky left-0 z-20 w-[270px] border-b border-r border-black/8 bg-[var(--paper)]/95 px-4 py-3">Urun</th>
@@ -373,7 +527,9 @@ export default function OrderDeclarationTryLab({
                 <th className="w-[140px] border-b border-r border-black/8 px-3 py-3 text-right">Navlun</th>
                 <th className="w-[140px] border-b border-r border-black/8 px-3 py-3 text-right">Sigorta</th>
                 <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">CIF</th>
-                <th className="w-[160px] border-b border-r border-black/8 px-3 py-3 text-right">Vergi matrahi</th>
+                <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">Ek gider</th>
+                <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">Damga</th>
+                <th className="w-[160px] border-b border-r border-black/8 px-3 py-3 text-right">KDV matrahı</th>
                 <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">GV</th>
                 <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">Ilave vergi</th>
                 <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">Anti-damping</th>
@@ -413,11 +569,13 @@ export default function OrderDeclarationTryLab({
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.freightShareTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.insuranceShareTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.cifTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.extraCostShareTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.stampTaxShareTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">
                     <div>
-                      {formatTry(line.customsBaseTry)}
+                      {formatTry(line.vatBaseTry)}
                       {line.surveillanceBaseTry > 0 ? (
-                        <p className="mt-1 text-[11px] text-black/45">Gozetim tabani: {formatTry(line.surveillanceBaseTry)}</p>
+                        <p className="mt-1 text-[11px] text-black/45">Gözetim tabanı: {formatTry(line.surveillanceBaseTry)}</p>
                       ) : null}
                     </div>
                   </td>
@@ -458,7 +616,9 @@ export default function OrderDeclarationTryLab({
                 <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.freightShare)}</td>
                 <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.insuranceShare)}</td>
                 <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.cif)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.customsBase)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.extraCostShare)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.stampTaxShare)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.vatBase)}</td>
                 <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.customsDuty)}</td>
                 <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.additionalDuty)}</td>
                 <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.antiDumping)}</td>
