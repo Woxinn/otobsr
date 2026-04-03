@@ -2,6 +2,17 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.469 - 2026-04-03
+
+- Login ekranı açık renk temaya çevrildi
+- Form kartı ve animasyonlu arka plan daha aydınlık, daha yumuşak bir görünüm aldı
+
+## v0.3.468 - 2026-04-03
+
+- Giriş ekranı sadeleştirildi; form dışındaki pazarlama blokları kaldırıldı
+- Login sayfasına düşük dikkat dağıtan, sürekli dönen animasyonlu arka plan eklendi
+- Giriş ekranındaki bozuk Türkçe karakterler temizlendi
+
 ## v0.3.467 - 2026-04-03
 
 - Geliştirme scripti `next dev --webpack` olarak değiştirildi

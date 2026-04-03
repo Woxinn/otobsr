@@ -6,14 +6,6 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import AppVersionBadge from "@/components/AppVersionBadge";
 import Logo from "@/components/Logo";
 
-const highlights = [
-  "Sipariş, RFQ ve plan akışları tek ekranda",
-  "Canlı stok, belge ve maliyet takibi",
-  "Operasyon odaklı hızlı yönetim paneli",
-];
-
-const badges = ["RFQ", "Sipariş", "Maliyet", "Belge", "Stok", "Plan"];
-
 export default function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,7 +26,7 @@ export default function LoginClient() {
       password,
     });
 
-      setLoading(false);
+    setLoading(false);
 
     if (signInError) {
       setError("Giriş başarısız. E-posta veya şifreyi kontrol edin.");
@@ -46,120 +38,70 @@ export default function LoginClient() {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(18,93,95,0.18),_transparent_36%),linear-gradient(135deg,#f2ede3_0%,#ebe4d6_45%,#d8d9d2_100%)] px-4 py-4 text-[#1d2228] sm:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl overflow-hidden rounded-[34px] border border-black/10 bg-[#f7f3eb]/90 shadow-[0_28px_90px_-38px_rgba(13,37,51,0.45)] backdrop-blur lg:grid lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="relative flex min-h-[320px] flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,#183038_0%,#0f4c50_45%,#1f7166_100%)] px-6 py-6 text-white sm:px-8 sm:py-8 lg:px-10 lg:py-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,214,102,0.18),transparent_26%),radial-gradient(circle_at_85%_15%,rgba(255,255,255,0.16),transparent_20%),radial-gradient(circle_at_70%_80%,rgba(255,214,102,0.14),transparent_24%)]" />
-          <div className="relative">
-            <div className="flex min-h-[148px] items-center justify-center rounded-[32px] border border-white/12 bg-white/8 px-8 py-8 shadow-[0_22px_50px_-30px_rgba(0,0,0,0.58)] backdrop-blur">
-              <Logo className="h-24 w-full max-w-[420px] object-contain" alt="Oto Başar" />
-            </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#f5efe3] text-[#1f2628]">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute left-[-10%] top-[-18%] h-[42rem] w-[42rem] animate-[spin_28s_linear_infinite] rounded-full bg-[radial-gradient(circle,rgba(214,174,98,0.24)_0%,rgba(214,174,98,0.06)_34%,transparent_70%)]" />
+        <div className="absolute right-[-12%] top-[8%] h-[34rem] w-[34rem] animate-[spin_22s_linear_infinite_reverse] rounded-full bg-[radial-gradient(circle,rgba(62,145,135,0.22)_0%,rgba(62,145,135,0.06)_35%,transparent_74%)]" />
+        <div className="absolute bottom-[-22%] left-[20%] h-[32rem] w-[32rem] animate-[spin_18s_linear_infinite] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.42)_0%,rgba(255,255,255,0.1)_40%,transparent_74%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,251,244,0.88)_0%,rgba(244,236,224,0.74)_48%,rgba(235,229,217,0.9)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(23,34,38,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(23,34,38,0.04)_1px,transparent_1px)] bg-[size:72px_72px] opacity-30" />
+      </div>
 
-            <div className="mt-10 max-w-xl">
-              <p className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-1 text-[11px] uppercase tracking-[0.28em] text-[#ffd666]">
-                Admin paneli
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6">
+        <div className="w-full max-w-md rounded-[34px] border border-black/8 bg-[rgba(255,252,246,0.76)] p-7 shadow-[0_30px_120px_-40px_rgba(31,38,40,0.26)] backdrop-blur-2xl sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <Logo className="h-14 w-auto max-w-[210px] object-contain" alt="Oto Başar" />
+              <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.34em] text-[#8d7754]">
+                Yetkili erişim
               </p>
-              <h1 className="mt-5 max-w-lg text-4xl font-semibold leading-[1.02] tracking-[-0.04em] [font-family:var(--font-display)] sm:text-5xl">
-                Ticaret akışlarının hepsini tek panelde yönetin.
+              <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#172226] [font-family:var(--font-display)]">
+                Giriş yapın
               </h1>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-white/76 sm:text-[15px]">
-                RFQ, sipariş, belge, maliyet ve stok verilerini tek bir operasyon
-                arayüzünde toparlayan iç ekip paneli.
+            </div>
+            <AppVersionBadge className="border-black/10 bg-white/70 text-black/62" />
+          </div>
+
+          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-black/46">E-posta</span>
+              <input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                required
+                autoComplete="email"
+                className="mt-2 w-full rounded-[22px] border border-black/10 bg-white/85 px-4 py-3.5 text-sm text-[#172226] outline-none transition placeholder:text-black/22 focus:border-[#b99353] focus:bg-white focus:ring-4 focus:ring-[#b99353]/10"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-black/46">Şifre</span>
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                type="password"
+                required
+                autoComplete="current-password"
+                className="mt-2 w-full rounded-[22px] border border-black/10 bg-white/85 px-4 py-3.5 text-sm text-[#172226] outline-none transition placeholder:text-black/22 focus:border-[#b99353] focus:bg-white focus:ring-4 focus:ring-[#b99353]/10"
+              />
+            </label>
+
+            {error ? (
+              <p className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {error}
               </p>
-            </div>
-          </div>
+            ) : null}
 
-          <div className="relative mt-8 grid gap-4 lg:mt-0">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {highlights.map((item, index) => (
-                <div
-                  key={item}
-                  className="rounded-[24px] border border-white/14 bg-white/10 px-4 py-4 backdrop-blur"
-                >
-                  <p className="text-[11px] uppercase tracking-[0.3em] text-white/50">
-                    0{index + 1}
-                  </p>
-                  <p className="mt-2 text-sm leading-5 text-white/88">{item}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {badges.map((badge) => (
-                <span
-                  key={badge}
-                  className="rounded-full border border-white/15 bg-black/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-white/72"
-                >
-                  {badge}
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="flex items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(248,243,235,0.96))] px-4 py-5 sm:px-6 lg:px-8">
-          <div className="w-full max-w-md rounded-[30px] border border-black/8 bg-white/82 p-6 shadow-[0_20px_60px_-30px_rgba(17,37,47,0.4)] backdrop-blur sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-[#8f7d64]">
-                  Yetkili erişim
-                </p>
-                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] [font-family:var(--font-display)]">
-                  Panele giriş yapın
-                </h2>
-              </div>
-              <AppVersionBadge className="border-[#d8c7a4] bg-[#efe7d8] text-[#6f5526]" />
-            </div>
-
-            <p className="mt-4 text-sm leading-6 text-black/58">
-              Yalnızca yetkili ekip üyeleri için. Giriş sonrası rol bazlı ekranlar
-              otomatik açılır.
-            </p>
-
-            <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
-              <label className="block">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-black/48">
-                  E-posta
-                </span>
-                <input
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  type="email"
-                  required
-                  autoComplete="email"
-                  className="mt-2 w-full rounded-[22px] border border-black/10 bg-[#fcfaf6] px-4 py-3.5 text-sm outline-none transition focus:border-[#1f7166] focus:bg-white focus:ring-4 focus:ring-[#1f7166]/10"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-black/48">
-                  Şifre
-                </span>
-                <input
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  className="mt-2 w-full rounded-[22px] border border-black/10 bg-[#fcfaf6] px-4 py-3.5 text-sm outline-none transition focus:border-[#1f7166] focus:bg-white focus:ring-4 focus:ring-[#1f7166]/10"
-                />
-              </label>
-
-              {error ? (
-                <p className="rounded-[20px] border border-[#efb9b0] bg-[#fff3f0] px-4 py-3 text-sm text-[#b24432]">
-                  {error}
-                </p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-full bg-[linear-gradient(135deg,#133c45_0%,#1f7166_100%)] px-5 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_40px_-22px_rgba(13,60,69,0.75)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loading ? "Giriş yapılıyor..." : "Giriş yap"}
-              </button>
-            </form>
-          </div>
-        </section>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-[linear-gradient(135deg,#cdb27d_0%,#e7d7ac_48%,#c59d53_100%)] px-5 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-[#1d2326] shadow-[0_20px_50px_-24px_rgba(231,215,172,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {loading ? "Giriş yapılıyor..." : "Giriş yap"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
