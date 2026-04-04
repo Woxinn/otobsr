@@ -12,6 +12,7 @@
 /mssql-agent/node_modules/
 /mssql-agent/build/
 /mssql-agent/dist/
+/mssql-agent/ad/
 /mssql-agent/agent-test.*
 /mssql-agent-cs/bin/
 /mssql-agent-cs/obj/

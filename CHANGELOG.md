@@ -2,6 +2,33 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.474 - 2026-04-03
+
+- `stokhar` kaynaklı canlı stok sorgusu programdaki akışa yaklaştırıldı
+- `TBLSTOKHAR.TARIH` filtresi yıl başı ile bugünün sonu arasına sınırlandı
+- Canlı stok hesabı hem web uygulamasında hem agent tarafında aynı tarih aralığı mantığıyla çalışacak hale getirildi
+
+## v0.3.473 - 2026-04-03
+
+- `stokhar` kaynaklı canlı stok hesabında `GCKOD` yorumlaması netleştirildi
+- Stok bakiyesi artık yalnız `G` giriş ve `C` çıkış hareketlerini dikkate alacak şekilde hesaplanıyor
+
+## v0.3.472 - 2026-04-03
+
+- Webpack `watchOptions.ignored` yapılandırması sadeleştirildi
+- Geliştirme açılışında oluşan geçersiz webpack config hatası giderildi
+
+## v0.3.471 - 2026-04-03
+
+- Geliştirme ortamında `mssql-agent/dist` klasörü webpack watcher kapsamından çıkarıldı
+- Agent heartbeat/status dosyası güncellendiğinde ürün detay gibi ekranlarda oluşan sürekli yenilenme sorunu azaltıldı
+
+## v0.3.470 - 2026-04-03
+
+- Canlı stok için alternatif `TBLSTOKSB + TBLSTOKHAR` bakiye sorgusu eklendi
+- Stok kaynağı `MSSQL_STOCK_SOURCE=stokhar` ile açılabilecek şekilde feature flag yapısına alındı
+- Web uygulaması agent modda stok kaynağını payload ile iletecek hale getirildi; sonraki kaynak değişimlerinde agent env bağımlılığı azaltıldı
+
 ## v0.3.469 - 2026-04-03
 
 - Login ekranı açık renk temaya çevrildi

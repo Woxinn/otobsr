@@ -20,6 +20,10 @@ export type Sales10yDebugRow = {
 const BRIDGE_TIMEOUT_MS = Math.max(5000, Number(process.env.MSSQL_BRIDGE_TIMEOUT_MS ?? "30000"));
 const BRIDGE_POLL_MS = Math.max(250, Number(process.env.MSSQL_BRIDGE_POLL_MS ?? "500"));
 const STOCK_CACHE_TTL_MS = Math.max(0, Number(process.env.MSSQL_STOCK_CACHE_TTL_MS ?? "15000"));
+type StockSource = "sthar" | "stokhar";
+
+const getStockSource = (): StockSource =>
+  (String(process.env.MSSQL_STOCK_SOURCE ?? "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar");
 
 const stockCache = new Map<string, { expiresAt: number; result: Map<string, number> }>();
 type DirectPool = InstanceType<typeof sql.ConnectionPool>;
@@ -33,7 +37,7 @@ const cloneStockMap = (source: Map<string, number>) =>
   new Map(Array.from(source.entries()).map(([key, value]) => [key, Number(value ?? 0)]));
 
 const getStockCacheKey = (codes: string[], matchMode: StockMatchMode) =>
-  `${matchMode}:${codes.slice().sort((a, b) => a.localeCompare(b)).join("|")}`;
+  `${getStockSource()}:${matchMode}:${codes.slice().sort((a, b) => a.localeCompare(b)).join("|")}`;
 
 const readStockCache = (codes: string[], matchMode: StockMatchMode) => {
   if (!STOCK_CACHE_TTL_MS) return null;
@@ -57,11 +61,15 @@ const writeStockCache = (codes: string[], matchMode: StockMatchMode, result: Map
 async function fetchDirectStockMapChunk(
   pool: DirectPool,
   codes: string[],
-  matchMode: StockMatchMode
+  matchMode: StockMatchMode,
+  stockSource: StockSource
 ) {
   const request = pool.request();
   const normalizedCodes = codes.map((code) => code.trim()).filter(Boolean);
   if (!normalizedCodes.length) return new Map<string, number>();
+  const today = new Date();
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const endExclusive = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
   const params = normalizedCodes.map((code, index) => {
     const param = `stok${index}`;
@@ -69,30 +77,48 @@ async function fetchDirectStockMapChunk(
     return { code, param };
   });
 
-  const whereClause = params
-    .map(({ param }) =>
-      matchMode === "exact"
-        ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
-        : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
-    )
-    .join(" OR ");
+  if (stockSource === "stokhar") {
+    request.input("startDate", sql.DateTime, startOfYear);
+    request.input("endDate", sql.DateTime, endExclusive);
+  }
 
-  const selectClause = params
-    .map(
-      ({ param }, index) => `SUM(CASE WHEN ${
-        matchMode === "exact"
-          ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
-          : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
-      } THEN CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END ELSE 0 END) AS s${index}`
-    )
-    .join(",\n            ");
+  const matchExpression = (field: string, param: string) =>
+    matchMode === "exact" ? `LTRIM(RTRIM(${field})) = @${param}` : `LTRIM(RTRIM(${field})) LIKE @${param}`;
 
-  const result = await request.query(`
-    SELECT
-      ${selectClause}
-    FROM TBLSTHAR Har
-    WHERE ${whereClause}
-  `);
+  const result =
+    stockSource === "stokhar"
+      ? await request.query(`
+          SELECT
+            ${params
+              .map(
+                ({ param }, index) => `CONVERT(DECIMAL(22,2), ISNULL(SUM(CASE WHEN ${matchExpression(
+                  "T1.KOD",
+                  param
+                )} THEN CASE WHEN UPPER(T2.GCKOD)='G' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) * -1 ELSE 0 END ELSE 0 END),0)) AS s${index}`
+              )
+              .join(",\n            ")}
+          FROM TBLSTOKSB T1
+          LEFT JOIN TBLSTOKHAR T2
+            ON T2.STOKID = T1.ID
+           AND T2.TARIH >= @startDate
+           AND T2.TARIH < @endDate
+           AND T2.KAYITTIPI = 0
+           AND T2.ISLEMTIPI IN (0,1)
+          WHERE ${params.map(({ param }) => matchExpression("T1.KOD", param)).join(" OR ")}
+        `)
+      : await request.query(`
+          SELECT
+            ${params
+              .map(
+                ({ param }, index) => `SUM(CASE WHEN ${matchExpression(
+                  "Har.STOK_KODU",
+                  param
+                )} THEN CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END ELSE 0 END) AS s${index}`
+              )
+              .join(",\n            ")}
+          FROM TBLSTHAR Har
+          WHERE ${params.map(({ param }) => matchExpression("Har.STOK_KODU", param)).join(" OR ")}
+        `);
 
   const row = result.recordset?.[0] ?? {};
   return new Map(params.map(({ code }, index) => [code, Number((row as any)[`s${index}`] ?? 0)]));
@@ -226,7 +252,7 @@ async function withModeFallback<T>(requestedBy: string, directFn: () => Promise<
   return directFn();
 }
 
-async function fetchDirectStockMap(codes: string[], matchMode: StockMatchMode) {
+async function fetchDirectStockMap(codes: string[], matchMode: StockMatchMode, stockSource: StockSource) {
   const map = new Map<string, number>();
   const pool = await connectDirectMssql();
   if (!pool) return map;
@@ -234,7 +260,7 @@ async function fetchDirectStockMap(codes: string[], matchMode: StockMatchMode) {
   try {
     for (let i = 0; i < codes.length; i += 100) {
       const chunk = codes.slice(i, i + 100);
-      const chunkResult = await fetchDirectStockMapChunk(pool, chunk, matchMode);
+      const chunkResult = await fetchDirectStockMapChunk(pool, chunk, matchMode, stockSource);
       chunkResult.forEach((value, key) => map.set(key, value));
     }
   } finally {
@@ -413,16 +439,17 @@ async function fetchDirectSales10yChunk(codes: string[]) {
 export async function fetchLiveStockMap(codes: string[], matchMode: StockMatchMode = "prefix") {
   const distinctCodes = trimDistinctCodes(codes);
   if (!distinctCodes.length) return new Map<string, number>();
+  const stockSource = getStockSource();
   const cached = readStockCache(distinctCodes, matchMode);
   if (cached) return cached;
   try {
     const result = await withModeFallback(
       "stock.lookup",
-      () => fetchDirectStockMap(distinctCodes, matchMode),
+      () => fetchDirectStockMap(distinctCodes, matchMode, stockSource),
       async () => {
         const result = await runBridgeRequest<Record<string, number>>(
           "stock.lookup",
-          { codes: distinctCodes, matchMode },
+          { codes: distinctCodes, matchMode, stockSource },
           "stock.lookup"
         );
         return new Map(Object.entries(result ?? {}).map(([key, value]) => [key, Number(value ?? 0)]));

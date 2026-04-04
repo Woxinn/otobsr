@@ -59,11 +59,16 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const nowIso = () => new Date().toISOString();
 const trimCode = (value) => String(value || "").trim();
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const getStockSource = (value) =>
+  String(value || process.env.MSSQL_STOCK_SOURCE || "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar";
 
-async function fetchStockMapChunk(pool, codes, matchMode) {
+async function fetchStockMapChunk(pool, codes, matchMode, stockSource) {
   const request = pool.request();
   const normalizedCodes = codes.map(trimCode).filter(Boolean);
   if (!normalizedCodes.length) return {};
+  const today = new Date();
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const endExclusive = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
   const params = normalizedCodes.map((code, index) => {
     const param = `stok${index}`;
@@ -71,30 +76,48 @@ async function fetchStockMapChunk(pool, codes, matchMode) {
     return { code, param };
   });
 
-  const whereClause = params
-    .map(({ param }) =>
-      matchMode === "exact"
-        ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
-        : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
-    )
-    .join(" OR ");
+  if (stockSource === "stokhar") {
+    request.input("startDate", sql.DateTime, startOfYear);
+    request.input("endDate", sql.DateTime, endExclusive);
+  }
 
-  const selectClause = params
-    .map(
-      ({ param }, index) => `SUM(CASE WHEN ${
-        matchMode === "exact"
-          ? `LTRIM(RTRIM(Har.STOK_KODU)) = @${param}`
-          : `LTRIM(RTRIM(Har.STOK_KODU)) LIKE @${param}`
-      } THEN CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END ELSE 0 END) AS s${index}`
-    )
-    .join(",\n              ");
+  const matchExpression = (field, param) =>
+    matchMode === "exact" ? `LTRIM(RTRIM(${field})) = @${param}` : `LTRIM(RTRIM(${field})) LIKE @${param}`;
 
-  const rs = await request.query(`
-    SELECT
-      ${selectClause}
-    FROM TBLSTHAR Har
-    WHERE ${whereClause}
-  `);
+  const rs =
+    stockSource === "stokhar"
+      ? await request.query(`
+          SELECT
+            ${params
+              .map(
+                ({ param }, index) => `CONVERT(DECIMAL(22,2), ISNULL(SUM(CASE WHEN ${matchExpression(
+                  "T1.KOD",
+                  param
+                )} THEN CASE WHEN UPPER(T2.GCKOD)='G' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) * -1 ELSE 0 END ELSE 0 END),0)) AS s${index}`
+              )
+              .join(",\n              ")}
+          FROM TBLSTOKSB T1
+          LEFT JOIN TBLSTOKHAR T2
+            ON T2.STOKID = T1.ID
+           AND T2.TARIH >= @startDate
+           AND T2.TARIH < @endDate
+           AND T2.KAYITTIPI = 0
+           AND T2.ISLEMTIPI IN (0,1)
+          WHERE ${params.map(({ param }) => matchExpression("T1.KOD", param)).join(" OR ")}
+        `)
+      : await request.query(`
+          SELECT
+            ${params
+              .map(
+                ({ param }, index) => `SUM(CASE WHEN ${matchExpression(
+                  "Har.STOK_KODU",
+                  param
+                )} THEN CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END ELSE 0 END) AS s${index}`
+              )
+              .join(",\n              ")}
+          FROM TBLSTHAR Har
+          WHERE ${params.map(({ param }) => matchExpression("Har.STOK_KODU", param)).join(" OR ")}
+        `);
 
   const row = rs.recordset?.[0] || {};
   return Object.fromEntries(params.map(({ code }, index) => [code, Number(row[`s${index}`] || 0)]));
@@ -293,12 +316,13 @@ class AgentCore extends EventEmitter {
   async handleStockLookup(payload) {
     const codes = Array.from(new Set((payload?.codes || []).map(trimCode).filter(Boolean)));
     const matchMode = payload?.matchMode === "exact" ? "exact" : "prefix";
+    const stockSource = getStockSource(payload?.stockSource);
     if (!codes.length) return {};
 
     return this.withPool(undefined, async (pool) => {
       const result = {};
       for (let i = 0; i < codes.length; i += 100) {
-        const chunkResult = await fetchStockMapChunk(pool, codes.slice(i, i + 100), matchMode);
+        const chunkResult = await fetchStockMapChunk(pool, codes.slice(i, i + 100), matchMode, stockSource);
         Object.assign(result, chunkResult);
       }
       return result;
