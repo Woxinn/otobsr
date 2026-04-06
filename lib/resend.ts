@@ -122,6 +122,7 @@ const resolveBrandLogoUrl = () => {
 };
 
 export function buildInsuranceRequestEmail(input: {
+  orderLabel?: string;
   consignmentNo: string;
   flotanNo: string;
   vehicleDetail: string;
@@ -134,7 +135,8 @@ export function buildInsuranceRequestEmail(input: {
   const goods = escapeHtml(input.goodsDescription);
   const goodsValue = escapeHtml(input.goodsValue);
   const logoUrl = escapeHtml(resolveBrandLogoUrl());
-  const subject = `Navlun Sigortası Talebi - ${input.flotanNo}`;
+  const subjectKey = (input.orderLabel ?? "").trim() || input.flotanNo;
+  const subject = `Navlun Sigortası Talebi - ${subjectKey}`;
   const text = [
     "Merhabalar,",
     "",

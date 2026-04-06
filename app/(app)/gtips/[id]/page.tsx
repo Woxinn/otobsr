@@ -95,6 +95,10 @@ export default async function GtipDetailPage({
               <dt>KDV</dt>
               <dd>{gtip.vat_rate ?? 0}%</dd>
             </div>
+            <div className="flex justify-between gap-4">
+              <dt>Sigorta emtea cinsi</dt>
+              <dd className="text-right">{(gtip as any).insurance_emtea_cinsi ?? "-"}</dd>
+            </div>
           </dl>
         </div>
 

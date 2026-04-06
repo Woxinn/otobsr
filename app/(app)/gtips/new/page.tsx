@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createGtip } from "@/app/actions/gtips";
 
 export default function NewGtipPage() {
@@ -13,7 +13,7 @@ export default function NewGtipPage() {
           href="/gtips"
           className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
         >
-          Listeye dön
+          Listeye don
         </Link>
       </div>
 
@@ -25,15 +25,23 @@ export default function NewGtipPage() {
               required
               name="code"
               className="mt-2 w-full rounded-2xl border border-black/15 px-3 py-2 text-sm"
-              placeholder="Örn: 8482.10.90"
+              placeholder="Orn: 8482.10.90"
             />
           </label>
           <label className="text-sm font-medium lg:col-span-1">
-            Açıklama
+            Aciklama
             <input
               name="description"
               className="mt-2 w-full rounded-2xl border border-black/15 px-3 py-2 text-sm"
-              placeholder="Kısa açıklama"
+              placeholder="Kisa aciklama"
+            />
+          </label>
+          <label className="text-sm font-medium lg:col-span-2">
+            Sigorta emtea cinsi
+            <input
+              name="insurance_emtea_cinsi"
+              className="mt-2 w-full rounded-2xl border border-black/15 px-3 py-2 text-sm"
+              placeholder="Orn: KAPLIN YEDEK PARCALARI"
             />
           </label>
         </div>
@@ -49,7 +57,7 @@ export default function NewGtipPage() {
             />
           </label>
           <label className="text-sm font-medium">
-            İlave GV (%)
+            Ilave GV (%)
             <input
               name="additional_duty_rate"
               type="number"
@@ -85,7 +93,7 @@ export default function NewGtipPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="flex items-center gap-3 text-sm font-medium">
             <input type="checkbox" name="surveillance_applicable" className="h-4 w-4" />
-            Gözetim var
+            Gozetim var
           </label>
           <input
             name="surveillance_unit_value"

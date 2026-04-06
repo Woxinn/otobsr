@@ -15,6 +15,7 @@ export async function createGtip(formData: FormData) {
   const payload = {
     code: (formData.get("code") as string | null)?.trim() ?? "",
     description: (formData.get("description") as string | null) ?? null,
+    insurance_emtea_cinsi: (formData.get("insurance_emtea_cinsi") as string | null)?.trim() ?? null,
     customs_duty_rate: toNumber(formData.get("customs_duty_rate")),
     additional_duty_rate: toNumber(formData.get("additional_duty_rate")),
     anti_dumping_applicable: toBoolean(formData.get("anti_dumping_applicable")),
@@ -51,6 +52,7 @@ export async function updateGtip(formData: FormData) {
   const payload = {
     code: (formData.get("code") as string | null)?.trim() ?? "",
     description: (formData.get("description") as string | null) ?? null,
+    insurance_emtea_cinsi: (formData.get("insurance_emtea_cinsi") as string | null)?.trim() ?? null,
     customs_duty_rate: toNumber(formData.get("customs_duty_rate")),
     additional_duty_rate: toNumber(formData.get("additional_duty_rate")),
     anti_dumping_applicable: toBoolean(formData.get("anti_dumping_applicable")),

@@ -2,9 +2,8 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateGtip } from "@/app/actions/gtips";
-import CountrySelect from "@/components/CountrySelect";
 
-const boolToChecked = (val: boolean | null | undefined) => (!!val ? true : false);
+const boolToChecked = (val: boolean | null | undefined) => !!val;
 
 export default async function EditGtipPage({
   params,
@@ -13,11 +12,7 @@ export default async function EditGtipPage({
 }) {
   const { id } = await params;
   const supabase = await createSupabaseServerClient();
-  const { data: gtip } = await supabase
-    .from("gtips")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const { data: gtip } = await supabase.from("gtips").select("*").eq("id", id).single();
 
   if (!gtip) notFound();
 
@@ -26,15 +21,13 @@ export default async function EditGtipPage({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">GTIP</p>
-          <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            {gtip.code} düzenle
-          </h1>
+          <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">{gtip.code} duzenle</h1>
         </div>
         <Link
           href={`/gtips/${gtip.id}`}
           className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
         >
-          Detaya dön
+          Detaya don
         </Link>
       </div>
 
@@ -51,11 +44,20 @@ export default async function EditGtipPage({
             />
           </label>
           <label className="text-sm font-medium lg:col-span-1">
-            Açıklama
+            Aciklama
             <input
               name="description"
               defaultValue={gtip.description ?? ""}
               className="mt-2 w-full rounded-2xl border border-black/15 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-sm font-medium lg:col-span-2">
+            Sigorta emtea cinsi
+            <input
+              name="insurance_emtea_cinsi"
+              defaultValue={(gtip as any).insurance_emtea_cinsi ?? ""}
+              className="mt-2 w-full rounded-2xl border border-black/15 px-3 py-2 text-sm"
+              placeholder="Orn: KAPLIN YEDEK PARCALARI"
             />
           </label>
         </div>
@@ -72,7 +74,7 @@ export default async function EditGtipPage({
             />
           </label>
           <label className="text-sm font-medium">
-            İlave GV (%)
+            Ilave GV (%)
             <input
               name="additional_duty_rate"
               type="number"
@@ -121,7 +123,7 @@ export default async function EditGtipPage({
               defaultChecked={boolToChecked(gtip.surveillance_applicable)}
               className="h-4 w-4"
             />
-            Gözetim var
+            Gozetim var
           </label>
           <input
             name="surveillance_unit_value"

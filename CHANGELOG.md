@@ -2,6 +2,30 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.494 - 2026-04-06
+
+- Resend inbound webhook endpointi eklendi: `POST /api/resend/inbound`
+- `email.received` eventinden `Poliçe_TR` eki cekilip mevcut otomatik navlun sigorta import akisina baglandi
+- Sigorta policy import mantigi ortak helper'a alinip (`lib/insurance-policy-import.ts`) hem manuel ingest hem webhook tarafinda tekrar kullanildi
+
+## v0.3.493 - 2026-04-06
+
+- Sigorta police maili icin kolay kaldirilabilir otomatik import endpointi eklendi: `POST /api/insurance-mail/ingest`
+- Ozellik env flag ile kontrol ediliyor (`INSURANCE_POLICY_AUTO_IMPORT_ENABLED=true`) ve secret header ile korunuyor (`x-insurance-ingest-secret`)
+- Konudan siparis eslestirme + `Poliçe_TR` eki filtreleme + mevcut navlun sigorta belgesi varsa tekrar yuklememe kurali eklendi
+
+## v0.3.492 - 2026-04-06
+
+- Sigorta maili gonderiminde konu satiri shipment/flotan yerine siparis adini kullanacak sekilde guncellendi
+- Mail composer, API'ye `orderLabel` gonderecek sekilde genisletildi
+- Konu olusturmada siparis adi yoksa mevcut flotan fallback'i korunarak geriye donuk uyumluluk saglandi
+
+## v0.3.491 - 2026-04-06
+
+- GTIP kaydina `insurance_emtea_cinsi` alani eklendi (migration + create/update formlari)
+- Sigorta formu uretiminde emtea cinsi artik siparisteki urunlerin GTIP emtea cinsi alanlarindan otomatik derleniyor
+- GTIP emtea cinsi bossa mevcut urun adi bazli fallback korunarak akisin bozulmasi engellendi
+
 ## v0.3.490 - 2026-04-06
 
 - Alt sabit ulke bazli KDVsiz maliyet seridine ulke bazli birim fiyat girisi eklendi

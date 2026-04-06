@@ -178,7 +178,7 @@ export async function getInsuranceFormData(orderId: string): Promise<InsuranceFo
         .maybeSingle(),
       supabase
         .from("order_items")
-        .select("name, products(name)")
+        .select("name, products(name, gtip_id, gtips(insurance_emtea_cinsi))")
         .eq("order_id", order.id)
         .order("line_no", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true }),
@@ -210,6 +210,20 @@ export async function getInsuranceFormData(orderId: string): Promise<InsuranceFo
   const packageCount = Number(packingSummary?.total_packages ?? order.packages ?? 0);
   const grossWeightKg = Number(packingSummary?.total_gross_weight_kg ?? order.weight_kg ?? 0);
 
+  const gtipGoodsDescriptions = Array.from(
+    new Set(
+      (orderItems ?? [])
+        .map((item: any) => {
+          const productRaw = item?.products;
+          const product = Array.isArray(productRaw) ? productRaw[0] : productRaw;
+          const gtipRaw = product?.gtips;
+          const gtip = Array.isArray(gtipRaw) ? gtipRaw[0] : gtipRaw;
+          return String(gtip?.insurance_emtea_cinsi ?? "").trim();
+        })
+        .filter(Boolean)
+    )
+  );
+
   const goodsNames = Array.from(
     new Set(
       (orderItems ?? [])
@@ -218,7 +232,11 @@ export async function getInsuranceFormData(orderId: string): Promise<InsuranceFo
     )
   );
   const goodsDescription =
-    goodsNames.length > 0 ? goodsNames.slice(0, 4).join(" / ") : order.name ?? "-";
+    gtipGoodsDescriptions.length > 0
+      ? gtipGoodsDescriptions.join(" / ")
+      : goodsNames.length > 0
+      ? goodsNames.slice(0, 4).join(" / ")
+      : order.name ?? "-";
 
   const voyageParts = [
     primaryShipment?.vessel_name ? `GEMI: ${primaryShipment.vessel_name}` : "",

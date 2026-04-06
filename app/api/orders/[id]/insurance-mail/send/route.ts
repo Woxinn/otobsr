@@ -39,9 +39,11 @@ export async function POST(
   }
 
   const payload = normalizeInsuranceFormPayload((body?.form ?? {}) as Partial<InsuranceFormPayload>);
+  const orderLabel = String(body?.orderLabel ?? "").trim();
   const workbookBuffer = await buildInsuranceWorkbook(payload);
   const fileBase = sanitizeFileName(`order-${id}`);
   const emailContent = buildInsuranceRequestEmail({
+    orderLabel,
     consignmentNo: payload.consignmentNo,
     flotanNo: payload.flotanNo,
     vehicleDetail: payload.vehicleDetail,
