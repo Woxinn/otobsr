@@ -2,6 +2,11 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.495 - 2026-04-06
+
+- Resend inbound webhook'u `proxy` auth redirectine takilmasin diye `/api/resend/inbound` ve `/api/insurance-mail/ingest` route'lari auth kontrolunden muaf tutuldu
+- Resend'de gorunen `307 Temporary Redirect` sorununun nedeni olan login yonlendirmesi giderildi
+
 ## v0.3.494 - 2026-04-06
 
 - Resend inbound webhook endpointi eklendi: `POST /api/resend/inbound`
