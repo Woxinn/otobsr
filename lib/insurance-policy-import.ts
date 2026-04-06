@@ -38,15 +38,19 @@ async function resolveOrderFromSubject(
   subject: string
 ) {
   const raw = subject.trim();
-  const subjectPart = raw.includes(" - ")
-    ? raw.split(" - ").slice(1).join(" - ").trim()
-    : raw;
+  const cleaned = raw
+    .replace(/^(re|fw|fwd)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const subjectPart = cleaned.includes(" - ")
+    ? cleaned.split(" - ").slice(1).join(" - ").trim()
+    : cleaned;
 
   if (subjectPart) {
     const { data: byName } = await admin
       .from("orders")
       .select("id, name, code, created_at")
-      .ilike("name", subjectPart)
+      .ilike("name", `%${subjectPart}%`)
       .order("created_at", { ascending: false })
       .limit(1);
     if (byName?.[0]) return byName[0];
@@ -54,7 +58,7 @@ async function resolveOrderFromSubject(
     const { data: byCode } = await admin
       .from("orders")
       .select("id, name, code, created_at")
-      .ilike("code", subjectPart)
+      .ilike("code", `%${subjectPart}%`)
       .order("created_at", { ascending: false })
       .limit(1);
     if (byCode?.[0]) return byCode[0];
@@ -66,7 +70,7 @@ async function resolveOrderFromSubject(
     .order("created_at", { ascending: false })
     .limit(400);
 
-  const normalizedSubject = normalizeText(raw);
+  const normalizedSubject = normalizeText(cleaned);
   const candidates = (recentOrders ?? [])
     .map((order) => {
       const name = String(order.name ?? "").trim();

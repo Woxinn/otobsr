@@ -2,6 +2,11 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.496 - 2026-04-06
+
+- Sigorta mail subject eslestirmesi `RE:/FW:` on-eklerini temizleyecek sekilde sertlestirildi
+- Siparis bulma sorgusu exact yerine `%...%` ilike ile genisletildi; `RE: Navlun Sigortasi Talebi - ETKT-30` gibi konularda eslesme duzeltildi
+
 ## v0.3.495 - 2026-04-06
 
 - Resend inbound webhook'u `proxy` auth redirectine takilmasin diye `/api/resend/inbound` ve `/api/insurance-mail/ingest` route'lari auth kontrolunden muaf tutuldu
