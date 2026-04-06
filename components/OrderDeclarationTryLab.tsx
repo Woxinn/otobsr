@@ -94,48 +94,63 @@ export default function OrderDeclarationTryLab({
   tcmbDate,
   tcmbError,
 }: Props) {
+  const manualCurrencyOptions = Array.from(new Set([orderCurrency, "TRY"].filter(Boolean)));
   const [rateInput, setRateInput] = useState(String(initialRate || 1));
   const [freightInput, setFreightInput] = useState(String(initialFreightTotal || 0));
+  const [freightCurrency, setFreightCurrency] = useState(orderCurrency);
   const [insuranceInput, setInsuranceInput] = useState(String(initialInsuranceTotal || 0));
+  const [insuranceCurrency, setInsuranceCurrency] = useState(orderCurrency);
   const [stampTaxInput, setStampTaxInput] = useState("0");
+  const [stampTaxCurrency, setStampTaxCurrency] = useState<"TRY" | string>("TRY");
   const [warehouseInput, setWarehouseInput] = useState("0");
+  const [warehouseCurrency, setWarehouseCurrency] = useState<"TRY" | string>("TRY");
   const [bankInput, setBankInput] = useState("0");
+  const [bankCurrency, setBankCurrency] = useState<"TRY" | string>("TRY");
   const [otherInput, setOtherInput] = useState("0");
+  const [otherCurrency, setOtherCurrency] = useState<"TRY" | string>("TRY");
 
   const rate = useMemo(() => {
     const parsed = parseDecimalInput(rateInput);
     return parsed !== null && parsed > 0 ? parsed : 0;
   }, [rateInput]);
 
+  const normalizeManualAmount = (value: string, currency: string) => {
+    const parsed = parseDecimalInput(value);
+    if (parsed === null || parsed < 0) return 0;
+    if (currency === "TRY") {
+      return rate > 0 ? parsed / rate : 0;
+    }
+    return parsed;
+  };
+
+  const convertManualAmountToTry = (value: number, currency: string) => {
+    if (currency === "TRY") return value;
+    return value * rate;
+  };
+
   const freightTotal = useMemo(() => {
-    const parsed = parseDecimalInput(freightInput);
-    return parsed !== null && parsed >= 0 ? parsed : 0;
-  }, [freightInput]);
+    return normalizeManualAmount(freightInput, freightCurrency);
+  }, [freightCurrency, freightInput, rate]);
 
   const insuranceTotal = useMemo(() => {
-    const parsed = parseDecimalInput(insuranceInput);
-    return parsed !== null && parsed >= 0 ? parsed : 0;
-  }, [insuranceInput]);
+    return normalizeManualAmount(insuranceInput, insuranceCurrency);
+  }, [insuranceCurrency, insuranceInput, rate]);
 
   const stampTaxTotal = useMemo(() => {
-    const parsed = parseDecimalInput(stampTaxInput);
-    return parsed !== null && parsed >= 0 ? parsed : 0;
-  }, [stampTaxInput]);
+    return normalizeManualAmount(stampTaxInput, stampTaxCurrency);
+  }, [rate, stampTaxCurrency, stampTaxInput]);
 
   const warehouseTotal = useMemo(() => {
-    const parsed = parseDecimalInput(warehouseInput);
-    return parsed !== null && parsed >= 0 ? parsed : 0;
-  }, [warehouseInput]);
+    return normalizeManualAmount(warehouseInput, warehouseCurrency);
+  }, [rate, warehouseCurrency, warehouseInput]);
 
   const bankTotal = useMemo(() => {
-    const parsed = parseDecimalInput(bankInput);
-    return parsed !== null && parsed >= 0 ? parsed : 0;
-  }, [bankInput]);
+    return normalizeManualAmount(bankInput, bankCurrency);
+  }, [bankCurrency, bankInput, rate]);
 
   const otherTotal = useMemo(() => {
-    const parsed = parseDecimalInput(otherInput);
-    return parsed !== null && parsed >= 0 ? parsed : 0;
-  }, [otherInput]);
+    return normalizeManualAmount(otherInput, otherCurrency);
+  }, [otherCurrency, otherInput, rate]);
 
   const ancillaryCostsTotal = warehouseTotal + bankTotal + otherTotal;
 
@@ -417,63 +432,153 @@ export default function OrderDeclarationTryLab({
             </div>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
               <span className="text-xs text-black/50">Navlun ({orderCurrency})</span>
-              <input
-                value={freightInput}
-                onChange={(e) => setFreightInput(e.target.value)}
-                inputMode="decimal"
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
-              />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(freightTotal * rate)} karşılığı</p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={freightInput}
+                  onChange={(e) => setFreightInput(e.target.value)}
+                  inputMode="decimal"
+                  className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                />
+                <select
+                  value={freightCurrency}
+                  onChange={(e) => setFreightCurrency(e.target.value)}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                >
+                  {manualCurrencyOptions.map((option) => (
+                    <option key={`freight-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-2 text-[11px] text-black/45">
+                {formatTry(convertManualAmountToTry(parseDecimalInput(freightInput) ?? 0, freightCurrency))} karşılığı
+              </p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
               <span className="text-xs text-black/50">Sigorta ({orderCurrency})</span>
-              <input
-                value={insuranceInput}
-                onChange={(e) => setInsuranceInput(e.target.value)}
-                inputMode="decimal"
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
-              />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(insuranceTotal * rate)} karşılığı</p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={insuranceInput}
+                  onChange={(e) => setInsuranceInput(e.target.value)}
+                  inputMode="decimal"
+                  className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                />
+                <select
+                  value={insuranceCurrency}
+                  onChange={(e) => setInsuranceCurrency(e.target.value)}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                >
+                  {manualCurrencyOptions.map((option) => (
+                    <option key={`insurance-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-2 text-[11px] text-black/45">
+                {formatTry(convertManualAmountToTry(parseDecimalInput(insuranceInput) ?? 0, insuranceCurrency))} karşılığı
+              </p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
-              <span className="text-xs text-black/50">Damga vergisi ({orderCurrency})</span>
-              <input
-                value={stampTaxInput}
-                onChange={(e) => setStampTaxInput(e.target.value)}
-                inputMode="decimal"
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
-              />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(stampTaxTotal * rate)} karşılığı</p>
+              <span className="text-xs text-black/50">Damga vergisi</span>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={stampTaxInput}
+                  onChange={(e) => setStampTaxInput(e.target.value)}
+                  inputMode="decimal"
+                  className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                />
+                <select
+                  value={stampTaxCurrency}
+                  onChange={(e) => setStampTaxCurrency(e.target.value)}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                >
+                  {manualCurrencyOptions.map((option) => (
+                    <option key={`stamp-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-2 text-[11px] text-black/45">
+                {formatTry(convertManualAmountToTry(parseDecimalInput(stampTaxInput) ?? 0, stampTaxCurrency))} karşılığı
+              </p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
-              <span className="text-xs text-black/50">Depo masrafı ({orderCurrency})</span>
-              <input
-                value={warehouseInput}
-                onChange={(e) => setWarehouseInput(e.target.value)}
-                inputMode="decimal"
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
-              />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(warehouseTotal * rate)} karşılığı</p>
+              <span className="text-xs text-black/50">Depo masrafı</span>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={warehouseInput}
+                  onChange={(e) => setWarehouseInput(e.target.value)}
+                  inputMode="decimal"
+                  className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                />
+                <select
+                  value={warehouseCurrency}
+                  onChange={(e) => setWarehouseCurrency(e.target.value)}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                >
+                  {manualCurrencyOptions.map((option) => (
+                    <option key={`warehouse-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-2 text-[11px] text-black/45">
+                {formatTry(convertManualAmountToTry(parseDecimalInput(warehouseInput) ?? 0, warehouseCurrency))} karşılığı
+              </p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
-              <span className="text-xs text-black/50">Banka masrafı ({orderCurrency})</span>
-              <input
-                value={bankInput}
-                onChange={(e) => setBankInput(e.target.value)}
-                inputMode="decimal"
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
-              />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(bankTotal * rate)} karşılığı</p>
+              <span className="text-xs text-black/50">Banka masrafı</span>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={bankInput}
+                  onChange={(e) => setBankInput(e.target.value)}
+                  inputMode="decimal"
+                  className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                />
+                <select
+                  value={bankCurrency}
+                  onChange={(e) => setBankCurrency(e.target.value)}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                >
+                  {manualCurrencyOptions.map((option) => (
+                    <option key={`bank-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-2 text-[11px] text-black/45">
+                {formatTry(convertManualAmountToTry(parseDecimalInput(bankInput) ?? 0, bankCurrency))} karşılığı
+              </p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
-              <span className="text-xs text-black/50">Diğer ({orderCurrency})</span>
-              <input
-                value={otherInput}
-                onChange={(e) => setOtherInput(e.target.value)}
-                inputMode="decimal"
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
-              />
-              <p className="mt-2 text-[11px] text-black/45">{formatTry(otherTotal * rate)} karşılığı</p>
+              <span className="text-xs text-black/50">Diğer</span>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={otherInput}
+                  onChange={(e) => setOtherInput(e.target.value)}
+                  inputMode="decimal"
+                  className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                />
+                <select
+                  value={otherCurrency}
+                  onChange={(e) => setOtherCurrency(e.target.value)}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none"
+                >
+                  {manualCurrencyOptions.map((option) => (
+                    <option key={`other-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-2 text-[11px] text-black/45">
+                {formatTry(convertManualAmountToTry(parseDecimalInput(otherInput) ?? 0, otherCurrency))} karşılığı
+              </p>
             </label>
             <label className="block rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
               <span className="text-xs text-black/50">Kullanılan kur</span>

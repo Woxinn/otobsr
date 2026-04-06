@@ -762,8 +762,26 @@ export default async function OrderDetailPage({
           <Link
             href={`/api/export-gumruk?orderId=${order.id}`}
             className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-md"
+            data-skip-route-loader
           >
             Gümrük Excel&apos;i indir
+          </Link>
+        ) : null}
+        {!isSales ? (
+          <Link
+            href={`/api/orders/${order.id}/insurance-form`}
+            className="rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:shadow-md"
+            data-skip-route-loader
+          >
+            Navlun sigortası formu
+          </Link>
+        ) : null}
+        {!isSales ? (
+          <Link
+            href={`/orders/${order.id}/insurance-mail`}
+            className="rounded-full border border-black/15 bg-[var(--sky)]/50 px-4 py-2 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            Sigorta e-postasi hazirla
           </Link>
         ) : null}
         {canSeeFinance ? (

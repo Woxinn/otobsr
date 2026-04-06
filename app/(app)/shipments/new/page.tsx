@@ -1,4 +1,4 @@
-import { createShipment } from "@/app/actions/shipments";
+﻿import { createShipment } from "@/app/actions/shipments";
 import { getCurrentUserRole, canEdit } from "@/lib/roles";
 
 export default async function NewShipmentPage({
@@ -48,9 +48,23 @@ export default async function NewShipmentPage({
             />
           </label>
           <label className="text-sm font-medium">
-            Konşimento No
+            Gemi adÄ±
             <input
-              name="reference"
+              name="vessel_name"
+              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-sm font-medium">
+            IMO
+            <input
+              name="vessel_imo"
+              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-sm font-medium">
+            Gemi bayraÄŸÄ±
+            <input
+              name="vessel_flag"
               className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
           </label>

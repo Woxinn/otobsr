@@ -53,12 +53,18 @@ export async function GET(req: Request) {
     .range(offset, offset + limit - 1);
 
   if (q.length >= 2) {
-    const tokens = q.replace(/,/g, " ").split(/\s+/).filter(Boolean);
-    if (tokens.length) {
-      const ors = tokens
-        .map((token) => ["code", "name", "brand", "description", "notes"].map((col) => `${col}.ilike.%${token}%`).join(","))
-        .join(",");
-      query = query.or(ors);
+    const tokens = q.replace(/,/g, " ").split(/\s+/).map((token) => token.trim()).filter(Boolean);
+    if (tokens.length === 1) {
+      const term = tokens[0];
+      query = query.or(
+        `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
+      );
+    } else {
+      tokens.forEach((term) => {
+        query = query.or(
+          `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
+        );
+      });
     }
   }
 

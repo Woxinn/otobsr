@@ -30,7 +30,9 @@ export async function createShipment(formData: FormData) {
     .from("shipments")
     .insert({
       file_no: fileNo,
-      reference: nullIfEmpty(formData.get("reference")),
+      vessel_name: nullIfEmpty(formData.get("vessel_name")),
+      vessel_imo: nullIfEmpty(formData.get("vessel_imo")),
+      vessel_flag: nullIfEmpty(formData.get("vessel_flag")),
       notes: nullIfEmpty(formData.get("notes")),
       tags: nullIfEmpty(formData.get("tags"))
         ? String(formData.get("tags")).split(",").map((tag) => tag.trim())
@@ -64,7 +66,9 @@ export async function updateShipment(formData: FormData) {
 
   const updatePayload: Record<string, string | string[] | null> = {
     file_no: nullIfEmpty(formData.get("file_no")),
-    reference: nullIfEmpty(formData.get("reference")),
+    vessel_name: nullIfEmpty(formData.get("vessel_name")),
+    vessel_imo: nullIfEmpty(formData.get("vessel_imo")),
+    vessel_flag: nullIfEmpty(formData.get("vessel_flag")),
     notes: nullIfEmpty(formData.get("notes")),
     tags: nullIfEmpty(formData.get("tags"))
       ? String(formData.get("tags")).split(",").map((tag) => tag.trim())

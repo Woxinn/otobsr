@@ -237,10 +237,26 @@ export default async function ShipmentEditPage({
                 />
               </label>
               <label className="block text-sm font-medium">
-                Konşimento No
+                Gemi adı
                 <input
-                  name="reference"
-                  defaultValue={shipment.reference ?? ""}
+                  name="vessel_name"
+                  defaultValue={shipment.vessel_name ?? ""}
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                IMO
+                <input
+                  name="vessel_imo"
+                  defaultValue={shipment.vessel_imo ?? ""}
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                Gemi bayrağı
+                <input
+                  name="vessel_flag"
+                  defaultValue={shipment.vessel_flag ?? ""}
                   className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
                 />
               </label>

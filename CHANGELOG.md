@@ -2,6 +2,95 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.490 - 2026-04-06
+
+- Alt sabit ulke bazli KDVsiz maliyet seridine ulke bazli birim fiyat girisi eklendi
+- Her ulke karti kendi birim fiyatiyla anlik KDVsiz maliyet sonucu verecek sekilde guncellendi
+- Genel birim fiyati tek tikla tum ulke kartlarina kopyalama aksiyonu eklendi
+
+## v0.3.489 - 2026-04-06
+
+- Maliyet ekranı ürün araması, ürünler modülündeki token bazlı filtre davranışıyla hizalandı
+- Çoklu kelime aramada her kelime için ayrı `or` filtresi uygulanarak isabet artırıldı
+- Hızlı arama önerilerinde aday ürün limiti yükseltilerek geniş veri setinde kaçırma azaltıldı
+
+## v0.3.488 - 2026-04-06
+
+- Ürün maliyet ekranı hızlı aramasında token bazlı eşleştirme geliştirildi
+- Arama artık çoklu parça sorguda (ör. `17 2100`) kod ve isimde tüm parçaları birlikte arıyor
+- Sonuçlar kod eşleşmesini öne çıkaracak şekilde skorlanıp daha doğru sıralanıyor
+
+## v0.3.487 - 2026-04-06
+
+- Ürün maliyet ekranına route değiştirmeden çalışan hızlı ürün geçişi eklendi
+- Ürün arama, son kullanılan ürünler ve favori ürünler aynı sayfada erişilebilir hale getirildi
+- Yeni `/api/products/cost-data` endpoint'i ile seçilen ürünün maliyet verisi dinamik yüklenmeye alındı
+
+## v0.3.486 - 2026-04-06
+
+- Sigorta e-posta hazirlama ekranina `Hazir alicilar` bolumu eklendi
+- Preset alicilar env'den (`INSURANCE_MAIL_PRESETS`) okunup tek tikla alici alanina ekleniyor
+- Alici birlestirme akisi duplicate adresleri otomatik temizleyecek sekilde guncellendi
+
+## v0.3.485 - 2026-04-06
+
+- Sigorta e-postası metni Türkçe karakterlerle güncellendi
+- İçerik "Merhabalar, ekteki sigorta bilgi formu doğrultusunda navlun sigortasını oluşturmanızı rica ederim." çerçevesine alındı
+- Konu ve bilgi kartı etiketlerinde Türkçe karakter kullanımı düzeltildi
+
+## v0.3.484 - 2026-04-06
+
+- Sigorta e-postasi gonderiminden sonra SweetAlert benzeri basari popup'i eklendi
+- Popup icinde gonderilen alici e-posta adresleri liste halinde gosteriliyor
+
+## v0.3.483 - 2026-04-06
+
+- Navlun sigortasi mail tasarimina marka logosu eklendi
+- Logo URL'i env ile yonetilebilir hale getirildi (`INSURANCE_MAIL_LOGO_URL` / `MAIL_BRAND_LOGO_URL`)
+- Env verilmezse uygulama domainindeki `/logo.gif` fallback olarak kullaniliyor
+
+## v0.3.482 - 2026-04-06
+
+- Navlun sigortasi e-postasi cihaz onay mailine benzer kartli bir HTML tasarima alindi
+- E-posta icerigi ortak helper ile uretilecek sekilde merkezilestirildi
+- Duzenlenebilir formdan gelen metinler HTML escape edilerek guvenli hale getirildi
+
+## v0.3.481 - 2026-04-06
+
+- Navlun sigortasi icin duzenlenebilir e-posta hazirlama sayfasi eklendi
+- Siparisten cekilen form alanlari bu ekranda degistirilebilir hale getirildi
+- Girilen alicilara Excel ekli Resend gonderimi eklendi
+- Siparis detayina `Sigorta e-postasi hazirla` aksiyonu eklendi
+
+## v0.3.480 - 2026-04-06
+
+- Navlun sigortası formundaki shipment verisi dolaylı join yerine doğrudan `shipments` sorgusuyla okunacak şekilde sertleştirildi
+- Gemi adı, IMO ve bayrak bilgilerinin shipment kaydından daha tutarlı çekilmesi sağlandı
+
+## v0.3.479 - 2026-04-06
+
+- Shipment oluşturma ve düzenleme ekranlarından konşimento alanı kaldırıldı
+- Shipment detayında konşimento bilgisi artık bağlı siparişlerden çekilip gösteriliyor
+- Navlun sigortası formu konşimento bilgisini shipment yerine doğrudan siparişten alacak şekilde netleştirildi
+
+## v0.3.478 - 2026-04-06
+
+- Shipment kayıtlarına `gemi adı`, `IMO` ve `gemi bayrağı` alanları eklendi
+- Yeni shipment ve shipment düzenleme ekranları bu alanları kaydedecek şekilde genişletildi
+- Navlun sigortası formu artık bu gemi bilgilerini shipment kaydından otomatik çekiyor
+
+## v0.3.477 - 2026-04-06
+
+- Beyanname Lab'daki manuel masraf alanlarına para birimi seçimi eklendi
+- Navlun, sigorta, damga, depo, banka ve diğer tutarları `TRY` veya sipariş para birimiyle girilebiliyor
+- Girilen tutarlar seçilen kura göre arka planda normalize edilip tabloda TL karşılığına yansıtılıyor
+
+## v0.3.476 - 2026-04-06
+
+- Sipariş detayı için navlun sigortası bilgi formu Excel exportu eklendi
+- Form, sipariş, bağlı shipment, packing özeti ve ürün kalemlerinden otomatik dolduruluyor
+- Sipariş ekranına tek tıkla indirme butonu eklendi ve download akışı route loader dışında tutuldu
+
 ## v0.3.475 - 2026-04-06
 
 - RFQ oluşturma ekranındaki ürün importu Excel dosyalarında daha toleranslı hale getirildi

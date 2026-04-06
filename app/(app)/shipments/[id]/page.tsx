@@ -96,7 +96,7 @@ export default async function ShipmentDetailPage({
 
   const { data: shipmentOrders } = await supabase
     .from("shipment_orders")
-    .select("order_id, orders(id, name, packages, weight_kg, total_amount, currency)")
+    .select("order_id, orders(id, name, consignment_no, packages, weight_kg, total_amount, currency)")
     .eq("shipment_id", shipment.id);
 
   const orderIds = shipmentOrders
@@ -257,7 +257,13 @@ export default async function ShipmentDetailPage({
               {shipment.file_no}
             </h2>
             <p className="mt-2 text-sm text-black/60">
-              Konşimento No: {shipment.reference ?? "-"}
+              Konşimento:{" "}
+              {selectedOrders.length
+                ? selectedOrders
+                    .map((order) => order.consignment_no)
+                    .filter(Boolean)
+                    .join(" / ") || "-"
+                : "-"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -331,6 +337,9 @@ export default async function ShipmentDetailPage({
             Konteyner: {shipment.container_no ?? "-"} | Seal: {shipment.seal_no ?? "-"}
           </span>
           <span>Tip: {shipment.container_type ?? "-"}</span>
+          <span>Gemi: {shipment.vessel_name ?? "-"}</span>
+          <span>IMO: {shipment.vessel_imo ?? "-"}</span>
+          <span>Bayrak: {shipment.vessel_flag ?? "-"}</span>
           <span>Çıkış: {shipment.origin_port?.name ?? "-"}</span>
           <span>Varış: {shipment.destination_port?.name ?? "-"}</span>
         </div>
@@ -348,6 +357,9 @@ export default async function ShipmentDetailPage({
           <div className="mt-4 grid gap-4 lg:grid-cols-2 text-sm">
             {[
               { label: "Forwarder", value: shipment.forwarders?.name ?? "-" },
+              { label: "Gemi adı", value: shipment.vessel_name ?? "-" },
+              { label: "IMO", value: shipment.vessel_imo ?? "-" },
+              { label: "Gemi bayrağı", value: shipment.vessel_flag ?? "-" },
               { label: "Çıkış limanı", value: shipment.origin_port?.name ?? "-" },
               { label: "Varış limanı", value: shipment.destination_port?.name ?? "-" },
               { label: "ETD (plan)", value: formatDate(shipment.etd_planned) },
@@ -439,6 +451,7 @@ export default async function ShipmentDetailPage({
                 >
                   <p className="font-semibold">{order.name ?? "-"}</p>
                   <p className="mt-2 text-xs text-black/60">
+                    Konşimento: {order.consignment_no ?? "-"} |{" "}
                     {formatNumber(order.packages ?? null, 0)} koli | {formatNumber(order.weight_kg)} kg | {formatMoney(order.total_amount ?? null, order.currency)}
                   </p>
                   {missingOrderDocs.length ? (
