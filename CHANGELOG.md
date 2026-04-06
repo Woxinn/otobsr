@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.497 - 2026-04-06
+
+- Inbound sigorta police importunda ek filtresi `Poliçe_TR` yerine `Police_` prefix'ine genislatildi
+- Tek ek yerine `Police_` ile baslayan tum ekler ayni siparise navlun sigortasi belgesi olarak yuklenir hale getirildi
+- Ayni dosya adina sahip mevcut kayitlar duplicate kabul edilip atlanacak sekilde idempotentlestirildi
+
 ## v0.3.496 - 2026-04-06
 
 - Sigorta mail subject eslestirmesi `RE:/FW:` on-eklerini temizleyecek sekilde sertlestirildi

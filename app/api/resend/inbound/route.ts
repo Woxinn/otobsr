@@ -33,7 +33,7 @@ const looksLikePoliceAttachment = (name: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
-    .startsWith("police_tr");
+    .startsWith("police_");
 
 export async function POST(req: NextRequest) {
   const enabled = process.env.INSURANCE_POLICY_AUTO_IMPORT_ENABLED === "true";
@@ -56,43 +56,52 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ skipped: true, reason: "Email verisi eksik." });
   }
 
-  const attachmentMeta = eventAttachments.find((a) =>
+  const attachmentMetas = eventAttachments.filter((a) =>
     looksLikePoliceAttachment(String(a?.filename ?? ""))
   );
-  if (!attachmentMeta?.id || !attachmentMeta.filename) {
-    return NextResponse.json({ skipped: true, reason: "Poliçe_TR eki yok." });
+  if (!attachmentMetas.length) {
+    return NextResponse.json({ skipped: true, reason: "Police_ eki yok." });
   }
 
   try {
-    const attachmentDetail = await resendApiGet(
-      `/emails/receiving/${emailId}/attachments/${attachmentMeta.id}`
-    );
-    const downloadUrl =
-      attachmentDetail?.data?.download_url ??
-      attachmentDetail?.download_url ??
-      attachmentDetail?.data?.url ??
-      attachmentDetail?.url ??
-      null;
+    const payloadAttachments: Array<{
+      filename: string;
+      contentBase64: string;
+      contentType?: string;
+    }> = [];
 
-    if (!downloadUrl) {
-      return NextResponse.json({ skipped: true, reason: "Attachment download URL bulunamadi." });
+    for (const attachmentMeta of attachmentMetas) {
+      if (!attachmentMeta.id || !attachmentMeta.filename) continue;
+      const attachmentDetail = await resendApiGet(
+        `/emails/receiving/${emailId}/attachments/${attachmentMeta.id}`
+      );
+      const downloadUrl =
+        attachmentDetail?.data?.download_url ??
+        attachmentDetail?.download_url ??
+        attachmentDetail?.data?.url ??
+        attachmentDetail?.url ??
+        null;
+      if (!downloadUrl) continue;
+
+      const fileRes = await fetch(String(downloadUrl), { cache: "no-store" });
+      if (!fileRes.ok) {
+        return NextResponse.json({ error: "Attachment indirilemedi." }, { status: 500 });
+      }
+      const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+      payloadAttachments.push({
+        filename: attachmentMeta.filename,
+        contentBase64: fileBuffer.toString("base64"),
+        contentType: attachmentMeta.content_type ?? "application/octet-stream",
+      });
     }
 
-    const fileRes = await fetch(String(downloadUrl), { cache: "no-store" });
-    if (!fileRes.ok) {
-      return NextResponse.json({ error: "Attachment indirilemedi." }, { status: 500 });
+    if (!payloadAttachments.length) {
+      return NextResponse.json({ skipped: true, reason: "Police_ eki indirilemedi." });
     }
-    const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
 
     const importResult = await importInsurancePolicyFromPayload({
       subject,
-      attachments: [
-        {
-          filename: attachmentMeta.filename,
-          contentBase64: fileBuffer.toString("base64"),
-          contentType: attachmentMeta.content_type ?? "application/octet-stream",
-        },
-      ],
+      attachments: payloadAttachments,
     });
 
     if (!importResult.ok) {

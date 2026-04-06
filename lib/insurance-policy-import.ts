@@ -28,9 +28,9 @@ const stripDataPrefix = (base64: string) => {
   return idx >= 0 ? base64.slice(idx + marker.length) : base64;
 };
 
-const startsWithPoliceTr = (filename: string) => {
+const startsWithPolicePrefix = (filename: string) => {
   const normalized = normalizeText(filename).replace(/\s+/g, "_");
-  return normalized.startsWith("police_tr");
+  return normalized.startsWith("police_") || normalized.startsWith("police-tr");
 };
 
 async function resolveOrderFromSubject(
@@ -99,16 +99,16 @@ export async function importInsurancePolicyFromPayload(input: {
     return { ok: false as const, status: 400, error: "subject ve attachments zorunlu." };
   }
 
-  const policeAttachment = attachments.find((item) => {
+  const policeAttachments = attachments.filter((item) => {
     const filename = String(item.filename ?? "");
-    return filename ? startsWithPoliceTr(filename) : false;
+    return filename ? startsWithPolicePrefix(filename) : false;
   });
-  if (!policeAttachment?.contentBase64 || !policeAttachment?.filename) {
+  if (!policeAttachments.length) {
     return {
       ok: false as const,
       status: 200,
       skipped: true,
-      reason: "Poliçe_TR eki bulunamadi.",
+      reason: "Police_ ile baslayan ek bulunamadi.",
     };
   }
 
@@ -133,52 +133,69 @@ export async function importInsurancePolicyFromPayload(input: {
     return { ok: false as const, status: 500, error: "NAVLUN_SIGORTA belge tipi bulunamadi." };
   }
 
-  const { data: existingDoc } = await admin
-    .from("order_documents")
-    .select("id")
-    .eq("order_id", order.id)
-    .eq("document_type_id", insuranceDocType.id)
-    .limit(1)
-    .maybeSingle();
+  const uploadedFiles: string[] = [];
+  const skippedFiles: string[] = [];
+  const today = new Date().toISOString().slice(0, 10);
 
-  if (existingDoc?.id) {
+  for (const attachment of policeAttachments) {
+    if (!attachment.filename || !attachment.contentBase64) continue;
+    const originalName = attachment.filename;
+
+    const { data: duplicateDoc } = await admin
+      .from("order_documents")
+      .select("id")
+      .eq("order_id", order.id)
+      .eq("document_type_id", insuranceDocType.id)
+      .eq("file_name", originalName)
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateDoc?.id) {
+      skippedFiles.push(originalName);
+      continue;
+    }
+
+    const safeName = sanitizeFileName(originalName);
+    const storagePath = `orders/${order.id}/insurance-auto/${Date.now()}-${safeName}`;
+    const binary = Buffer.from(stripDataPrefix(attachment.contentBase64), "base64");
+
+    const { error: uploadError } = await admin.storage.from("documents").upload(storagePath, binary, {
+      contentType: attachment.contentType || "application/octet-stream",
+      upsert: false,
+    });
+    if (uploadError) return { ok: false as const, status: 500, error: uploadError.message };
+
+    const { error: insertError } = await admin.from("order_documents").insert({
+      order_id: order.id,
+      storage_path: storagePath,
+      file_name: originalName,
+      document_type_id: insuranceDocType.id,
+      status: "Geldi",
+      received_at: today,
+      notes: `Otomatik mail importu | subject: ${subject}`,
+    });
+    if (insertError) return { ok: false as const, status: 500, error: insertError.message };
+
+    uploadedFiles.push(originalName);
+  }
+
+  if (!uploadedFiles.length) {
     return {
       ok: false as const,
       status: 200,
       skipped: true,
-      reason: "Sipariste navlun sigorta belgesi zaten var.",
+      reason: "Police_ ekleri zaten yuklu.",
+      skippedFiles,
     };
   }
-
-  const safeName = sanitizeFileName(policeAttachment.filename);
-  const storagePath = `orders/${order.id}/insurance-auto/${Date.now()}-${safeName}`;
-  const binary = Buffer.from(stripDataPrefix(policeAttachment.contentBase64), "base64");
-
-  const { error: uploadError } = await admin.storage.from("documents").upload(storagePath, binary, {
-    contentType: policeAttachment.contentType || "application/octet-stream",
-    upsert: false,
-  });
-
-  if (uploadError) return { ok: false as const, status: 500, error: uploadError.message };
-
-  const today = new Date().toISOString().slice(0, 10);
-  const { error: insertError } = await admin.from("order_documents").insert({
-    order_id: order.id,
-    storage_path: storagePath,
-    file_name: policeAttachment.filename,
-    document_type_id: insuranceDocType.id,
-    status: "Geldi",
-    received_at: today,
-    notes: `Otomatik mail importu | subject: ${subject}`,
-  });
-  if (insertError) return { ok: false as const, status: 500, error: insertError.message };
 
   return {
     ok: true as const,
     status: 200,
     orderId: order.id,
     orderName: order.name ?? null,
-    uploadedFile: policeAttachment.filename,
-    storagePath,
+    uploadedCount: uploadedFiles.length,
+    uploadedFiles,
+    skippedFiles,
   };
 }
