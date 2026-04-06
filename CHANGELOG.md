@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.475 - 2026-04-06
+
+- RFQ oluşturma ekranındaki ürün importu Excel dosyalarında daha toleranslı hale getirildi
+- `.xlsx`, `.xls`, `.xlsm`, `.xlsb` ve `.csv` dosyaları aynı yükleme alanından kabul ediliyor
+- Başlıksız dosyalarda ilk sütun ürün kodu, ikinci sütun adet olarak okunacak şekilde esneklik eklendi
+
 ## v0.3.474 - 2026-04-03
 
 - `stokhar` kaynaklı canlı stok sorgusu programdaki akışa yaklaştırıldı

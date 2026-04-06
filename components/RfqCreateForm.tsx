@@ -184,6 +184,36 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
     return Array.from(bucket.values());
   };
 
+  const parseSheetRows = (rows: (string | number)[][]) => {
+    const normalizedRows = rows
+      .map((row) => row.map((cell) => String(cell ?? "").trim()))
+      .filter((row) => row.some(Boolean));
+
+    if (!normalizedRows.length) return [] as { code: string; qty: number }[];
+
+    const firstRow = normalizedRows[0].map((cell) => cell.toLowerCase());
+    const codeIdx = firstRow.findIndex((h) =>
+      ["code", "kod", "product_code", "ürün kodu", "urun kodu"].includes(h)
+    );
+    const qtyIdx = firstRow.findIndex((h) => ["qty", "quantity", "adet", "miktar"].includes(h));
+    const hasHeader = codeIdx >= 0;
+    const effectiveCodeIdx = hasHeader ? codeIdx : 0;
+    const effectiveQtyIdx = hasHeader ? qtyIdx : 1;
+    const dataRows = hasHeader ? normalizedRows.slice(1) : normalizedRows;
+
+    return dataRows
+      .map((row) => {
+        const code = String(row[effectiveCodeIdx] ?? "").trim();
+        const qtyRaw = effectiveQtyIdx >= 0 ? row[effectiveQtyIdx] : "1";
+        const qty = Number(qtyRaw ?? 1);
+        return {
+          code,
+          qty: Number.isFinite(qty) && qty > 0 ? qty : 1,
+        };
+      })
+      .filter((row) => row.code);
+  };
+
   const applyParsed = async (parsed: { code: string; qty: number }[]) => {
     if (!parsed.length) {
       setMessage("Liste boş");
@@ -235,24 +265,15 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
     if (!file) return;
     try {
       const name = file.name.toLowerCase();
-      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+      if ([".xlsx", ".xls", ".xlsm", ".xlsb", ".csv"].some((ext) => name.endsWith(ext))) {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         if (!sheet) throw new Error("Sheet bulunamadı");
         const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, defval: "" });
         if (!rows.length) throw new Error("Dosya boş");
-        const headers = rows[0].map((h) => String(h ?? "").trim().toLowerCase());
-        const codeIdx = headers.findIndex((h) => h === "code" || h === "kod" || h === "product_code");
-        const qtyIdx = headers.findIndex((h) => h === "qty" || h === "quantity" || h === "adet");
-        if (codeIdx === -1) throw new Error("İlk satırda 'code' başlığı gerekli");
-        const parsed: { code: string; qty: number }[] = [];
-        rows.slice(1).forEach((r) => {
-          const code = String(r[codeIdx] ?? "").trim();
-          const qtyRaw = qtyIdx >= 0 ? r[qtyIdx] : 1;
-          const qty = Number(qtyRaw ?? 1);
-          if (code) parsed.push({ code, qty: Number.isFinite(qty) && qty > 0 ? qty : 1 });
-        });
+        const parsed = parseSheetRows(rows);
+        if (!parsed.length) throw new Error("Dosyada okunabilir ürün kodu bulunamadı");
         await applyParsed(parsed);
       } else {
         const text = await file.text();
@@ -535,12 +556,12 @@ export default function RfqCreateForm({ products, suppliers, gtips }: Props) {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/50">Excel / CSV yükle</p>
               <input
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.xlsm,.xlsb,.csv"
                 className="block w-full text-sm text-black file:mr-3 file:rounded-full file:border file:border-black/15 file:bg-white file:px-3 file:py-1 file:text-xs file:font-semibold hover:file:bg-black/5"
                 onChange={(e) => handleFileUpload(e.target.files?.[0] ?? null)}
               />
               <p className="text-[11px] text-black/50">
-                İlk satır başlık olmalı: <code>code</code>, <code>qty</code>
+                Excel ve CSV kabul eder. İlk satırda <code>code</code>/<code>kod</code> ve isteğe bağlı <code>qty</code>/<code>adet</code> olabilir; başlık yoksa ilk iki sütun kod ve adet olarak okunur.
               </p>
             </div>
           </div>
