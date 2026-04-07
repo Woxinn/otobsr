@@ -53,59 +53,43 @@ async function resolveOrderFromSubject(
     new Set([subjectPart, tailPart, ...regexTerms].map((item) => String(item ?? "").trim()).filter(Boolean))
   );
 
-  for (const term of candidateTerms) {
-    const { data: byName } = await admin
-      .from("orders")
-      .select("id, name, code, created_at")
-      .ilike("name", `%${term}%`)
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (byName?.[0]) return byName[0];
-
-    const { data: byCode } = await admin
-      .from("orders")
-      .select("id, name, code, created_at")
-      .ilike("code", `%${term}%`)
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (byCode?.[0]) return byCode[0];
-
-    // Hyphen/space variance: ETKT-30 -> tokens [ETKT, 30]
-    const tokenParts = term.split(/[^a-zA-Z0-9]+/).map((p) => p.trim()).filter(Boolean);
-    if (tokenParts.length >= 2) {
-      let tokenQuery = admin
-        .from("orders")
-        .select("id, name, code, created_at")
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      tokenParts.forEach((token) => {
-        tokenQuery = tokenQuery.or(`name.ilike.%${token}%,code.ilike.%${token}%`);
-      });
-
-      const { data: byTokenized } = await tokenQuery;
-      if (byTokenized?.[0]) return byTokenized[0];
-    }
-  }
-
   const { data: recentOrders } = await admin
     .from("orders")
     .select("id, name, code, created_at")
     .order("created_at", { ascending: false })
-    .limit(1200);
+    .limit(5000);
 
   const normalizedSubject = normalizeText(cleaned);
+  const compact = (value: string) => normalizeText(value).replace(/\s+/g, "");
+  const compactSubject = compact(cleaned);
+  const compactTerms = Array.from(new Set(candidateTerms.map((term) => compact(term)).filter(Boolean)));
+
   const candidates = (recentOrders ?? [])
     .map((order) => {
       const name = String(order.name ?? "").trim();
       const code = String(order.code ?? "").trim();
       const nName = normalizeText(name);
       const nCode = normalizeText(code);
-      const matched =
-        (nName && normalizedSubject.includes(nName)) ||
-        (nCode && normalizedSubject.includes(nCode));
-      const score = Math.max(nName.length, nCode.length);
-      return { order, matched, score };
+      const cName = compact(name);
+      const cCode = compact(code);
+
+      let score = 0;
+      if (!cName && !cCode) return { order, matched: false, score: 0 };
+
+      // Exact first: ETKT-30, ETKT 30, etkt30 varyasyonlarini ayni kabul et.
+      if (compactTerms.some((term) => term && (cCode === term || cName === term))) score += 1000;
+
+      // Subject icinde gecen kod/ad.
+      if (cCode && (normalizedSubject.includes(nCode) || compactSubject.includes(cCode))) score += 300;
+      if (cName && (normalizedSubject.includes(nName) || compactSubject.includes(cName))) score += 120;
+
+      // Token bazli fallback.
+      const tokenMatchCount = compactTerms.filter(
+        (term) => term && ((cCode && cCode.includes(term)) || (cName && cName.includes(term)))
+      ).length;
+      score += tokenMatchCount * 40;
+
+      return { order, matched: score > 0, score };
     })
     .filter((row) => row.matched)
     .sort((a, b) => b.score - a.score);

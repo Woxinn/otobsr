@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.500 - 2026-04-07
+
+- Inbound siparis eslestirme algoritmasi query zinciri yerine tek havuzda normalize+skor modeline gecirildi
+- `ETKT-30`, `ETKT 30`, `etkt30` varyasyonlari ayni kod kabul edilerek exact eslesme agirligi ciddi artirildi
+- Subject taramasinda 5000 siparise kadar aday alinip konu icindeki kod/ad ve token parcalariyla puanlanarak en isabetli siparis seciliyor
+
 ## v0.3.499 - 2026-04-07
 
 - Inbound siparis eslestirmesine kod parcali arama eklendi (`ETKT-30` -> `ETKT` + `30`)
