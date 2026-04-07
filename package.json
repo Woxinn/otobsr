@@ -1,6 +1,6 @@
 {
   "name": "otobsrimportv",
-  "version": "0.3.498",
+  "version": "0.3.499",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",

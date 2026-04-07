@@ -2,6 +2,11 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.499 - 2026-04-07
+
+- Inbound siparis eslestirmesine kod parcali arama eklendi (`ETKT-30` -> `ETKT` + `30`)
+- Tire/ayrac farklarinda (`-`, bosluk, farkli unicode ayrac) konu-siparis eslesmesi daha toleransli hale getirildi
+
 ## v0.3.498 - 2026-04-07
 
 - Inbound subjectten siparis bulma akisi genisletildi: konu kuyrugu, son `-` parcasi ve alfanumerik kod adaylariyla ek arama yapiliyor

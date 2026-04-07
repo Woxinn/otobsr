@@ -69,6 +69,23 @@ async function resolveOrderFromSubject(
       .order("created_at", { ascending: false })
       .limit(1);
     if (byCode?.[0]) return byCode[0];
+
+    // Hyphen/space variance: ETKT-30 -> tokens [ETKT, 30]
+    const tokenParts = term.split(/[^a-zA-Z0-9]+/).map((p) => p.trim()).filter(Boolean);
+    if (tokenParts.length >= 2) {
+      let tokenQuery = admin
+        .from("orders")
+        .select("id, name, code, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      tokenParts.forEach((token) => {
+        tokenQuery = tokenQuery.or(`name.ilike.%${token}%,code.ilike.%${token}%`);
+      });
+
+      const { data: byTokenized } = await tokenQuery;
+      if (byTokenized?.[0]) return byTokenized[0];
+    }
   }
 
   const { data: recentOrders } = await admin
