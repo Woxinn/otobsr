@@ -45,12 +45,19 @@ async function resolveOrderFromSubject(
   const subjectPart = cleaned.includes(" - ")
     ? cleaned.split(" - ").slice(1).join(" - ").trim()
     : cleaned;
+  const tailPart = cleaned.includes("-")
+    ? cleaned.split("-").slice(-1).join("-").trim()
+    : "";
+  const regexTerms = cleaned.match(/[A-Z0-9][A-Z0-9-]{2,}/gi) ?? [];
+  const candidateTerms = Array.from(
+    new Set([subjectPart, tailPart, ...regexTerms].map((item) => String(item ?? "").trim()).filter(Boolean))
+  );
 
-  if (subjectPart) {
+  for (const term of candidateTerms) {
     const { data: byName } = await admin
       .from("orders")
       .select("id, name, code, created_at")
-      .ilike("name", `%${subjectPart}%`)
+      .ilike("name", `%${term}%`)
       .order("created_at", { ascending: false })
       .limit(1);
     if (byName?.[0]) return byName[0];
@@ -58,7 +65,7 @@ async function resolveOrderFromSubject(
     const { data: byCode } = await admin
       .from("orders")
       .select("id, name, code, created_at")
-      .ilike("code", `%${subjectPart}%`)
+      .ilike("code", `%${term}%`)
       .order("created_at", { ascending: false })
       .limit(1);
     if (byCode?.[0]) return byCode[0];
@@ -68,7 +75,7 @@ async function resolveOrderFromSubject(
     .from("orders")
     .select("id, name, code, created_at")
     .order("created_at", { ascending: false })
-    .limit(400);
+    .limit(1200);
 
   const normalizedSubject = normalizeText(cleaned);
   const candidates = (recentOrders ?? [])
@@ -119,7 +126,7 @@ export async function importInsurancePolicyFromPayload(input: {
       ok: false as const,
       status: 200,
       skipped: true,
-      reason: "Konuya gore siparis bulunamadi.",
+      reason: `Konuya gore siparis bulunamadi. Subject: ${subject}`,
     };
   }
 

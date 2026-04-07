@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.498 - 2026-04-07
+
+- Inbound subjectten siparis bulma akisi genisletildi: konu kuyrugu, son `-` parcasi ve alfanumerik kod adaylariyla ek arama yapiliyor
+- Siparis aday havuzu buyutulerek (1200 kayit) gecmis siparislerde eslesme kacirma riski azaltildi
+- Eslesme olmazsa donen sebep metnine parse edilen subject eklenerek debug kolaylastirildi
+
 ## v0.3.497 - 2026-04-06
 
 - Inbound sigorta police importunda ek filtresi `Poliçe_TR` yerine `Police_` prefix'ine genislatildi
