@@ -64,6 +64,17 @@ async function resolveOrderFromSubject(
   const compactSubject = compact(cleaned);
   const compactTerms = Array.from(new Set(candidateTerms.map((term) => compact(term)).filter(Boolean)));
 
+  // 1) Global DB search first (old siparisler 5000 limitine takilmasin)
+  for (const term of candidateTerms) {
+    const { data: directMatch } = await admin
+      .from("orders")
+      .select("id, name, code, created_at")
+      .or(`name.ilike.%${term}%,code.ilike.%${term}%`)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (directMatch?.[0]) return directMatch[0];
+  }
+
   const candidates = (recentOrders ?? [])
     .map((order) => {
       const name = String(order.name ?? "").trim();

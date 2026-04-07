@@ -2,6 +2,11 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.501 - 2026-04-07
+
+- Inbound siparis eslestirmesine global DB taramasi geri eklendi; 5000 kayit sinirina takilan eski siparisler icin eslesme geri kazanildi
+- Subjectten uretilen adaylar artik once `orders.name/code ilike` ile dogrudan sorgulanip, sonra skor fallback'i calistirilir
+
 ## v0.3.500 - 2026-04-07
 
 - Inbound siparis eslestirme algoritmasi query zinciri yerine tek havuzda normalize+skor modeline gecirildi
