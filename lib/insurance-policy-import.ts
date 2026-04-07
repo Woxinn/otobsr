@@ -111,6 +111,7 @@ async function resolveOrderFromSubject(
 export async function importInsurancePolicyFromPayload(input: {
   subject: string;
   attachments: InsuranceImportAttachment[];
+  orderId?: string;
 }) {
   const subject = String(input.subject ?? "").trim();
   const attachments = input.attachments ?? [];
@@ -132,7 +133,14 @@ export async function importInsurancePolicyFromPayload(input: {
   }
 
   const admin = createSupabaseAdminClient();
-  const order = await resolveOrderFromSubject(admin, subject);
+  const order = input.orderId
+    ? await admin
+        .from("orders")
+        .select("id, name, code, created_at")
+        .eq("id", input.orderId)
+        .maybeSingle()
+        .then((r) => r.data)
+    : await resolveOrderFromSubject(admin, subject);
   if (!order?.id) {
     return {
       ok: false as const,

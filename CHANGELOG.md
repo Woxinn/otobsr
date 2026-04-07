@@ -2,6 +2,14 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.502 - 2026-04-07
+
+- Yari-otomatik sigorta policy akisi eklendi: inbound mailler DB'ye yakalanip siparis bazli manuel import edilebilir hale getirildi
+- Yeni tablolar: `insurance_inbound_mails`, `insurance_inbound_attachments`
+- Yeni API'ler: `GET /api/insurance-mail/inbox`, `POST /api/insurance-mail/inbox/import`
+- Sigorta mail hazirlama sayfasina gelen maillerden secip mevcut siparise tek tikla `NAVLUN_SIGORTA` belge yukleme paneli eklendi
+- Resend inbound route'u auto-import kapali olsa bile inbox yakalama yapacak sekilde ayrildi (`INSURANCE_POLICY_INBOX_CAPTURE_ENABLED`)
+
 ## v0.3.501 - 2026-04-07
 
 - Inbound siparis eslestirmesine global DB taramasi geri eklendi; 5000 kayit sinirina takilan eski siparisler icin eslesme geri kazanildi

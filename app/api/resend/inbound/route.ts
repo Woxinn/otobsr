@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { importInsurancePolicyFromPayload } from "@/lib/insurance-policy-import";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,9 +37,10 @@ const looksLikePoliceAttachment = (name: string) =>
     .startsWith("police_");
 
 export async function POST(req: NextRequest) {
-  const enabled = process.env.INSURANCE_POLICY_AUTO_IMPORT_ENABLED === "true";
-  if (!enabled) {
-    return NextResponse.json({ error: "Otomatik sigorta importu kapali." }, { status: 403 });
+  const captureEnabled =
+    process.env.INSURANCE_POLICY_INBOX_CAPTURE_ENABLED !== "false";
+  if (!captureEnabled) {
+    return NextResponse.json({ error: "Sigorta inbox yakalama kapali." }, { status: 403 });
   }
 
   const event = await req.json().catch(() => null);
@@ -48,6 +50,13 @@ export async function POST(req: NextRequest) {
 
   const subject = String(event?.data?.subject ?? "").trim();
   const emailId = String(event?.data?.email_id ?? "").trim();
+  const fromEmail = String(
+    event?.data?.from?.email ??
+      event?.data?.from_email ??
+      event?.data?.from ??
+      ""
+  ).trim();
+  const receivedAt = String(event?.data?.created_at ?? event?.created_at ?? "").trim();
   const eventAttachments = (Array.isArray(event?.data?.attachments)
     ? event.data.attachments
     : []) as ResendReceivedAttachment[];
@@ -59,8 +68,47 @@ export async function POST(req: NextRequest) {
   const attachmentMetas = eventAttachments.filter((a) =>
     looksLikePoliceAttachment(String(a?.filename ?? ""))
   );
+
+  const admin = createSupabaseAdminClient();
+  const { data: mailRow, error: mailError } = await admin
+    .from("insurance_inbound_mails")
+    .upsert(
+      {
+        provider_message_id: emailId,
+        subject,
+        from_email: fromEmail || null,
+        received_at: receivedAt || null,
+        has_policy_attachment: attachmentMetas.length > 0,
+        policy_attachment_count: attachmentMetas.length,
+        raw_payload: event?.data ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "provider_message_id" }
+    )
+    .select("id")
+    .single();
+  if (mailError || !mailRow?.id) {
+    return NextResponse.json({ error: mailError?.message ?? "Inbound mail kaydi yapilamadi." }, { status: 500 });
+  }
+
+  for (const attachment of eventAttachments) {
+    if (!attachment?.id) continue;
+    await admin
+      .from("insurance_inbound_attachments")
+      .upsert(
+        {
+          mail_id: mailRow.id,
+          provider_attachment_id: attachment.id,
+          filename: attachment.filename ?? null,
+          content_type: attachment.content_type ?? null,
+          is_policy_candidate: looksLikePoliceAttachment(String(attachment.filename ?? "")),
+        },
+        { onConflict: "mail_id,provider_attachment_id" }
+      );
+  }
+
   if (!attachmentMetas.length) {
-    return NextResponse.json({ skipped: true, reason: "Police_ eki yok." });
+    return NextResponse.json({ ok: true, captured: true, skipped: true, reason: "Police_ eki yok." });
   }
 
   try {
@@ -99,17 +147,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true, reason: "Police_ eki indirilemedi." });
     }
 
-    const importResult = await importInsurancePolicyFromPayload({
-      subject,
-      attachments: payloadAttachments,
-    });
+    const autoImportEnabled = process.env.INSURANCE_POLICY_AUTO_IMPORT_ENABLED === "true";
+    if (!autoImportEnabled) {
+      return NextResponse.json({
+        ok: true,
+        captured: true,
+        skipped: true,
+        reason: "Yari-otomatik mod: mail kaydedildi, manuel eslestirme bekleniyor.",
+      });
+    }
+
+    const importResult = await importInsurancePolicyFromPayload({ subject, attachments: payloadAttachments });
 
     if (!importResult.ok) {
+      await admin
+        .from("insurance_inbound_mails")
+        .update({
+          import_status: "failed",
+          import_note: (importResult as any).reason ?? (importResult as any).error ?? "Import basarisiz",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", mailRow.id);
       const { status, ...payload } = importResult;
       return NextResponse.json(payload, { status });
     }
+    await admin
+      .from("insurance_inbound_mails")
+      .update({
+        import_status: "imported",
+        imported_order_id: (importResult as any).orderId ?? null,
+        imported_at: new Date().toISOString(),
+        import_note: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", mailRow.id);
     return NextResponse.json(importResult, { status: 200 });
   } catch (error) {
+    await admin
+      .from("insurance_inbound_mails")
+      .update({
+        import_status: "failed",
+        import_note: error instanceof Error ? error.message : "Inbound isleme hatasi",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", mailRow.id);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Inbound isleme hatasi" },
       { status: 500 }

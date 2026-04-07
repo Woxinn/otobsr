@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import InsuranceMailComposer from "@/components/InsuranceMailComposer";
+import InsuranceInboxImporter from "@/components/InsuranceInboxImporter";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import { getInsuranceFormData } from "@/lib/insurance-form";
 
@@ -54,6 +55,7 @@ export default async function InsuranceMailPage({
         initialPayload={data.payload}
         presets={parseRecipientPresets()}
       />
+      <InsuranceInboxImporter orderId={data.orderId} />
     </section>
   );
 }
