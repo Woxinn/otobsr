@@ -247,7 +247,7 @@ export default function ProductForm({
                   {attr.is_required ? " *" : ""}
                   <input
                     type={attr.value_type === "number" ? "number" : "text"}
-                    step={attr.value_type === "number" ? "0.01" : undefined}
+                    step={attr.value_type === "number" ? "any" : undefined}
                     name={`attr_${attr.id}`}
                     defaultValue={defaultValue ?? ""}
                     className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
@@ -316,7 +316,7 @@ export default function ProductForm({
                 <input
                   name={`extra_value_${index}`}
                   type={extra.value_type === "number" ? "number" : "text"}
-                  step={extra.value_type === "number" ? "0.01" : undefined}
+                  step={extra.value_type === "number" ? "any" : undefined}
                   value={extra.value}
                   onChange={(event) =>
                     updateExtra(index, { value: event.target.value })

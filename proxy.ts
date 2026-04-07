@@ -27,10 +27,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/api/resend/inbound") || pathname.startsWith("/api/insurance-mail/ingest")) {
-    return NextResponse.next();
-  }
-
   const hasAccessToken = request.cookies
     .getAll()
     .some((cookie) => cookie.name.includes("auth-token"));

@@ -1075,6 +1075,7 @@ export async function completeMissingOrderProducts(formData: FormData) {
     const rowMeta: {
       code: string;
       name: string;
+      matched_product_id: string | null;
       group_id: string | null;
       group_name: string | null;
       line_no: number | null;
@@ -1093,6 +1094,11 @@ export async function completeMissingOrderProducts(formData: FormData) {
   >();
 
   rows.forEach((row, index) => {
+    const useExisting = nullIfEmpty(formData.get(`row_${index}_use_existing`)) === "1";
+    const matchedProductId = nullIfEmpty(formData.get(`row_${index}_match_product_id`));
+    if (useExisting && !matchedProductId) {
+      redirect(`/orders/${orderId}?toast=missing-products-error`);
+    }
     const name =
       nullIfEmpty(formData.get(`row_${index}_name`)) ??
       row.name ??
@@ -1100,7 +1106,7 @@ export async function completeMissingOrderProducts(formData: FormData) {
       "-";
     const groupId = nullIfEmpty(formData.get(`row_${index}_group_id`));
     const groupName = nullIfEmpty(formData.get(`row_${index}_new_group`));
-    if (!groupId && groupName) {
+    if (!matchedProductId && !groupId && groupName) {
       requestedGroupNames.add(groupName.toLowerCase());
     }
     const unitPrice =
@@ -1192,6 +1198,7 @@ export async function completeMissingOrderProducts(formData: FormData) {
       rowMeta.push({
         code: row.code,
         name,
+        matched_product_id: matchedProductId,
         group_id: groupId,
         group_name: groupName ?? null,
         line_no: row.line_no ?? null,
@@ -1229,27 +1236,32 @@ export async function completeMissingOrderProducts(formData: FormData) {
     group_id: string | null;
     unit_price: number | null;
     notes: string | null;
-  }[] = rowMeta.map((row) => ({
-    code: row.code,
-    name: row.name,
-    group_id:
-      row.group_id ??
-      (row.group_name ? groupIdByName.get(row.group_name.toLowerCase()) ?? null : null),
-    unit_price: row.unit_price,
-    notes: row.notes,
-  }));
+  }[] = rowMeta
+    .filter((row) => !row.matched_product_id)
+    .map((row) => ({
+      code: row.code,
+      name: row.name,
+      group_id:
+        row.group_id ??
+        (row.group_name ? groupIdByName.get(row.group_name.toLowerCase()) ?? null : null),
+      unit_price: row.unit_price,
+      notes: row.notes,
+    }));
 
-  const { data: products, error: insertError } = await supabase
-    .from("products")
-    .upsert(productInserts, { onConflict: "code" })
-    .select("id, code");
+  let productByCode = new Map<string, { id: string; code: string }>();
+  if (productInserts.length) {
+    const { data: products, error: insertError } = await supabase
+      .from("products")
+      .upsert(productInserts, { onConflict: "code" })
+      .select("id, code");
 
-  if (insertError || !products) {
-    console.error("Missing products create failed", insertError);
-    redirect(`/orders/${orderId}?toast=missing-products-error`);
+    if (insertError || !products) {
+      console.error("Missing products create failed", insertError);
+      redirect(`/orders/${orderId}?toast=missing-products-error`);
+    }
+
+    productByCode = new Map(products.map((p) => [p.code, p]));
   }
-
-  const productByCode = new Map(products.map((p) => [p.code, p]));
 
   const attributeValuesPayload: {
     product_id: string;
@@ -1280,50 +1292,50 @@ export async function completeMissingOrderProducts(formData: FormData) {
   }[] = [];
 
   rowMeta.forEach((row, index) => {
-    const product = productByCode.get(rows[index]?.code);
-    if (!product) return;
+    const productId = row.matched_product_id ?? productByCode.get(rows[index]?.code)?.id ?? null;
+    if (!productId) return;
 
-    const catAttrs = catAttributesByCode.get(rows[index]?.code) ?? [];
-    catAttrs.forEach((attr) => {
-      attributeValuesPayload.push({
-        product_id: product.id,
-        attribute_id: attr.attribute_id,
-        value_text: attr.value_text,
-        value_number: attr.value_number,
+    if (!row.matched_product_id) {
+      const catAttrs = catAttributesByCode.get(rows[index]?.code) ?? [];
+      catAttrs.forEach((attr) => {
+        attributeValuesPayload.push({
+          product_id: productId,
+          attribute_id: attr.attribute_id,
+          value_text: attr.value_text,
+          value_number: attr.value_number,
+        });
       });
-    });
+    }
 
-      orderItemsPayload.push({
-        order_id: orderId,
-        product_id: product.id,
-        name: rows[index]?.name ?? product.code,
-        line_no: row.line_no ?? null,
-        quantity: row.quantity,
-        unit_price: normalizeUnitPrice(productInserts[index]?.unit_price ?? null),
-        total_amount:
-        normalizeLineAmount(rows[index]?.total_amount) ??
-        ((normalizeUnitPrice(productInserts[index]?.unit_price ?? null)) !== null &&
-        row.quantity !== null
-          ? normalizeLineAmount(
-              (normalizeUnitPrice(productInserts[index]?.unit_price ?? null) as number) *
-                row.quantity
-            )
+    orderItemsPayload.push({
+      order_id: orderId,
+      product_id: productId,
+      name: row.name ?? rows[index]?.name ?? rows[index]?.code ?? null,
+      line_no: row.line_no ?? null,
+      quantity: row.quantity,
+      unit_price: row.unit_price,
+      total_amount:
+        normalizeLineAmount(row.total_amount) ??
+        (row.unit_price !== null && row.quantity !== null
+          ? normalizeLineAmount(row.unit_price * row.quantity)
           : null),
       net_weight_kg: row.net_weight_kg,
       gross_weight_kg: row.gross_weight_kg,
       notes: row.notes,
     });
 
-    row.attrs.forEach((attr) => {
-      extraAttributesPayload.push({
-        product_id: product.id,
-        name: attr.name,
-        unit: attr.unit,
-        value_type: attr.valueType,
-        value_text: attr.valueType === "text" ? attr.rawValue : null,
-        value_number: attr.valueType === "number" ? toNumberFromText(attr.rawValue) : null,
+    if (!row.matched_product_id) {
+      row.attrs.forEach((attr) => {
+        extraAttributesPayload.push({
+          product_id: productId,
+          name: attr.name,
+          unit: attr.unit,
+          value_type: attr.valueType,
+          value_text: attr.valueType === "text" ? attr.rawValue : null,
+          value_number: attr.valueType === "number" ? toNumberFromText(attr.rawValue) : null,
+        });
       });
-    });
+    }
   });
 
   if (orderItemsPayload.length) {

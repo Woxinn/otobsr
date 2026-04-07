@@ -2,6 +2,23 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.505 - 2026-04-07
+
+- Urun duzenleme/olusturma formunda sayisal nitelik inputlarinin step degeri `any` yapildi
+- Boylece agirlik gibi kucuk ondalikli degerler (`0,002332` vb.) tarayici dogrulamasina takilmadan girilebilir hale geldi
+
+## v0.3.504 - 2026-04-07
+
+- Siparis importunda eksik urun cozum ekranina `Varolan urunle eslestir` secenegi eklendi
+- Eksik urun satirinda sistemden urun arayip secme akisi eklendi; secilen urun yeni urun olusturmadan dogrudan siparis kalemine baglanir
+- Eslestirme secilip urun secilmezse akis hata toast ile durdurularak yanlis import engellendi
+
+## v0.3.503 - 2026-04-07
+
+- Sigorta mailinden gelen dosya yakalama/import akisi tamamen kaldirildi
+- Kaldirilanlar: Resend inbound webhook route'u, insurance ingest/inbox API'leri, yarı-otomatik import paneli ve ilgili helper/migration dosyalari
+- Sigorta ekrani tekrar sadece manuel e-posta hazirlama/gonderme akisina donduruldu
+
 ## v0.3.502 - 2026-04-07
 
 - Yari-otomatik sigorta policy akisi eklendi: inbound mailler DB'ye yakalanip siparis bazli manuel import edilebilir hale getirildi

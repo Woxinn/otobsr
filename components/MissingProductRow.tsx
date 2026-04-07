@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Attribute = {
   id: string;
@@ -52,6 +52,11 @@ const normalize = (value: string) =>
 export default function MissingProductRow({ row, index, groups, showQuantity = false }: Props) {
   const [selectedGroupId, setSelectedGroupId] = useState<string>(row.group_id ?? "");
   const [newGroupName, setNewGroupName] = useState<string>(row.group_name ?? "");
+  const [useExistingProduct, setUseExistingProduct] = useState(false);
+  const [matchQuery, setMatchQuery] = useState("");
+  const [matchResults, setMatchResults] = useState<Array<{ id: string; code: string; name: string | null }>>([]);
+  const [selectedMatch, setSelectedMatch] = useState<{ id: string; code: string; name: string | null } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const groupAttributes = useMemo(() => {
     const group = groups.find((g) => g.id === selectedGroupId);
@@ -70,6 +75,35 @@ export default function MissingProductRow({ row, index, groups, showQuantity = f
     return map;
   }, [row.attributes]);
 
+  useEffect(() => {
+    if (!useExistingProduct) return;
+    const query = matchQuery.trim();
+    if (query.length < 2) {
+      setMatchResults([]);
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const params = new URLSearchParams({ q: query, limit: "10" });
+        const res = await fetch(`/api/products/search?${params.toString()}`);
+        const data = await res.json();
+        if (!active) return;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setMatchResults(items);
+      } catch {
+        if (active) setMatchResults([]);
+      } finally {
+        if (active) setIsSearching(false);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [matchQuery, useExistingProduct]);
+
   return (
     <div className="rounded-2xl border border-black/10 bg-[radial-gradient(circle_at_top_left,#fff,#f7f9fb)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -78,12 +112,63 @@ export default function MissingProductRow({ row, index, groups, showQuantity = f
         </div>
         <div className="text-xs text-black/60">Adet: {row.quantity ?? "-"}</div>
       </div>
+      <div className="mt-3 rounded-xl border border-black/10 bg-white p-3">
+        <input type="hidden" name={`row_${index}_use_existing`} value={useExistingProduct ? "1" : "0"} />
+        <label className="inline-flex items-center gap-2 text-xs font-semibold text-black/70">
+          <input
+            type="checkbox"
+            checked={useExistingProduct}
+            onChange={(e) => {
+              setUseExistingProduct(e.target.checked);
+              if (!e.target.checked) {
+                setSelectedMatch(null);
+                setMatchQuery("");
+                setMatchResults([]);
+              }
+            }}
+            className="h-4 w-4"
+          />
+          Varolan urunle eslestir
+        </label>
+        {useExistingProduct ? (
+          <div className="mt-2 space-y-2">
+            <input
+              value={matchQuery}
+              onChange={(e) => setMatchQuery(e.target.value)}
+              placeholder="Sistemde urun ara (kod/isim)"
+              className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
+            />
+            {isSearching ? <p className="text-[11px] text-black/60">Araniyor...</p> : null}
+            <div className="flex flex-wrap gap-2">
+              {matchResults.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedMatch(item)}
+                  className={`rounded-full border px-3 py-1 text-xs ${
+                    selectedMatch?.id === item.id ? "border-[var(--ocean)] bg-[var(--ocean)]/10" : "border-black/15"
+                  }`}
+                >
+                  {item.code} - {item.name ?? "-"}
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name={`row_${index}_match_product_id`} value={selectedMatch?.id ?? ""} />
+            <p className="text-[11px] text-black/55">
+              {selectedMatch
+                ? `Secilen urun: ${selectedMatch.code} - ${selectedMatch.name ?? "-"}`
+                : "Devam etmek icin bir urun secin."}
+            </p>
+          </div>
+        ) : null}
+      </div>
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <label className="text-xs font-semibold text-black/60">
           Ürün kodu
           <input
             name={`row_${index}_code`}
             defaultValue={row.code ?? ""}
+            disabled={useExistingProduct}
             className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
             placeholder="Ürün kodu"
           />
@@ -93,6 +178,7 @@ export default function MissingProductRow({ row, index, groups, showQuantity = f
           <input
             name={`row_${index}_name`}
             defaultValue={row.name ?? row.code}
+            disabled={useExistingProduct}
             className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
             placeholder="Ürün adi"
           />
@@ -105,6 +191,7 @@ export default function MissingProductRow({ row, index, groups, showQuantity = f
             onChange={(e) => {
               setSelectedGroupId(e.target.value);
             }}
+            disabled={useExistingProduct}
             className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
           >
             <option value="">Seciniz</option>
@@ -118,6 +205,7 @@ export default function MissingProductRow({ row, index, groups, showQuantity = f
             name={`row_${index}_new_group`}
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
+            disabled={useExistingProduct}
             placeholder="Yeni kategori adi (opsiyonel)"
             className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
           />
