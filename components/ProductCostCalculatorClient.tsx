@@ -101,6 +101,7 @@ export default function ProductCostCalculatorClient(initial: Props) {
   const [basePriceText, setBasePriceText] = useState(formatInputNumber(initial.initialBasePrice));
   const [weightText, setWeightText] = useState(formatInputNumber(initial.initialWeightKg));
   const [domesticCostText, setDomesticCostText] = useState(formatInputNumber(initial.product.domestic_cost_percent));
+  const [marginText, setMarginText] = useState("0");
   const [countryPriceTexts, setCountryPriceTexts] = useState<Record<string, string>>({});
 
   const [searchText, setSearchText] = useState("");
@@ -238,6 +239,7 @@ export default function ProductCostCalculatorClient(initial: Props) {
   const basePrice = parseInputNumber(basePriceText);
   const weightKg = parseInputNumber(weightText);
   const domesticCostPercent = parseInputNumber(domesticCostText);
+  const marginPercent = parseInputNumber(marginText) ?? 0;
 
   const countryGtip = data.countryRates.find((c) => c.country === selectedCountry) ?? null;
   const gtipToUse: GtipRow | null = resolveGtipForCountry(data.gtipBase, data.countryRates, selectedCountry);
@@ -272,6 +274,7 @@ export default function ProductCostCalculatorClient(initial: Props) {
   const kdvBaz = kdvBaseCandidates.length ? Math.max(...kdvBaseCandidates) : null;
 
   const kdvLiMaliyet = kdvSizMaliyet !== null && vatCredit !== null ? kdvSizMaliyet + vatCredit : null;
+  const sellingPrice = kdvSizMaliyet !== null ? kdvSizMaliyet * (1 + marginPercent / 100) : null;
 
   const warnings: string[] = [];
   if (!data.product.gtip_id) warnings.push("GTIP bagli degil");
@@ -304,9 +307,10 @@ export default function ProductCostCalculatorClient(initial: Props) {
         country,
         basePrice: countryBasePrice,
         netCost: result.netCost,
+        sellingPrice: result.netCost !== null ? result.netCost * (1 + marginPercent / 100) : null,
       };
     });
-  }, [data.availableCountries, basePrice, domesticCostPercent, weightKg, data.gtipBase, data.countryRates, countryPriceTexts]);
+  }, [data.availableCountries, basePrice, domesticCostPercent, weightKg, data.gtipBase, data.countryRates, countryPriceTexts, marginPercent]);
 
   const applyGlobalBaseToAllCountries = () => {
     setCountryPriceTexts(
@@ -480,6 +484,17 @@ export default function ProductCostCalculatorClient(initial: Props) {
                 placeholder="Orn: 12,5"
               />
             </label>
+            <label className="text-black/70">
+              Kar marji (%)
+              <input
+                value={marginText}
+                onChange={(e) => setMarginText(sanitizeNumericInput(e.target.value))}
+                inputMode="decimal"
+                pattern="[0-9,]*"
+                className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2"
+                placeholder="Orn: 25"
+              />
+            </label>
           </div>
           <dl className="mt-4 space-y-2 text-sm text-black/70">
             <div className="flex items-center justify-between">
@@ -584,9 +599,17 @@ export default function ProductCostCalculatorClient(initial: Props) {
               <dt>Net KDV</dt>
               <dd>{fmt(netVatPayable)}</dd>
             </div>
+            <div className="flex items-center justify-between">
+              <dt>Kar marji (%)</dt>
+              <dd>{fmt(marginPercent)}</dd>
+            </div>
             <div className="flex items-center justify-between font-semibold">
               <dt>KDVsiz maliyet</dt>
               <dd>{fmt(kdvSizMaliyet)}</dd>
+            </div>
+            <div className="flex items-center justify-between font-semibold text-[var(--ocean)]">
+              <dt>Satis fiyati</dt>
+              <dd>{fmt(sellingPrice)}</dd>
             </div>
           </dl>
         </div>
@@ -643,6 +666,7 @@ export default function ProductCostCalculatorClient(initial: Props) {
                   placeholder="Birim fiyat"
                 />
                 <p className="mt-1 text-sm font-semibold text-black">{fmt(item.netCost)}</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-[var(--ocean)]">Satis: {fmt(item.sellingPrice)}</p>
               </div>
             ))
           ) : (

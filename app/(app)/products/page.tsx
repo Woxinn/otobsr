@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
@@ -55,6 +56,10 @@ const buildWeightSource = (values: any[], productId: string) =>
       };
     });
 
+export const metadata: Metadata = {
+  title: "Ürünler",
+};
+
 export default async function ProductsPage({
   searchParams,
 }: {
@@ -91,7 +96,7 @@ export default async function ProductsPage({
   logError("uncategorizedCount", uncategorizedError);
 
   const query = resolvedParams.q?.trim();
-  const safeQuery = query ? query.replace(/,/g, " ") : "";
+  const safeQuery = query ?? "";
   const queryTokens = safeQuery
     ? safeQuery
         .split(/\s+/)

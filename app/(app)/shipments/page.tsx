@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit } from "@/lib/roles";
 import { getShipmentFlags } from "@/lib/shipments";
@@ -9,6 +10,7 @@ type SearchParams = {
   forwarder?: string;
   origin?: string;
   destination?: string;
+  shipmentStatus?: string;
   etaFrom?: string;
   etaTo?: string;
   inSea?: string;
@@ -33,6 +35,24 @@ function getWeekRange() {
   sunday.setHours(23, 59, 59, 999);
   return { monday, sunday };
 }
+
+const normalizeStatus = (value: string | null | undefined) =>
+  (value ?? "")
+    .toLowerCase()
+    .replaceAll("ı", "i")
+    .replaceAll("ğ", "g")
+    .replaceAll("ş", "s")
+    .replaceAll("ö", "o")
+    .replaceAll("ü", "u")
+    .replaceAll("ç", "c")
+    .trim();
+
+const statusToFilterKey = (value: string | null | undefined) =>
+  normalizeStatus(value).replace(/\s+/g, "-");
+
+export const metadata: Metadata = {
+  title: "Sevkiyatlar",
+};
 
 export default async function ShipmentsPage({
   searchParams,
@@ -296,6 +316,7 @@ export default async function ShipmentsPage({
 
   const { monday, sunday } = getWeekRange();
   const query = resolvedParams.q?.toLowerCase();
+  const shipmentStatusFilter = (resolvedParams.shipmentStatus ?? "").trim().toLowerCase();
   const orderShipmentIds = new Set<string>();
   if (query) {
     shipmentOrdersRows?.forEach((item) => {
@@ -358,6 +379,11 @@ export default async function ShipmentsPage({
           : (item as any).destination_port?.name) === resolvedParams.destination
     );
   }
+  if (shipmentStatusFilter && shipmentStatusFilter !== "geciken") {
+    filtered = filtered.filter(
+      (item) => statusToFilterKey(item.status) === shipmentStatusFilter
+    );
+  }
   if (resolvedParams.inSea === "1") {
     filtered = filtered.filter((item) => item.atd_actual);
   }
@@ -399,7 +425,7 @@ export default async function ShipmentsPage({
       .filter((item) => item.flags.missingRequiredCount > 0)
       .map((item) => item.shipment);
   }
-  if (resolvedParams.overdue === "1") {
+  if (resolvedParams.overdue === "1" || shipmentStatusFilter === "geciken") {
     filtered = shipmentCards
       .filter((item) => item.flags.overdue)
       .map((item) => item.shipment);
@@ -761,6 +787,7 @@ export default async function ShipmentsPage({
     </section>
   );
 }
+
 
 
 

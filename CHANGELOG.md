@@ -2,6 +2,81 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.518 - 2026-04-08
+
+- Siparis detay sayfasi metadata title fallback'i duzeltildi
+- Baslik sirasi: `orders.name` -> `orders.reference_name` -> `#<orderId-kisa>`
+- Boylece sekme basligi `Siparis | Siparis` olarak sabit kalma sorunu giderildi
+
+## v0.3.517 - 2026-04-08
+
+- Siparis listesinde agirlik gorunumu iyilestirildi
+- Gosterim fallback sirasi: `packing summary net` -> `orders.weight_kg` -> `order_items` uzerinden anlik hesaplanan referans agirlik
+- Boylece urun referans agirligindan gelen satirlarda da toplam kg listede bos kalmaz
+
+## v0.3.516 - 2026-04-08
+
+- Shipment detay ekraninda `Durum` karti guncellendi
+- Artik ana satirda `Guncel durum` (shipment.status) gosteriliyor; `Sistem onerisi` alt bilgi satirina alindi
+
+## v0.3.515 - 2026-04-08
+
+- Siparis durumu guncelleme akisina shipment durum senkronu eklendi (`app/actions/orders.ts`)
+- Yeni kural: siparis durumundan shipmente sadece ileri yonlu gecis yapilir (geri dusurme engellendi)
+- `Depoya Teslim Edildi` ve `Gumrukte` siparisleri shipment tarafinda `Gemiden Indi` asamasina esitlenir; shipment `Varis Limaninda`ya geri donmez
+
+## v0.3.514 - 2026-04-08
+
+- Dashboard `Canli Durum Seridi - Shipment` kartlarinin yonlendirmesi `orders` yerine `shipments` listesine alindi
+- Shipment listesine `shipmentStatus` filtre parametresi eklendi
+- `shipmentStatus=geciken` secenegi dogrudan geciken shipmentleri filtreleyecek sekilde baglandi
+
+## v0.3.513 - 2026-04-08
+
+- Beyanname Lab kur/masraf girisleri yanyana yatay ust bara tasindi
+- Sag sabit panel yapisi kaldirilarak ozet kartlarin hemen ustunden yonetilen yeni akis uygulandi
+
+## v0.3.512 - 2026-04-08
+
+- Beyanname Lab sag kur/masraf paneline masaustu icin daralt/genislet (collapse) kontrolu eklendi
+- Panel daraldiginda ozet ve tablo offsetleri otomatik kuculerek gorunur alan geri kazanildi
+
+## v0.3.511 - 2026-04-08
+
+- Beyanname Lab tablo bloguna sag panel offseti eklendi (`lg:mr-[312px]`)
+- Sag masraf panelinin tablo ustune binmesi engellendi
+
+## v0.3.510 - 2026-04-08
+
+- Beyanname Lab sag masraf paneli normal akistan ayrildi (absolute sag kolon), panel yuksekliginin olusturdugu bosluk sorunu kaldirildi
+- Sol ozet alanina sag panel genisligi kadar `padding-right` verilip bloklarin daha dengeli akmasi saglandi
+
+## v0.3.509 - 2026-04-08
+
+- Beyanname Lab ust blok yerlesimi yeniden kuruldu; sagdaki kur/masraf paneli yuksekligi nedeniyle olusan buyuk bosluk kaldirildi
+- Vergi kirilim kartlari ust ozetle ayni sol kolonda toplanarak daha dogal akista ve modern blok yapisinda gosterildi
+
+## v0.3.508 - 2026-04-08
+
+- Beyanname Lab ozet tasarimi kompakt hale getirildi; kartlar ve panel bosluklari azaltildi
+- Ozet kartlarinda desktop/mobile grid dagilimi iyilestirildi (`sm:2`, `xl:4`)
+- Sagdaki kur/masraf paneli sabit ve daha dar/okunur yapida guncellendi (`sticky`, daha kisa kartlar)
+- Vergi kirilim kartlarinda da benzer kompakt modern gorunum uygulandi
+
+## v0.3.507 - 2026-04-08
+
+- Siparis kalemi olusturma/guncelleme ve import akislari net-brut agirlik cozumunu ortak kuralla guncelledi (`net`/`brut` tekil girildiginde digeri otomatik tamamlanir)
+- Eksik urun tamamlama akisinda varolan urunle eslestirme yapildiginda, agirlik bos ise urun agirlik referansindan satir agirligi otomatik doldurulur
+- Siparis kalem importu `.xls` dosyalarini da destekler hale getirildi
+- Packing list importu sadece CSV degil, `.xlsx/.xls` dosya importunu da destekler hale getirildi
+
+## v0.3.506 - 2026-04-08
+
+- Agirlik hesaplari icin ortak cozumleyici eklendi: `lib/order-weight.ts`
+- Beyanname Lab agirlik dagitimi (direkt satir -> packing payi -> summary fallback) ortak motorla calisacak sekilde birlestirildi
+- Gumruk Excel exportunda yeni agirlik motoru opsiyonel flag ile eklendi (`WEIGHT_ENGINE_V2=1`)
+- Rollback kolayligi icin flag kapaliyken export eski packing satiri agirlik davranisina geri doner
+
 ## v0.3.505 - 2026-04-07
 
 - Urun duzenleme/olusturma formunda sayisal nitelik inputlarinin step degeri `any` yapildi

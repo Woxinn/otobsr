@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
 import { getCurrentUserRole, canViewFinance } from "@/lib/roles";
@@ -17,6 +18,10 @@ function getWeekRange() {
   sunday.setHours(23, 59, 59, 999);
   return { monday, sunday };
 }
+
+export const metadata: Metadata = {
+  title: "Gösterge Paneli",
+};
 
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
@@ -565,7 +570,7 @@ export default async function DashboardPage() {
             {liveStatusStrip.map((item, idx) => (
               <Link
                 key={item.label}
-                href={`/orders?shipmentStatus=${item.filter}`}
+                href={`/shipments?shipmentStatus=${item.filter}`}
                 className={`rounded-2xl border border-black/10 bg-gradient-to-br ${item.tone} p-3 transition duration-300 hover:-translate-y-0.5 hover:shadow-md`}
                 style={{ animationDelay: `${idx * 60}ms` }}
               >
@@ -808,3 +813,4 @@ export default async function DashboardPage() {
     </section>
   );
 }
+

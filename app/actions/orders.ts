@@ -17,6 +17,105 @@ const normalizeNumber = (value: FormDataEntryValue | null) => {
   return text.replace(",", ".");
 };
 
+const normalizeStatusToken = (value: string | null | undefined) =>
+  (value ?? "")
+    .toLowerCase()
+    .replaceAll("ı", "i")
+    .replaceAll("ğ", "g")
+    .replaceAll("ş", "s")
+    .replaceAll("ö", "o")
+    .replaceAll("ü", "u")
+    .replaceAll("ç", "c")
+    .trim();
+
+const shipmentStageFromStatus = (value: string | null | undefined) => {
+  const token = normalizeStatusToken(value);
+  if (token === "kalkis limaninda") return 1;
+  if (token === "denizde") return 2;
+  if (token === "varis limaninda") return 3;
+  if (token === "gemiden indi") return 4;
+  return 0;
+};
+
+const shipmentStatusFromOrderStatus = (value: string | null | undefined) => {
+  const token = normalizeStatusToken(value);
+  if (token === "kalkis limaninda") return "Kalkis Limaninda";
+  if (token === "denizde") return "Denizde";
+  if (token === "varis limaninda") return "Varis Limaninda";
+  if (token === "gumrukte") return "Gemiden Indi";
+  if (token === "depoya teslim edildi" || token === "depoya teslim" || token === "delivered") {
+    return "Gemiden Indi";
+  }
+  return null;
+};
+
+const syncShipmentStatusFromOrderUpdates = async (
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  orderIds: string[]
+) => {
+  if (!orderIds.length) return;
+
+  const uniqueOrderIds = Array.from(new Set(orderIds));
+  const { data: links } = await supabase
+    .from("shipment_orders")
+    .select("shipment_id, order_id")
+    .in("order_id", uniqueOrderIds);
+
+  const shipmentIds = Array.from(
+    new Set((links ?? []).map((row) => row.shipment_id).filter(Boolean) as string[])
+  );
+  if (!shipmentIds.length) return;
+
+  const { data: shipmentOrders } = await supabase
+    .from("shipment_orders")
+    .select("shipment_id, order_id")
+    .in("shipment_id", shipmentIds);
+
+  const allLinkedOrderIds = Array.from(
+    new Set((shipmentOrders ?? []).map((row) => row.order_id).filter(Boolean) as string[])
+  );
+
+  const [{ data: shipments }, { data: orders }] = await Promise.all([
+    supabase.from("shipments").select("id, status").in("id", shipmentIds),
+    allLinkedOrderIds.length
+      ? supabase.from("orders").select("id, order_status").in("id", allLinkedOrderIds)
+      : Promise.resolve({ data: [] as { id: string; order_status: string | null }[] }),
+  ]);
+
+  const orderStatusById = new Map((orders ?? []).map((row) => [row.id, row.order_status]));
+  const shipmentStatusById = new Map((shipments ?? []).map((row) => [row.id, row.status]));
+
+  for (const shipmentId of shipmentIds) {
+    const linkedOrderIds = (shipmentOrders ?? [])
+      .filter((row) => row.shipment_id === shipmentId)
+      .map((row) => row.order_id)
+      .filter(Boolean) as string[];
+    if (!linkedOrderIds.length) continue;
+
+    let targetStatus: string | null = null;
+    let maxStage = 0;
+    linkedOrderIds.forEach((orderId) => {
+      const mapped = shipmentStatusFromOrderStatus(orderStatusById.get(orderId));
+      if (!mapped) return;
+      const stage = shipmentStageFromStatus(mapped);
+      if (stage >= maxStage) {
+        maxStage = stage;
+        targetStatus = mapped;
+      }
+    });
+    if (!targetStatus) continue;
+
+    const currentStatus = shipmentStatusById.get(shipmentId) ?? null;
+    const currentStage = shipmentStageFromStatus(currentStatus);
+    if (maxStage > currentStage) {
+      await supabase
+        .from("shipments")
+        .update({ status: targetStatus })
+        .eq("id", shipmentId);
+    }
+  }
+};
+
 export async function createOrder(formData: FormData) {
   await requireAdminRole();
   const supabase = await createSupabaseServerClient();
@@ -155,8 +254,11 @@ export async function updateOrderStatus(formData: FormData) {
     return;
   }
 
+  await syncShipmentStatusFromOrderUpdates(supabase, [orderId]);
+
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/shipments");
 }
 
 export async function archiveOrder(orderId: string) {
@@ -218,7 +320,9 @@ export async function bulkUpdateOrders(formData: FormData) {
         archived_at: shouldArchive ? now : null,
       })
       .in("id", ids);
+    await syncShipmentStatusFromOrderUpdates(supabase, ids);
   }
 
   revalidatePath("/orders");
+  revalidatePath("/shipments");
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireAdminRole } from "@/lib/roles";
+import * as XLSX from "xlsx";
 
 const nullIfEmpty = (value: FormDataEntryValue | null) => {
   if (value === null) return null;
@@ -75,27 +76,50 @@ export async function importOrderPackingList(formData: FormData) {
   if (!orderId) return;
 
   const file = formData.get("file");
-  if (!file || typeof file === "string" || !("text" in file)) {
+  if (!file || typeof file === "string" || !("arrayBuffer" in file)) {
     redirect(`/orders/${orderId}?tab=packing&toast=pl-import-failed`);
   }
 
-  const text = await (file as File).text();
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const upload = file as File;
+  const filename = upload.name.toLowerCase();
+  const isExcel = filename.endsWith(".xlsx") || filename.endsWith(".xls");
 
-  if (!lines.length) {
+  let rows: string[][] = [];
+  let delimiter: string | null = null;
+  if (isExcel) {
+    const buffer = await upload.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const sheetRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+      header: 1,
+      blankrows: false,
+    });
+    rows = sheetRows
+      .map((row) => row.map((cell) => String(cell ?? "").trim()))
+      .filter((row) => row.some((cell) => cell.length));
+  } else {
+    const text = await upload.text();
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length) {
+      const headerLine = lines[0];
+      delimiter = headerLine.includes(";")
+        ? ";"
+        : headerLine.includes("\t")
+        ? "\t"
+        : ",";
+      rows = lines.map((line) => parseCsvLine(line, delimiter ?? ","));
+    }
+  }
+
+  if (!rows.length) {
     redirect(`/orders/${orderId}?tab=packing&toast=pl-import-empty`);
   }
 
-  const headerLine = lines[0];
-  const delimiter = headerLine.includes(";")
-    ? ";"
-    : headerLine.includes("\t")
-    ? "\t"
-    : ",";
-  const headers = parseCsvLine(headerLine, delimiter);
+  const headers = rows[0];
 
   const idxCode = resolveHeaderIndex(headers, ["product_code", "code", "urun_kodu"]);
   const idxDescription = resolveHeaderIndex(headers, [
@@ -157,11 +181,11 @@ export async function importOrderPackingList(formData: FormData) {
   ]);
   const idxNotes = resolveHeaderIndex(headers, ["notes", "note", "not"]);
 
-  const rows = lines.slice(1).map((line) => parseCsvLine(line, delimiter));
+  const dataRows = rows.slice(1);
 
   const codes =
     idxCode >= 0
-      ? rows
+      ? dataRows
           .map((row) => (row[idxCode] ?? "").trim())
           .filter((value) => value.length > 0)
       : [];
@@ -177,7 +201,7 @@ export async function importOrderPackingList(formData: FormData) {
     (products ?? []).map((product) => [product.code, product])
   );
 
-  const payload = rows
+  const payload = dataRows
     .map((row) => {
       const rawCode = idxCode >= 0 ? (row[idxCode] ?? "").trim() : "";
       const product = rawCode ? productByCode.get(rawCode) : null;

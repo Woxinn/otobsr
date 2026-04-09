@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canViewModule } from "@/lib/roles";
 import OrderPlanInput from "@/components/OrderPlanInput";
@@ -173,6 +174,10 @@ const computePlan = ({
     multiplier: trend.multiplier,
     trend_based_suggestion,
   };
+};
+
+export const metadata: Metadata = {
+  title: "Sipariş Planı",
 };
 
 export default async function OrderPlanPage({
@@ -833,6 +838,7 @@ export default async function OrderPlanPage({
     </section>
   );
 }
+
 
 
 

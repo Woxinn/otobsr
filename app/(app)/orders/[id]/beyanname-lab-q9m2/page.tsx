@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import { fetchTcmbTryRate } from "@/lib/tcmb";
+import { resolveOrderItemWeights } from "@/lib/order-weight";
 import OrderDeclarationTryLab from "@/components/OrderDeclarationTryLab";
 
 type RouteParams = {
@@ -189,45 +190,6 @@ export default async function OrderDeclarationLabPage({
   const packingItems = (packingItemsRaw ?? []) as any[];
   const orderDocuments = (orderDocumentsRaw ?? []) as any[];
 
-  const packingByProductId = new Map<string, { qty: number; net: number; gross: number }>();
-  const packingByProductCode = new Map<string, { qty: number; net: number; gross: number }>();
-
-  for (const row of packingItems) {
-    const qty = toNumber(row.quantity);
-    const net = toNumber(row.net_weight_kg ?? row.weight_kg);
-    const gross = toNumber(row.gross_weight_kg ?? row.weight_kg);
-    const productId = row.product_id ? String(row.product_id) : null;
-    const productCode = row.product_code ? String(row.product_code).trim() : null;
-
-    if (productId) {
-      const prev = packingByProductId.get(productId) ?? { qty: 0, net: 0, gross: 0 };
-      prev.qty += qty;
-      prev.net += net;
-      prev.gross += gross;
-      packingByProductId.set(productId, prev);
-    }
-
-    if (productCode) {
-      const prev = packingByProductCode.get(productCode) ?? { qty: 0, net: 0, gross: 0 };
-      prev.qty += qty;
-      prev.net += net;
-      prev.gross += gross;
-      packingByProductCode.set(productCode, prev);
-    }
-  }
-
-  const itemQtyByProductId = new Map<string, number>();
-  const itemQtyByProductCode = new Map<string, number>();
-
-  for (const item of orderItems) {
-    const product = takeOne<any>(item.products);
-    const productId = product?.id ? String(product.id) : null;
-    const productCode = product?.code ? String(product.code).trim() : null;
-    const qty = toNumber(item.quantity);
-    if (productId) itemQtyByProductId.set(productId, (itemQtyByProductId.get(productId) ?? 0) + qty);
-    if (productCode) itemQtyByProductCode.set(productCode, (itemQtyByProductCode.get(productCode) ?? 0) + qty);
-  }
-
   const orderCurrency = order.currency ?? "USD";
   const currencyWarnings: string[] = [];
 
@@ -266,89 +228,73 @@ export default async function OrderDeclarationLabPage({
   const insuranceTotal = usableInsuranceDocs.reduce((sum, doc) => sum + toNumber(doc.insurance_amount), 0);
   const freightTotal = usableFreightDocs.reduce((sum, doc) => sum + toNumber(doc.freight_amount), 0);
 
+  const weightResolution = resolveOrderItemWeights({
+    orderItems: orderItems.map((item: any) => {
+      const product = takeOne<any>(item.products);
+      return {
+        id: String(item.id),
+        quantity: item.quantity,
+        totalAmount: item.total_amount,
+        unitPrice: item.unit_price,
+        netWeightKg: item.net_weight_kg,
+        grossWeightKg: item.gross_weight_kg,
+        productId: product?.id ? String(product.id) : null,
+        productCode: product?.code ? String(product.code) : null,
+      };
+    }),
+    packingItems,
+    summary: packingSummary as any,
+  });
+
   const baseLines = orderItems.map((item: any) => {
     const product = takeOne<any>(item.products);
-    const gtip = takeOne<any>(product?.gtip);
     const quantity = toNumber(item.quantity);
     const unitPrice = toNumber(item.unit_price);
     const fobTotal = toNumber(item.total_amount || quantity * unitPrice);
-    const directNet = toNumber(item.net_weight_kg);
-    const directGross = toNumber(item.gross_weight_kg);
-    const productId = product?.id ? String(product.id) : null;
-    const productCode = product?.code ? String(product.code).trim() : null;
-    const packingAgg =
-      (productId ? packingByProductId.get(productId) : null) ??
-      (productCode ? packingByProductCode.get(productCode) : null) ??
-      null;
-    const sameProductQty =
-      (productId ? itemQtyByProductId.get(productId) : null) ??
-      (productCode ? itemQtyByProductCode.get(productCode) : null) ??
-      0;
-    const qtyShare = sameProductQty > 0 ? quantity / sameProductQty : 0;
-
-    const netKg =
-      directNet > 0
-        ? directNet
-        : packingAgg && packingAgg.net > 0
-          ? round(packingAgg.net * qtyShare, 4)
-          : 0;
-    const grossKg =
-      directGross > 0
-        ? directGross
-        : packingAgg && packingAgg.gross > 0
-          ? round(packingAgg.gross * qtyShare, 4)
-          : 0;
+    const resolved = weightResolution.items.get(String(item.id));
 
     return {
       id: String(item.id),
       code: product?.code ?? "-",
       name: item.name ?? product?.name ?? "Urun",
-      gtip,
+      gtip: takeOne<any>(product?.gtip),
       quantity,
       unitPrice,
       fobTotal,
-      netKg,
-      grossKg,
+      netKg: resolved?.netKg ?? 0,
+      grossKg: resolved?.grossKg ?? 0,
+      weightWarnings: resolved?.warnings ?? [],
     };
   });
-
   const totalFob = baseLines.reduce((sum, line) => sum + line.fobTotal, 0);
-  const totalKnownNet = baseLines.reduce((sum, line) => sum + line.netKg, 0);
-  const totalKnownGross = baseLines.reduce((sum, line) => sum + line.grossKg, 0);
-  const summaryNet = toNumber(packingSummary?.total_net_weight_kg);
-  const summaryGross = toNumber(packingSummary?.total_gross_weight_kg);
-  const fallbackNet = totalKnownNet > 0 ? totalKnownNet : summaryNet;
-  const fallbackGross = totalKnownGross > 0 ? totalKnownGross : summaryGross;
 
   const lines: DeclarationLine[] = baseLines.map((line) => {
     const warnings: string[] = [];
     const gtip = line.gtip;
 
-    let netKg = line.netKg;
-    let grossKg = line.grossKg;
+    const netKg = line.netKg;
+    const grossKg = line.grossKg;
+    warnings.push(...line.weightWarnings);
 
-    if (netKg <= 0 && fallbackNet > 0 && totalFob > 0) {
-      netKg = round((line.fobTotal / totalFob) * fallbackNet, 4);
-      warnings.push("Net agirlik FOB payi ile dagitildi");
-    }
-    if (grossKg <= 0 && fallbackGross > 0 && totalFob > 0) {
-      grossKg = round((line.fobTotal / totalFob) * fallbackGross, 4);
-      warnings.push("Brut agirlik FOB payi ile dagitildi");
-    }
-
-    const freightBaseTotal = fallbackNet > 0 ? fallbackNet : totalFob;
+    const freightBaseTotal =
+      weightResolution.totals.fallbackNetKg > 0 ? weightResolution.totals.fallbackNetKg : totalFob;
     const freightShare =
       freightTotal > 0 && freightBaseTotal > 0
         ? round(
             freightTotal *
-              (fallbackNet > 0 ? netKg / fallbackNet : line.fobTotal / Math.max(totalFob, 1)),
+              (weightResolution.totals.fallbackNetKg > 0
+                ? netKg / weightResolution.totals.fallbackNetKg
+                : line.fobTotal / Math.max(totalFob, 1)),
             6
           )
         : 0;
 
     const insuranceShare =
       insuranceTotal > 0 && totalFob > 0
-        ? round(insuranceTotal * (line.fobTotal / totalFob), 6)
+        ? round(
+            insuranceTotal * (line.fobTotal / totalFob),
+            6
+          )
         : 0;
 
     const cif = round(line.fobTotal + freightShare + insuranceShare, 6);
@@ -455,6 +401,8 @@ export default async function OrderDeclarationLabPage({
   const uniqueWarnings = Array.from(new Set([...currencyWarnings, ...lines.flatMap((line) => line.warnings)]));
   const tcmbRate = await fetchTcmbTryRate(orderCurrency);
   const initialTryRate = tcmbRate.rate && tcmbRate.rate > 0 ? tcmbRate.rate : 1;
+  const summaryNet = weightResolution.totals.summaryNetKg;
+  const summaryGross = weightResolution.totals.summaryGrossKg;
 
   return (
     <section className="space-y-6">

@@ -391,10 +391,10 @@ export default async function ShipmentDetailPage({
               BL gelmeden Gumrukte durumuna gecilemez. Kapandi manuel yapilir.
             </p>
             <p className="mt-2 text-sm text-black/70">
-              Sistem onerisi: <span className="font-semibold">{suggestedStatus}</span>
+              Guncel durum: <span className="font-semibold">{shipment.status ?? "Planlandi"}</span>
             </p>
             <p className="mt-3 text-xs text-black/60">
-              Durum degisiklikleri icin duzenleme ekranini kullanin.
+              Sistem onerisi: <span className="font-semibold">{suggestedStatus}</span>
             </p>
           </div>
 

@@ -28,10 +28,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const supabase = await createSupabaseServerClient();
   const { data: order } = await supabase
     .from("orders")
-    .select("name, code")
+    .select("name, reference_name")
     .eq("id", id)
     .maybeSingle();
-  const title = order?.name || order?.code || "Sipariş";
+  const title =
+    order?.name?.trim() ||
+    order?.reference_name?.trim() ||
+    `#${id.slice(0, 8).toUpperCase()}`;
   return { title: `Sipariş | ${title}` };
 }
 import ConfirmActionForm from "@/components/ConfirmActionForm";
@@ -256,6 +259,59 @@ export default async function OrderDetailPage({
         .filter((value): value is string => Boolean(value))
     )
   );
+  const previousUnitPriceByProduct = new Map<
+    string,
+    { unitPrice: number; orderName: string | null; orderCreatedAt: string | null }
+  >();
+  if (productIdsFromOrder.length && order.created_at) {
+    const { data: previousOrders } = await supabase
+      .from("orders")
+      .select("id, name, created_at")
+      .lt("created_at", order.created_at)
+      .order("created_at", { ascending: false })
+      .range(0, 1999);
+    const previousOrderRows = previousOrders ?? [];
+    const previousOrderIds = previousOrderRows.map((row) => row.id).filter(Boolean);
+    if (previousOrderIds.length) {
+      const orderRankById = new Map<string, number>();
+      const orderMetaById = new Map<string, { name: string | null; created_at: string | null }>();
+      previousOrderRows.forEach((row, index) => {
+        orderRankById.set(String(row.id), index);
+        orderMetaById.set(String(row.id), {
+          name: row.name ?? null,
+          created_at: row.created_at ?? null,
+        });
+      });
+
+      const { data: previousOrderItems } = await supabase
+        .from("order_items")
+        .select("order_id, product_id, unit_price")
+        .in("order_id", previousOrderIds)
+        .in("product_id", productIdsFromOrder)
+        .not("unit_price", "is", null);
+
+      const sortedPreviousItems = (previousOrderItems ?? [])
+        .filter((row) => row.order_id && row.product_id)
+        .sort((a, b) => {
+          const rankA = orderRankById.get(String(a.order_id)) ?? Number.MAX_SAFE_INTEGER;
+          const rankB = orderRankById.get(String(b.order_id)) ?? Number.MAX_SAFE_INTEGER;
+          return rankA - rankB;
+        });
+
+      sortedPreviousItems.forEach((row) => {
+        const productId = String(row.product_id);
+        if (previousUnitPriceByProduct.has(productId)) return;
+        const unitPrice = Number(row.unit_price ?? 0);
+        if (!Number.isFinite(unitPrice) || unitPrice <= 0) return;
+        const orderMeta = orderMetaById.get(String(row.order_id));
+        previousUnitPriceByProduct.set(productId, {
+          unitPrice,
+          orderName: orderMeta?.name ?? null,
+          orderCreatedAt: orderMeta?.created_at ?? null,
+        });
+      });
+    }
+  }
 
   const productIdsFromPacking = Array.from(
     new Set(
@@ -485,6 +541,18 @@ export default async function OrderDetailPage({
     grossWeight: Number(packingSummaryResolved?.total_gross_weight_kg ?? 0),
     cbm: Number(packingSummaryResolved?.total_cbm ?? 0),
   };
+  const packingItemsTotalQty = (packingListItems ?? []).reduce(
+    (sum, item) => sum + Number(item.quantity ?? 0),
+    0
+  );
+  const resolvedTotalQty =
+    totalsAll.qty > 0
+      ? totalsAll.qty
+      : packingItemsTotalQty > 0
+      ? packingItemsTotalQty
+      : packingTotals.packages > 0
+      ? packingTotals.packages
+      : Number(order.packages ?? 0);
 
   const parseNumber = (value: string | number | null | undefined) => {
     if (value === null || value === undefined) return null;
@@ -825,7 +893,7 @@ export default async function OrderDetailPage({
                 </>
               ) : null}
               <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                Adet: {formatNumber(totalsAll.qty, 0)}
+                Adet: {formatNumber(resolvedTotalQty, 0)}
               </span>
               {!isSales ? (
                 <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
@@ -981,7 +1049,7 @@ export default async function OrderDetailPage({
               <h4 className="text-lg font-semibold">Ürün kalemleri</h4>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
                   <span>
-                    Toplam: {formatNumber(totalsAll.qty, 0)} adet
+                    Toplam: {formatNumber(resolvedTotalQty, 0)} adet
                     {isSales ? "" : ` | ${formatMoney(totalsAll.amount, order.currency)}`}
                   </span>
                     {canEditPage && orderItems?.length ? (
@@ -1101,6 +1169,7 @@ export default async function OrderDetailPage({
                       <th className="py-3">Ürün</th>
                       <th className="py-3">Adet</th>
                       {canSeeFinance ? <th className="py-3">Birim fiyat</th> : null}
+                      {canSeeFinance ? <th className="py-3">Önceki sip. birim fiyat</th> : null}
                       {canSeeFinance ? <th className="py-3">Total</th> : null}
                       <th className="py-3">Nitelikler</th>
                       <th className="py-3">Not</th>
@@ -1114,6 +1183,30 @@ export default async function OrderDetailPage({
                         (item.quantity && item.unit_price
                           ? Number(item.quantity) * Number(item.unit_price)
                           : null);
+                      const currentUnitPrice =
+                        item.unit_price ?? item.products?.unit_price ?? null;
+                      const previousUnitPrice =
+                        item.product_id ? previousUnitPriceByProduct.get(item.product_id) : undefined;
+                      const fallbackUnitPrice =
+                        item.products?.unit_price !== null &&
+                        item.products?.unit_price !== undefined &&
+                        Number(item.products.unit_price) > 0
+                          ? {
+                              unitPrice: Number(item.products.unit_price),
+                              orderName: "Ürün kartı",
+                              orderCreatedAt: null,
+                            }
+                          : undefined;
+                      const baselineUnitPrice = previousUnitPrice ?? fallbackUnitPrice;
+                      const unitPriceDiffPct =
+                        currentUnitPrice !== null &&
+                        currentUnitPrice !== undefined &&
+                        baselineUnitPrice?.unitPrice &&
+                        baselineUnitPrice.unitPrice > 0
+                          ? ((Number(currentUnitPrice) - baselineUnitPrice.unitPrice) /
+                              baselineUnitPrice.unitPrice) *
+                            100
+                          : null;
                       return (
                         <tr
                           key={item.id}
@@ -1144,8 +1237,29 @@ export default async function OrderDetailPage({
                           {canSeeFinance ? (
                             <td className="py-4">
                               {formatUnitPrice(
-                                item.unit_price ?? item.products?.unit_price ?? null,
+                                currentUnitPrice,
                                 order.currency
+                              )}
+                            </td>
+                          ) : null}
+                          {canSeeFinance ? (
+                            <td className="py-4">
+                              {baselineUnitPrice ? (
+                                <div className="space-y-1">
+                                  <div>
+                                    <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                                      {formatUnitPrice(baselineUnitPrice.unitPrice, order.currency)}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-black/55">
+                                    {baselineUnitPrice.orderName ?? "-"}
+                                    {unitPriceDiffPct !== null
+                                      ? ` | ${unitPriceDiffPct >= 0 ? "+" : ""}${formatNumber(unitPriceDiffPct, 2)}%`
+                                      : ""}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-black/50">-</span>
                               )}
                             </td>
                           ) : null}

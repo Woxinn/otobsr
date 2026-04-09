@@ -1,4 +1,5 @@
-import Link from "next/link";
+﻿import Link from "next/link";
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canEdit, canViewModule, getCurrentUserRole } from "@/lib/roles";
 import ProformaDeleteButton from "@/components/ProformaDeleteButton";
@@ -19,6 +20,10 @@ const fmtDate = (value: string | null | undefined) => {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return "-";
   return dt.toLocaleDateString("tr-TR");
+};
+
+export const metadata: Metadata = {
+  title: "Proformalar",
 };
 
 export default async function ProformasPage({
@@ -151,3 +156,4 @@ export default async function ProformasPage({
     </section>
   );
 }
+

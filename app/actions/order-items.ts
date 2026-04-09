@@ -68,6 +68,28 @@ const normalizeUnitPrice = (value: number | null | undefined) =>
 const normalizeLineAmount = (value: number | null | undefined) =>
   roundToScale(value, UNIT_PRICE_SCALE);
 
+const resolveNetGrossWeights = ({
+  netInput,
+  grossInput,
+  quantity,
+  perUnitWeight,
+}: {
+  netInput: number | null;
+  grossInput: number | null;
+  quantity: number | null;
+  perUnitWeight: number | null;
+}) => {
+  let netWeight = netInput ?? grossInput ?? null;
+  let grossWeight = grossInput ?? netInput ?? null;
+
+  if (netWeight === null && grossWeight === null && quantity !== null && perUnitWeight !== null) {
+    netWeight = perUnitWeight * quantity;
+    grossWeight = netWeight;
+  }
+
+  return { netWeight, grossWeight };
+};
+
 const parseCsvLine = (line: string, delimiter: string) => {
   const result: string[] = [];
   let current = "";
@@ -404,26 +426,27 @@ export async function createOrderItem(formData: FormData) {
   );
   const unitPrice = unitPriceInput ?? normalizeUnitPrice(product?.unit_price) ?? null;
 
-  let netWeight = toNumberFromText(String(formData.get("net_weight_kg") ?? ""));
-  let grossWeight = toNumberFromText(
+  const netWeightInput = toNumberFromText(String(formData.get("net_weight_kg") ?? ""));
+  const grossWeightInput = toNumberFromText(
     String(formData.get("gross_weight_kg") ?? "")
   );
+  let perUnitWeight: number | null = null;
 
-  if (
-    netWeight === null &&
-    grossWeight === null &&
-    resolvedProductId &&
-    quantity !== null
-  ) {
+  if (resolvedProductId && quantity !== null) {
     const weightByProduct = await buildWeightByProductIds(supabase, [
       resolvedProductId,
     ]);
     const perUnit = weightByProduct.get(resolvedProductId);
     if (perUnit !== undefined && perUnit !== null) {
-      netWeight = perUnit * quantity;
-      grossWeight = grossWeight ?? netWeight;
+      perUnitWeight = perUnit;
     }
   }
+  const { netWeight, grossWeight } = resolveNetGrossWeights({
+    netInput: netWeightInput,
+    grossInput: grossWeightInput,
+    quantity,
+    perUnitWeight,
+  });
 
   const totalAmount =
     unitPrice !== null && quantity !== null
@@ -472,19 +495,25 @@ export async function updateOrderItem(formData: FormData) {
   );
   const unitPrice = unitPriceInput ?? normalizeUnitPrice(product?.unit_price) ?? null;
 
-  let netWeight = toNumberFromText(String(formData.get("net_weight_kg") ?? ""));
-  let grossWeight = toNumberFromText(
+  const netWeightInput = toNumberFromText(String(formData.get("net_weight_kg") ?? ""));
+  const grossWeightInput = toNumberFromText(
     String(formData.get("gross_weight_kg") ?? "")
   );
+  let perUnitWeight: number | null = null;
 
-  if (netWeight === null && grossWeight === null && productId && quantity !== null) {
+  if (productId && quantity !== null) {
     const weightByProduct = await buildWeightByProductIds(supabase, [productId]);
     const perUnit = weightByProduct.get(productId);
     if (perUnit !== undefined && perUnit !== null) {
-      netWeight = perUnit * quantity;
-      grossWeight = grossWeight ?? netWeight;
+      perUnitWeight = perUnit;
     }
   }
+  const { netWeight, grossWeight } = resolveNetGrossWeights({
+    netInput: netWeightInput,
+    grossInput: grossWeightInput,
+    quantity,
+    perUnitWeight,
+  });
 
   const totalAmount =
     unitPrice !== null && quantity !== null
@@ -575,7 +604,7 @@ export async function importOrderItems(formData: FormData) {
 
   const upload = file as File;
   const filename = upload.name.toLowerCase();
-  const isExcel = filename.endsWith(".xlsx");
+  const isExcel = filename.endsWith(".xlsx") || filename.endsWith(".xls");
 
   let rows: string[][] = [];
   if (isExcel) {
@@ -871,22 +900,20 @@ export async function importOrderItems(formData: FormData) {
     const unitPrice =
       normalizedUnitPriceInput ?? normalizeUnitPrice(product?.unit_price) ?? null;
 
-    let resolvedNetWeight = netWeightInput;
-    let resolvedGrossWeight = grossWeightInput;
-
-    if (resolvedNetWeight === null && resolvedGrossWeight === null && quantity !== null) {
-      let perUnitWeight = rowWeightFromAttrs;
-      if (perUnitWeight === null && product?.id) {
-        const fallbackWeight = weightByProduct.get(product.id);
-        if (fallbackWeight !== undefined && fallbackWeight !== null) {
-          perUnitWeight = fallbackWeight;
-        }
-      }
-      if (perUnitWeight !== null) {
-        resolvedNetWeight = perUnitWeight * quantity;
-        resolvedGrossWeight = resolvedGrossWeight ?? resolvedNetWeight;
+    let perUnitWeight = rowWeightFromAttrs;
+    if (perUnitWeight === null && product?.id) {
+      const fallbackWeight = weightByProduct.get(product.id);
+      if (fallbackWeight !== undefined && fallbackWeight !== null) {
+        perUnitWeight = fallbackWeight;
       }
     }
+    const { netWeight: resolvedNetWeight, grossWeight: resolvedGrossWeight } =
+      resolveNetGrossWeights({
+        netInput: netWeightInput,
+        grossInput: grossWeightInput,
+        quantity,
+        perUnitWeight,
+      });
 
     const totalAmount =
       normalizedTotalAmountInput ??
@@ -1184,16 +1211,12 @@ export async function completeMissingOrderProducts(formData: FormData) {
       if (parsed !== null) perUnitWeight = parsed;
     });
 
-    const net = row.net_weight_kg;
-    const gross = row.gross_weight_kg;
-    let resolvedNet = net;
-    let resolvedGross = gross;
-    if (resolvedNet === null && resolvedGross === null && row.quantity !== null) {
-      if (perUnitWeight !== null) {
-        resolvedNet = perUnitWeight * row.quantity;
-        resolvedGross = resolvedGross ?? resolvedNet;
-      }
-    }
+    const { netWeight: resolvedNet, grossWeight: resolvedGross } = resolveNetGrossWeights({
+      netInput: row.net_weight_kg,
+      grossInput: row.gross_weight_kg,
+      quantity: row.quantity,
+      perUnitWeight,
+    });
 
       rowMeta.push({
         code: row.code,
@@ -1263,6 +1286,18 @@ export async function completeMissingOrderProducts(formData: FormData) {
     productByCode = new Map(products.map((p) => [p.code, p]));
   }
 
+  const resolvedProductIdsForWeight = Array.from(
+    new Set(
+      rowMeta
+        .map((row, index) => row.matched_product_id ?? productByCode.get(rows[index]?.code)?.id ?? null)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+  const resolvedWeightByProduct = await buildWeightByProductIds(
+    supabase,
+    resolvedProductIdsForWeight
+  );
+
   const attributeValuesPayload: {
     product_id: string;
     attribute_id: string;
@@ -1294,6 +1329,14 @@ export async function completeMissingOrderProducts(formData: FormData) {
   rowMeta.forEach((row, index) => {
     const productId = row.matched_product_id ?? productByCode.get(rows[index]?.code)?.id ?? null;
     if (!productId) return;
+    const fallbackPerUnitWeight = resolvedWeightByProduct.get(productId) ?? null;
+    const { netWeight: resolvedNetWeight, grossWeight: resolvedGrossWeight } =
+      resolveNetGrossWeights({
+        netInput: row.net_weight_kg,
+        grossInput: row.gross_weight_kg,
+        quantity: row.quantity,
+        perUnitWeight: fallbackPerUnitWeight,
+      });
 
     if (!row.matched_product_id) {
       const catAttrs = catAttributesByCode.get(rows[index]?.code) ?? [];
@@ -1319,8 +1362,8 @@ export async function completeMissingOrderProducts(formData: FormData) {
         (row.unit_price !== null && row.quantity !== null
           ? normalizeLineAmount(row.unit_price * row.quantity)
           : null),
-      net_weight_kg: row.net_weight_kg,
-      gross_weight_kg: row.gross_weight_kg,
+      net_weight_kg: resolvedNetWeight,
+      gross_weight_kg: resolvedGrossWeight,
       notes: row.notes,
     });
 
@@ -1413,9 +1456,9 @@ export async function completeSingleMissingProduct(formData: FormData) {
       : null);
   const notes = nullIfEmpty(formData.get("row_0_notes"));
 
-  const netWeight =
+  const netWeightInput =
     toNumberFromText(String(formData.get("row_0_net_weight") ?? "")) ?? null;
-  const grossWeight =
+  const grossWeightInput =
     toNumberFromText(String(formData.get("row_0_gross_weight") ?? "")) ?? null;
 
   // Ürün var mı?
@@ -1452,6 +1495,21 @@ export async function completeSingleMissingProduct(formData: FormData) {
       await supabase.from("products").upsert({ id: productId, group_id: groupId });
     }
   }
+
+  let perUnitWeight: number | null = null;
+  if (productId && quantity !== null) {
+    const weightByProduct = await buildWeightByProductIds(supabase, [productId]);
+    const fallbackWeight = weightByProduct.get(productId);
+    if (fallbackWeight !== undefined && fallbackWeight !== null) {
+      perUnitWeight = fallbackWeight;
+    }
+  }
+  const { netWeight, grossWeight } = resolveNetGrossWeights({
+    netInput: netWeightInput,
+    grossInput: grossWeightInput,
+    quantity,
+    perUnitWeight,
+  });
 
   // Kategori nitelikleri
   for (let catIndex = 0; ; catIndex += 1) {

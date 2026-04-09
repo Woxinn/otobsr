@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { Download } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -32,6 +33,29 @@ type SearchParams = {
   perPage?: string;
   archived?: string;
   toast?: string;
+};
+
+const normalizeAttributeName = (value: string | null | undefined) =>
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u0131|\u0130/g, "i");
+
+const isWeightName = (value: string | null | undefined) => {
+  const normalized = normalizeAttributeName(value);
+  return normalized.includes("agirlik") || normalized.includes("weight");
+};
+
+const toNumberSafe = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+export const metadata: Metadata = {
+  title: "Siparişler",
 };
 
 export default async function OrdersPage({
@@ -79,12 +103,6 @@ export default async function OrdersPage({
         .select("order_id, total_packages, total_net_weight_kg")
         .in("order_id", orderIds)
     : { data: [] as any[] };
-  const { data: orderItemQtyRows } = orderIds.length
-    ? await supabase
-        .from("order_items")
-        .select("order_id, quantity")
-        .in("order_id", orderIds)
-    : { data: [] as any[] };
   const { data: orderShipments } = orderIds.length
     ? await supabase
         .from("shipment_orders")
@@ -127,12 +145,6 @@ export default async function OrdersPage({
     });
   });
 
-  const qtyByOrder = (orderItemQtyRows ?? []).reduce<Map<string, number>>((acc, row: any) => {
-    if (!row.order_id) return acc;
-    const current = acc.get(String(row.order_id)) ?? 0;
-    acc.set(String(row.order_id), current + Number(row.quantity ?? 0));
-    return acc;
-  }, new Map<string, number>());
 
   const orderDocumentTypes = (documentTypes ?? []).filter(
     (type) => type.applies_to === "order"
@@ -305,6 +317,95 @@ export default async function OrdersPage({
   const safePage = Math.min(currentPage, totalPages);
   const pageStart = (safePage - 1) * perPage;
   const pageItems = filtered.slice(pageStart, pageStart + perPage);
+  const pageOrderIds = pageItems.map((item) => item.id);
+  const QTY_CHUNK_SIZE = 1000;
+
+  const fetchOrderItemQtyTotal = async (orderId: string) => {
+    let total = 0;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("order_items")
+        .select("quantity")
+        .eq("order_id", orderId)
+        .range(from, from + QTY_CHUNK_SIZE - 1);
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("[orders page] order item qty fetch error", { orderId, error });
+        return total;
+      }
+      if (!data || data.length === 0) return total;
+      total += data.reduce((sum: number, row: any) => sum + Number(row.quantity ?? 0), 0);
+      if (data.length < QTY_CHUNK_SIZE) return total;
+      from += QTY_CHUNK_SIZE;
+    }
+  };
+
+  const qtyEntries = await Promise.all(
+    pageOrderIds.map(async (orderId) => [orderId, await fetchOrderItemQtyTotal(orderId)] as const)
+  );
+  const qtyByOrder = new Map<string, number>(qtyEntries);
+
+  const { data: pageOrderWeightRows } = pageOrderIds.length
+    ? await supabase
+        .from("order_items")
+        .select("order_id, quantity, net_weight_kg, gross_weight_kg, product_id")
+        .in("order_id", pageOrderIds)
+    : { data: [] as any[] };
+
+  const fallbackProductIds = Array.from(
+    new Set(
+      (pageOrderWeightRows ?? [])
+        .filter((row: any) => row.net_weight_kg == null && row.gross_weight_kg == null && row.product_id)
+        .map((row: any) => row.product_id)
+    )
+  );
+
+  const { data: weightAttrRows } = fallbackProductIds.length
+    ? await supabase
+        .from("product_attribute_values")
+        .select("product_id, value_text, value_number, product_attributes(name)")
+        .in("product_id", fallbackProductIds)
+    : { data: [] as any[] };
+
+  const { data: weightExtraRows } = fallbackProductIds.length
+    ? await supabase
+        .from("product_extra_attributes")
+        .select("product_id, name, value_text, value_number")
+        .in("product_id", fallbackProductIds)
+    : { data: [] as any[] };
+
+  const weightByProduct = new Map<string, number>();
+  (weightAttrRows ?? []).forEach((row: any) => {
+    if (!row.product_id || weightByProduct.has(row.product_id)) return;
+    const attribute = Array.isArray(row.product_attributes)
+      ? row.product_attributes[0]
+      : row.product_attributes;
+    if (!isWeightName(attribute?.name)) return;
+    const val = toNumberSafe(row.value_number) ?? toNumberSafe(row.value_text);
+    if (val !== null) weightByProduct.set(row.product_id, val);
+  });
+  (weightExtraRows ?? []).forEach((row: any) => {
+    if (!row.product_id || weightByProduct.has(row.product_id)) return;
+    if (!isWeightName(row.name)) return;
+    const val = toNumberSafe(row.value_number) ?? toNumberSafe(row.value_text);
+    if (val !== null) weightByProduct.set(row.product_id, val);
+  });
+
+  const computedWeightByOrder = (pageOrderWeightRows ?? []).reduce<Map<string, number>>((acc, row: any) => {
+    if (!row.order_id) return acc;
+    const current = acc.get(String(row.order_id)) ?? 0;
+    const quantity = Number(row.quantity ?? 0);
+    const direct = toNumberSafe(row.net_weight_kg) ?? toNumberSafe(row.gross_weight_kg);
+    const fallback =
+      direct !== null
+        ? direct
+        : row.product_id && weightByProduct.has(row.product_id)
+        ? (weightByProduct.get(row.product_id) ?? 0) * quantity
+        : 0;
+    acc.set(String(row.order_id), current + fallback);
+    return acc;
+  }, new Map<string, number>());
 
   const returnParams = new URLSearchParams();
   Object.entries(resolvedParams).forEach(([key, value]) => {
@@ -343,6 +444,12 @@ export default async function OrdersPage({
       minimumFractionDigits: 0,
       maximumFractionDigits,
     });
+  };
+
+  const resolveOrderQuantity = (order: any) => {
+    const fromItems = qtyByOrder.get(order.id);
+    if (fromItems !== null && fromItems !== undefined && fromItems > 0) return fromItems;
+    return null;
   };
 
   const rowColorsFromId = (id: string) => {
@@ -693,9 +800,12 @@ export default async function OrdersPage({
                                   </span>
                                 ) : null}
                                 <div className="mt-1 text-xs text-black/55">
-                                  {formatNumber(qtyByOrder.get(order.id) ?? order.packages, 0)} adet |{" "}
+                                  {formatNumber(resolveOrderQuantity(order), 0)} adet |{" "}
                                   {formatNumber(
-                                    packingSummaryByOrder.get(order.id)?.total_net_weight_kg ?? order.weight_kg,
+                                    packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
+                                      order.weight_kg ??
+                                      computedWeightByOrder.get(order.id) ??
+                                      null,
                                     2
                                   )}{" "}
                                   kg
@@ -837,7 +947,15 @@ export default async function OrdersPage({
                               <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
                               {isArchived ? <span className="mt-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">Arşivde</span> : null}
                               <div className="mt-1 text-xs text-black/55">
-                                {formatNumber(qtyByOrder.get(order.id) ?? order.packages, 0)} adet | {formatNumber(packingSummaryByOrder.get(order.id)?.total_net_weight_kg ?? order.weight_kg, 2)} kg
+                                {formatNumber(resolveOrderQuantity(order), 0)} adet |{" "}
+                                {formatNumber(
+                                  packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
+                                    order.weight_kg ??
+                                    computedWeightByOrder.get(order.id) ??
+                                    null,
+                                  2
+                                )}{" "}
+                                kg
                               </div>
                               <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>
                               {missingDocs.length && !isSales ? (

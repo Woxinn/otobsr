@@ -1,6 +1,11 @@
 ﻿import Link from "next/link";
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CSSProperties } from "react";
+
+export const metadata: Metadata = {
+  title: "Tedarikçiler",
+};
 
 export default async function SuppliersPage() {
   const supabase = await createSupabaseServerClient();
@@ -131,5 +136,6 @@ export default async function SuppliersPage() {
     </section>
   );
 }
+
 
 

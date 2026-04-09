@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/roles";
+import { resolveOrderItemWeights } from "@/lib/order-weight";
+
+const USE_WEIGHT_ENGINE_V2 = process.env.WEIGHT_ENGINE_V2 === "1";
 
 type AttrRow = {
   product_id: string;
@@ -122,7 +125,7 @@ export async function GET(req: NextRequest) {
   const { data: orderItems, error: oiError } = await supabase
     .from("order_items")
     .select(
-      "id, order_id, product_id, quantity, unit_price, total_amount, orders(name), products(id, code, name, gtip_id, domestic_cost_percent, product_type_id, gtip:gtips(code), product_type:product_types(name))"
+      "id, order_id, product_id, quantity, unit_price, total_amount, net_weight_kg, gross_weight_kg, orders(name), products(id, code, name, gtip_id, domestic_cost_percent, product_type_id, gtip:gtips(code), product_type:product_types(name))"
     )
     .eq("order_id", orderId)
     .order("created_at", { ascending: true });
@@ -201,6 +204,38 @@ export async function GET(req: NextRequest) {
       if (error) throw error;
       if (data) attrValues.push(...data);
     }
+  }
+
+  let weightResolution: ReturnType<typeof resolveOrderItemWeights> | null = null;
+  if (USE_WEIGHT_ENGINE_V2) {
+    const { data: orderPackingItems } = await supabase
+      .from("order_packing_list_items")
+      .select("product_id, product_code, quantity, net_weight_kg, gross_weight_kg, weight_kg")
+      .eq("order_id", orderId);
+
+    const { data: orderPackingSummary } = await supabase
+      .from("order_packing_list_summary")
+      .select("total_net_weight_kg, total_gross_weight_kg")
+      .eq("order_id", orderId)
+      .maybeSingle();
+
+    weightResolution = resolveOrderItemWeights({
+      orderItems: (orderItems ?? []).map((oi: any) => {
+        const product = Array.isArray(oi.products) ? oi.products[0] : oi.products;
+        return {
+          id: String(oi.id),
+          quantity: oi.quantity,
+          totalAmount: oi.total_amount,
+          unitPrice: oi.unit_price,
+          netWeightKg: oi.net_weight_kg,
+          grossWeightKg: oi.gross_weight_kg,
+          productId: oi.product_id ?? product?.id ?? null,
+          productCode: product?.code ?? null,
+        };
+      }),
+      packingItems: (orderPackingItems ?? []) as any[],
+      summary: (orderPackingSummary ?? null) as any,
+    });
   }
 
   const extraAttrValues: ExtraAttrRow[] = [];
@@ -477,10 +512,10 @@ export async function GET(req: NextRequest) {
     const codeKey = normalizeCode(code);
     const orderQty = Number(oi.quantity ?? 0) || 0;
     const packing = consumePacking(product.id, codeKey, orderQty);
-    const qtyPacked = packing ? packing.qty : orderQty;
     const amountQty = orderQty; // tutarlar sipariş adedi üzerinden
-    const netExport = packing ? packing.net : "";
-    const grossExport = packing ? packing.gross : "";
+    const resolved = weightResolution?.items.get(String(oi.id));
+    const netExport = resolved ? resolved.netKg : packing ? packing.net : "";
+    const grossExport = resolved ? resolved.grossKg : packing ? packing.gross : "";
     const boxesExport = packing ? packing.boxes : 0;
     const tipKey = typeByProduct.get(product.id) ?? product.product_type?.name ?? "Belirtilecek";
     const comp = pickCompliance(product.product_type_id, product.product_type?.name ?? tipKey);

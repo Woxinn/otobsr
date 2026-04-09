@@ -1,7 +1,12 @@
 ﻿import Link from "next/link";
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canViewModule, getCurrentUserRole } from "@/lib/roles";
 import RfqDeleteButton from "@/components/RfqDeleteButton";
+
+export const metadata: Metadata = {
+  title: "Teklif Talepleri",
+};
 
 export default async function RfqListPage() {
   const supabase = await createSupabaseServerClient();
@@ -87,3 +92,4 @@ export default async function RfqListPage() {
     </section>
   );
 }
+

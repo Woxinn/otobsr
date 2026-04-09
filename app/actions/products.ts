@@ -295,6 +295,7 @@ export async function createProduct(formData: FormData) {
   const name = nullIfEmpty(formData.get("name"));
   const groupId = nullIfEmpty(formData.get("group_id"));
   const brand = nullIfEmpty(formData.get("brand"));
+  const netsisStokKodu = nullIfEmpty(formData.get("netsis_stok_kodu"));
   const gtipId = nullIfEmpty(formData.get("gtip_id"));
   const domesticCostPercent = toNumber(formData.get("domestic_cost_percent"));
   const unitPrice = normalizeUnitPrice(toNumber(formData.get("unit_price")));
@@ -308,6 +309,7 @@ export async function createProduct(formData: FormData) {
       group_id: groupId,
       unit_price: unitPrice,
       brand,
+      netsis_stok_kodu: netsisStokKodu,
       gtip_id: gtipId,
       domestic_cost_percent: domesticCostPercent ?? 0,
       description: nullIfEmpty(formData.get("description")),
@@ -358,6 +360,7 @@ export async function updateProduct(formData: FormData) {
   if (!id) return;
   const groupId = nullIfEmpty(formData.get("group_id"));
   const brand = nullIfEmpty(formData.get("brand"));
+  const netsisStokKodu = nullIfEmpty(formData.get("netsis_stok_kodu"));
   const gtipId = nullIfEmpty(formData.get("gtip_id"));
   const domesticCostPercent = toNumber(formData.get("domestic_cost_percent"));
   const unitPrice = normalizeUnitPrice(toNumber(formData.get("unit_price")));
@@ -370,6 +373,7 @@ export async function updateProduct(formData: FormData) {
       group_id: groupId,
       unit_price: unitPrice,
       brand,
+      netsis_stok_kodu: netsisStokKodu,
       gtip_id: gtipId,
       domestic_cost_percent: domesticCostPercent ?? 0,
       description: nullIfEmpty(formData.get("description")),

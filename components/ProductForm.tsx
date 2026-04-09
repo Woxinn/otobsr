@@ -34,6 +34,7 @@ type ExtraAttribute = {
 type ProductRecord = {
   id: string;
   code: string | null;
+  netsis_stok_kodu?: string | null;
   name: string | null;
   unit_price: number | null;
   brand: string | null;
@@ -154,6 +155,15 @@ export default function ProductForm({
             name="code"
             defaultValue={product?.code ?? ""}
             placeholder="BIZ-001"
+            className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="text-sm font-medium">
+          Stok kodu (Netsis)
+          <input
+            name="netsis_stok_kodu"
+            defaultValue={product?.netsis_stok_kodu ?? ""}
+            placeholder="STK-001"
             className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
           />
         </label>
