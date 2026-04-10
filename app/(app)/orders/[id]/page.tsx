@@ -147,7 +147,6 @@ const ensurePackingSummary = async ({
 
 type SearchParams = {
   tab?: string;
-  itemsPage?: string;
   itemsQ?: string;
 };
 
@@ -181,13 +180,11 @@ export default async function OrderDetailPage({
     .select("id, name")
     .order("name");
 
-  const itemsPage = Math.max(1, Number(resolvedSearchParams.itemsPage ?? 1) || 1);
-  const itemsPageSize = 20;
   const itemsQuery = resolvedSearchParams.itemsQ?.trim();
 
     let orderItemsQuery = supabase
       .from("order_items")
-      .select("*, products(id, code, name, unit_price)", { count: "exact" })
+      .select("*, products(id, code, name, unit_price)")
       .eq("order_id", order.id)
       .order("line_no", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true });
@@ -196,19 +193,13 @@ export default async function OrderDetailPage({
     orderItemsQuery = orderItemsQuery.ilike("name", `%${itemsQuery}%`);
   }
 
-  const { data: orderItems, count: orderItemsCount } = await orderItemsQuery.range(
-    (itemsPage - 1) * itemsPageSize,
-    itemsPage * itemsPageSize - 1
-  );
+  const { data: orderItems } = await orderItemsQuery;
 
   // Light query for totals (tÃ¼m kalemler)
   const { data: orderItemsAll } = await supabase
     .from("order_items")
     .select("quantity, total_amount, net_weight_kg, gross_weight_kg, product_id")
     .eq("order_id", order.id);
-  const totalItemCount = orderItemsCount ?? orderItemsAll?.length ?? 0;
-  const totalItemPages = Math.max(1, Math.ceil(totalItemCount / itemsPageSize));
-
   const { data: packingListItems } = await supabase
     .from("order_packing_list_items")
     .select("*, products(id, code, name)")
@@ -478,14 +469,6 @@ export default async function OrderDetailPage({
     insuranceDocs.find((doc) => doc.insurance_currency)?.insurance_currency ??
     order.currency ??
     "USD";
-
-  const buildItemsPageLink = (page: number) => {
-    const params = new URLSearchParams();
-    params.set("tab", "products");
-    if (itemsQuery) params.set("itemsQ", itemsQuery);
-    params.set("itemsPage", String(page));
-    return `/orders/${order.id}?${params.toString()}`;
-  };
 
   const { data: shipmentLinks } = await supabase
     .from("shipment_orders")
@@ -1313,27 +1296,6 @@ export default async function OrderDetailPage({
                     </span>
                   ) : null}
                 </div>
-                {totalItemPages > 1 ? (
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {Array.from({ length: totalItemPages }).map((_, idx) => {
-                      const page = idx + 1;
-                      const active = page === itemsPage;
-                      return (
-                        <Link
-                          key={page}
-                          href={buildItemsPageLink(page)}
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            active
-                              ? "bg-[var(--ocean)] text-white"
-                              : "border border-black/10 bg-white text-black/70"
-                          }`}
-                        >
-                          {page}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ) : null}
               </div>
             ) : (
               <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">

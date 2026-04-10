@@ -1,12 +1,15 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import GtipListClient from "@/components/GtipListClient";
 
 export default async function GtipListPage() {
   const supabase = await createSupabaseServerClient();
 
   const { data: gtips } = await supabase
     .from("gtips")
-    .select("id, code, description, customs_duty_rate, additional_duty_rate, vat_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value, products(count)")
+    .select(
+      "id, code, description, customs_duty_rate, additional_duty_rate, vat_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value, products(count)"
+    )
     .order("code");
 
   return (
@@ -25,66 +28,7 @@ export default async function GtipListPage() {
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
-        <table className="w-full border-collapse text-sm">
-          <thead className="bg-[var(--sand)] text-left text-xs uppercase tracking-[0.15em] text-black/60">
-            <tr>
-              <th className="px-4 py-3">Kod</th>
-              <th className="px-4 py-3">Açıklama</th>
-              <th className="px-4 py-3 text-right">GV %</th>
-              <th className="px-4 py-3 text-right">İlave GV %</th>
-              <th className="px-4 py-3 text-right">KDV %</th>
-              <th className="px-4 py-3 text-right">Dumping</th>
-              <th className="px-4 py-3 text-right">Gözetim</th>
-              <th className="px-4 py-3 text-right">Ürün adedi</th>
-              <th className="px-4 py-3 text-right">Detay</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gtips?.length ? (
-              gtips.map((g) => {
-                const productCount = Array.isArray(g.products)
-                  ? g.products[0]?.count
-                  : (g.products as { count?: number } | null | undefined)?.count;
-                return (
-                  <tr key={g.id} className="border-t border-black/5 hover:bg-[rgba(15,61,62,0.03)]">
-                    <td className="px-4 py-3 font-semibold text-black">{g.code}</td>
-                    <td className="px-4 py-3 text-black/70">{g.description ?? "-"}</td>
-                    <td className="px-4 py-3 text-right">{g.customs_duty_rate ?? 0}</td>
-                    <td className="px-4 py-3 text-right">{g.additional_duty_rate ?? 0}</td>
-                    <td className="px-4 py-3 text-right">{g.vat_rate ?? 0}</td>
-                    <td className="px-4 py-3 text-right">
-                      {g.anti_dumping_applicable
-                        ? `${g.anti_dumping_rate ?? 0} /kg`
-                        : "Yok"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {g.surveillance_applicable
-                        ? `${g.surveillance_unit_value ?? 0} /kg`
-                        : "Yok"}
-                    </td>
-                    <td className="px-4 py-3 text-right">{productCount ?? 0}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/gtips/${g.id}`}
-                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70"
-                      >
-                        Gör
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td className="px-4 py-4 text-sm text-black/60" colSpan={9}>
-                  Henüz GTİP eklenmemiş.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <GtipListClient gtips={(gtips as any[]) ?? []} />
     </section>
   );
 }
