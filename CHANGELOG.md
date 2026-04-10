@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.519 - 2026-04-10
+
+- GTIP listesi tablosuna `Dumping` ve `Gozetim` sutunlari eklendi
+- Liste sorgusu `anti_dumping_applicable`, `anti_dumping_rate`, `surveillance_applicable`, `surveillance_unit_value` alanlarini da cekecek sekilde guncellendi
+- Sutunlarda aktifse `/kg` degeri, pasifse `Yok` gosterimi eklendi
+
 ## v0.3.518 - 2026-04-08
 
 - Siparis detay sayfasi metadata title fallback'i duzeltildi

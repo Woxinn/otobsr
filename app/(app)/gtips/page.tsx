@@ -6,7 +6,7 @@ export default async function GtipListPage() {
 
   const { data: gtips } = await supabase
     .from("gtips")
-    .select("id, code, description, customs_duty_rate, additional_duty_rate, vat_rate, products(count)")
+    .select("id, code, description, customs_duty_rate, additional_duty_rate, vat_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value, products(count)")
     .order("code");
 
   return (
@@ -34,6 +34,8 @@ export default async function GtipListPage() {
               <th className="px-4 py-3 text-right">GV %</th>
               <th className="px-4 py-3 text-right">İlave GV %</th>
               <th className="px-4 py-3 text-right">KDV %</th>
+              <th className="px-4 py-3 text-right">Dumping</th>
+              <th className="px-4 py-3 text-right">Gözetim</th>
               <th className="px-4 py-3 text-right">Ürün adedi</th>
               <th className="px-4 py-3 text-right">Detay</th>
             </tr>
@@ -51,6 +53,16 @@ export default async function GtipListPage() {
                     <td className="px-4 py-3 text-right">{g.customs_duty_rate ?? 0}</td>
                     <td className="px-4 py-3 text-right">{g.additional_duty_rate ?? 0}</td>
                     <td className="px-4 py-3 text-right">{g.vat_rate ?? 0}</td>
+                    <td className="px-4 py-3 text-right">
+                      {g.anti_dumping_applicable
+                        ? `${g.anti_dumping_rate ?? 0} /kg`
+                        : "Yok"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {g.surveillance_applicable
+                        ? `${g.surveillance_unit_value ?? 0} /kg`
+                        : "Yok"}
+                    </td>
                     <td className="px-4 py-3 text-right">{productCount ?? 0}</td>
                     <td className="px-4 py-3 text-right">
                       <Link
@@ -65,7 +77,7 @@ export default async function GtipListPage() {
               })
             ) : (
               <tr>
-                <td className="px-4 py-4 text-sm text-black/60" colSpan={7}>
+                <td className="px-4 py-4 text-sm text-black/60" colSpan={9}>
                   Henüz GTİP eklenmemiş.
                 </td>
               </tr>
