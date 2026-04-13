@@ -154,12 +154,16 @@ export async function GET(request: Request) {
   }
 
   const quoteIds = (quotes ?? []).map((q) => q.id);
-  const { data: quoteItems, error: qiErr } = await supabase
-    .from("rfq_quote_items")
-    .select("rfq_quote_id, rfq_item_id, unit_price")
-    .in("rfq_quote_id", quoteIds.length ? quoteIds : ["-"]);
-  if (qiErr) {
-    return NextResponse.json({ error: qiErr.message }, { status: 500 });
+  let quoteItems: Array<{ rfq_quote_id: string; rfq_item_id: string; unit_price: number | null }> = [];
+  if (quoteIds.length > 0) {
+    const { data, error: qiErr } = await supabase
+      .from("rfq_quote_items")
+      .select("rfq_quote_id, rfq_item_id, unit_price")
+      .in("rfq_quote_id", quoteIds);
+    if (qiErr) {
+      return NextResponse.json({ error: qiErr.message }, { status: 500 });
+    }
+    quoteItems = (data ?? []) as Array<{ rfq_quote_id: string; rfq_item_id: string; unit_price: number | null }>;
   }
 
   const supplierList: SupplierRow[] = Array.from(
