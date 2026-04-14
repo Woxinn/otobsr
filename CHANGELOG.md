@@ -2,6 +2,18 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.522 - 2026-04-14
+
+- Proforma detay fiyat karsilastirmasina fallback eklendi
+- Tedarikcinin son siparisinde ilgili urun yoksa, referans olarak urun kartindaki birim fiyat kullanilir
+- Kaynak etiketi bu durumda `Urun karti` olarak gosterilir
+
+## v0.3.521 - 2026-04-14
+
+- Proforma detayindaki fiyat karsilastirma referansi guncellendi
+- Artik referans fiyat global son siparis degil, proformanin tedarikcisine ait son siparis satiri uzerinden hesaplanir
+- Sutun adi `Tedarikcinin son sip. birim fiyat` olarak netlestirildi
+
 ## v0.3.520 - 2026-04-14
 
 - Proforma detay urun tablosuna `Son sip. birim fiyat` sutunu eklendi

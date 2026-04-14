@@ -62,14 +62,27 @@ export default async function ProformaDetailPage({
   const productIds = Array.from(
     new Set(items.map((row) => row.product_id).filter((value): value is string => Boolean(value)))
   );
+  const productUnitPriceById = new Map<string, number>();
+  if (productIds.length) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, unit_price")
+      .in("id", productIds);
+    (products ?? []).forEach((product) => {
+      const unitPrice = Number(product.unit_price ?? 0);
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) return;
+      productUnitPriceById.set(String(product.id), unitPrice);
+    });
+  }
   const latestOrderUnitPriceByProduct = new Map<
     string,
     { unitPrice: number; orderName: string | null; orderCreatedAt: string | null }
   >();
-  if (productIds.length) {
+  if (productIds.length && proforma.supplier_id) {
     const { data: latestOrders } = await supabase
       .from("orders")
       .select("id, name, created_at")
+      .eq("supplier_id", proforma.supplier_id)
       .order("created_at", { ascending: false, nullsFirst: false })
       .range(0, 1999);
     const latestOrderRows = latestOrders ?? [];
@@ -177,7 +190,7 @@ export default async function ProformaDetailPage({
                 <th className="px-3 py-3">Urun adi</th>
                 <th className="px-3 py-3 text-right">Adet</th>
                 <th className="px-3 py-3 text-right">Birim fiyat</th>
-                <th className="px-3 py-3 text-right">Son sip. birim fiyat</th>
+                <th className="px-3 py-3 text-right">Tedarikcinin son sip. birim fiyat</th>
                 <th className="px-3 py-3 text-right">Satir tutar</th>
                 <th className="px-3 py-3">Not</th>
               </tr>
@@ -186,10 +199,19 @@ export default async function ProformaDetailPage({
               {items.map((row) => {
                 const latestOrderUnitPrice =
                   row.product_id ? latestOrderUnitPriceByProduct.get(String(row.product_id)) : undefined;
+                const fallbackUnitPrice =
+                  row.product_id && productUnitPriceById.get(String(row.product_id))
+                    ? {
+                        unitPrice: Number(productUnitPriceById.get(String(row.product_id))),
+                        orderName: "Urun karti",
+                        orderCreatedAt: null,
+                      }
+                    : undefined;
+                const baselineUnitPrice = latestOrderUnitPrice ?? fallbackUnitPrice;
                 const currentUnitPrice = Number(row.unit_price ?? 0);
                 const diffPct =
-                  latestOrderUnitPrice?.unitPrice && latestOrderUnitPrice.unitPrice > 0 && Number.isFinite(currentUnitPrice)
-                    ? ((currentUnitPrice - latestOrderUnitPrice.unitPrice) / latestOrderUnitPrice.unitPrice) * 100
+                  baselineUnitPrice?.unitPrice && baselineUnitPrice.unitPrice > 0 && Number.isFinite(currentUnitPrice)
+                    ? ((currentUnitPrice - baselineUnitPrice.unitPrice) / baselineUnitPrice.unitPrice) * 100
                     : null;
                 return (
                   <tr key={row.id} className="border-b border-black/5 hover:bg-black/5">
@@ -198,15 +220,15 @@ export default async function ProformaDetailPage({
                     <td className="px-3 py-3 text-right">{fmtNum(row.quantity)}</td>
                     <td className="px-3 py-3 text-right">{fmtMoney(row.unit_price)}</td>
                     <td className="px-3 py-3 text-right">
-                      {latestOrderUnitPrice ? (
+                      {baselineUnitPrice ? (
                         <div className="space-y-1">
                           <div>
                             <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-                              {fmtMoney(latestOrderUnitPrice.unitPrice)}
+                              {fmtMoney(baselineUnitPrice.unitPrice)}
                             </span>
                           </div>
                           <div className="text-xs text-black/55">
-                            {latestOrderUnitPrice.orderName ?? "-"}
+                            {baselineUnitPrice.orderName ?? "-"}
                             {diffPct !== null ? ` | ${diffPct >= 0 ? "+" : ""}${fmtNum(diffPct)}%` : ""}
                           </div>
                         </div>
