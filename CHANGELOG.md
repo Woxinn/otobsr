@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.520 - 2026-04-14
+
+- Proforma detay urun tablosuna `Son sip. birim fiyat` sutunu eklendi
+- Karsilastirma kaynagi, urunun sistemdeki en guncel siparis satiri olacak sekilde baglandi
+- Son siparis fiyati kirmizi badge ile gosterildi; ayni satirda proforma birim fiyatina gore fark yuzdesi eklendi
+
 ## v0.3.519 - 2026-04-10
 
 - GTIP listesi tablosuna `Dumping` ve `Gozetim` sutunlari eklendi
