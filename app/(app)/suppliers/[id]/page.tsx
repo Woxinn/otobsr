@@ -132,14 +132,8 @@ export default async function SupplierDetailPage({
       .replaceAll("ç", "c")
       .trim();
 
-  const closedStatuses = [
-    "hazir",
-    "depoya teslim edildi",
-    "gumrukte",
-    "varis limaninda",
-    "denizde",
-    "kalkis limaninda",
-  ];
+  // Bu ekranda "acik siparis" tanimi: sadece "depoya teslim edildi" disindakiler.
+  const closedStatuses = ["depoya teslim edildi"];
   const openOrders = (orders ?? []).filter(
     (o) => !closedStatuses.includes(normalizeStatus(o.order_status))
   );

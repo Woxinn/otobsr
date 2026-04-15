@@ -7,8 +7,8 @@ import ProductsListToast from "@/components/ProductsListToast";
 import ProductsSelectionControls from "@/components/ProductsSelectionControls";
 import { deleteAllProducts, deleteSelectedProducts } from "@/app/actions/products";
 import { computeCosts, GtipRow, pickWeightKg } from "@/lib/gtipCost";
-import { fetchLiveStockMap } from "@/lib/live-mssql";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
+import ProductLiveStockInline from "@/components/ProductLiveStockInline";
 
 const logError = (label: string, error: any) => {
   if (error) {
@@ -180,13 +180,6 @@ export default async function ProductsPage({
   // MSSQL stok cek (Netsis koduna gore)
   const productsList = (products as any[] | null | undefined) ?? [];
 
-  // MSSQL stok cek (Netsis koduna gore)
-  const netsisCodes = productsList
-    .map((product) =>
-      product.netsis_stok_kodu ? String(product.netsis_stok_kodu).trim() : null
-    )
-    .filter(Boolean) as string[];
-
   const productIds = Array.from(
     new Set(productsList.map((product) => product.id).filter(Boolean))
   );
@@ -199,13 +192,11 @@ export default async function ProductsPage({
   );
 
   const [
-    netsisStockMap,
     { data: orderItems, error: orderItemsError },
     { data: attributeValues, error: attrError },
     { data: extraAttributeValues, error: extraAttrError },
     { data: countryRates },
   ] = await Promise.all([
-    fetchLiveStockMap(netsisCodes, "prefix"),
     productIds.length > 0
       ? supabase
           .from("order_items")
@@ -805,17 +796,15 @@ export default async function ProductsPage({
                         </td>
                         <td className="px-4 py-4 text-sm text-black/70">
                           <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                            {product.netsis_stok_kodu ? (
-                              <div className="text-base font-semibold text-black">
-                                {(() => {
-                                  const key = String(product.netsis_stok_kodu).trim();
-                                  const val = netsisStockMap.get(key);
-                                  return val === null || val === undefined ? "-" : val;
-                                })()}
-                              </div>
-                            ) : (
-                              "-"
-                            )}
+                            <div className="text-base font-semibold text-black">
+                              <ProductLiveStockInline
+                                stockCode={
+                                  product.netsis_stok_kodu
+                                    ? String(product.netsis_stok_kodu).trim()
+                                    : null
+                                }
+                              />
+                            </div>
                           </Link>
                         </td>
                         <td className="px-4 py-4 text-sm text-black/70">

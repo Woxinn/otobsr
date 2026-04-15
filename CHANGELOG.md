@@ -2,6 +2,36 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.527 - 2026-04-15
+
+- Siparis Plani ekraninda MSSQL stok/satis cekimi server renderdan ayrildi
+- Yeni endpoint eklendi: `POST /api/order-plan/live-metrics` (stok + 60/120 gun satis metrikleri toplu cekim)
+- Yeni client tablo komponenti eklendi: `components/OrderPlanLiveTable.tsx`
+- Sayfa acilisi artik MSSQL beklemez; stok/satis/miktar kolonlari arka planda dolarak guncellenir
+
+## v0.3.526 - 2026-04-15
+
+- Urunler listesinde canli stok yuklemesi server renderdan ayrildi
+- Liste acilisinda MSSQL stok beklemesi kaldirildi; stok hucreleri client tarafta arka planda tekil/dedup fetch ile dolar
+- Yeni komponent: `components/ProductLiveStockInline.tsx`
+
+## v0.3.525 - 2026-04-15
+
+- Urun detay canli stok karti yuklenme gostergesi gorsel olarak iyilestirildi
+- Bekleme durumunda sabit `...` yerine breathing etkili 3 nokta animasyonu eklendi
+
+## v0.3.524 - 2026-04-15
+
+- Urun detay canli stok kartindaki istemci timeout siniri kaldirildi
+- `Canli stok gecikiyor` ve `yenile` uyari/metinleri kaldirildi
+- Stok alani artik sessiz sekilde arka planda yuklenir; sayfa beklemeden acik kalir
+
+## v0.3.523 - 2026-04-15
+
+- Urun detay sayfasinda canli stok alani async hale getirildi; sayfa stok beklemeden acilir
+- Yeni endpoint eklendi: `GET /api/products/live-stock?code=...`
+- Yeni client komponent eklendi: `components/ProductLiveStockCard.tsx` (loading + hata + manuel yenile)
+
 ## v0.3.522 - 2026-04-14
 
 - Proforma detay fiyat karsilastirmasina fallback eklendi

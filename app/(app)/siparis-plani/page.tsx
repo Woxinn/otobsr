@@ -2,12 +2,10 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canViewModule } from "@/lib/roles";
-import OrderPlanInput from "@/components/OrderPlanInput";
 import Sales10ySyncButton from "@/components/Sales10ySyncButton";
 import RfqCreateModal from "@/components/RfqCreateModal";
-import PlanRowClickBinder from "@/components/PlanRowClickBinder";
+import OrderPlanLiveTable from "@/components/OrderPlanLiveTable";
 import { updateOrderPlanDefaults } from "@/app/actions/order-plan";
-import { fetchLiveSalesAgg, fetchLiveStockMap } from "@/lib/live-mssql";
 
 const FALLBACK_LEAD_TIME_DAYS = 105;
 const FALLBACK_SAFETY_DAYS = 15;
@@ -24,30 +22,7 @@ type SearchParams = {
   quantityFilter?: string;
 };
 
-type SalesAgg = {
-  sales120: number;
-  sales60: number;
-  salesPrev60: number;
-  sales10y: number;
-};
-
 const DELIVERED_STATUS_TOKENS = new Set(["depoya teslim edildi", "depoya teslim", "delivered"]);
-
-const rowColorsFromId = (id: string) => {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-    hash &= hash;
-  }
-  const hue = Math.abs(hash) % 360;
-  return {
-    bg: `hsl(${hue}, 82%, 97%)`,
-    accent: `hsl(${hue}, 70%, 45%)`,
-  };
-};
-
-const fmt = (value: number | null | undefined) =>
-  Number(value ?? 0).toLocaleString("tr-TR");
 
 const normalizeStatusToken = (value: string | null | undefined) =>
   String(value ?? "")
@@ -124,57 +99,6 @@ const fetchTransitByProduct = async (supabase: any, productIds: string[]) => {
   return totals;
 };
 
-const ceil = (n: number) => Math.ceil(n);
-
-const computeTrend = (sales60: number, salesPrev60: number) => {
-  if (salesPrev60 === 0) return { trend_direction: "stable", multiplier: 1 };
-  const change_ratio = (sales60 - salesPrev60) / salesPrev60;
-  if (change_ratio > 0.1) return { trend_direction: "increasing", multiplier: 1.15 };
-  if (change_ratio < -0.1) return { trend_direction: "decreasing", multiplier: 0.85 };
-  return { trend_direction: "stable", multiplier: 1 };
-};
-
-const computePlan = ({
-  available_stock,
-  sales_last_4_months,
-  sales_last_60_days,
-  sales_previous_60_days,
-  lead_time_days,
-  safety_days,
-}: {
-  available_stock: number;
-  sales_last_4_months: number;
-  sales_last_60_days: number;
-  sales_previous_60_days: number;
-  lead_time_days: number;
-  safety_days: number;
-}) => {
-  let base_order_quantity = 0;
-  // Level 1
-  if (available_stock < sales_last_4_months) {
-    base_order_quantity = sales_last_4_months;
-  } else if (
-    available_stock >= sales_last_4_months &&
-    lead_time_days + safety_days >= 120
-  ) {
-    const target_stock = sales_last_4_months * 2;
-    base_order_quantity = target_stock - available_stock;
-  } else {
-    base_order_quantity = 0;
-  }
-  if (base_order_quantity < 0) base_order_quantity = 0;
-  base_order_quantity = ceil(base_order_quantity);
-
-  const trend = computeTrend(sales_last_60_days, sales_previous_60_days);
-  const trend_based_suggestion = ceil(base_order_quantity * trend.multiplier);
-
-  return {
-    base_order_quantity,
-    trend_direction: trend.trend_direction,
-    multiplier: trend.multiplier,
-    trend_based_suggestion,
-  };
-};
 
 export const metadata: Metadata = {
   title: "Sipariş Planı",
@@ -333,18 +257,6 @@ export default async function OrderPlanPage({
   }
 
   const productIds = Array.from(new Set(productList.map((p: any) => p.id).filter(Boolean)));
-  const codes = Array.from(
-    new Set(
-      (productList as any[])
-        .map((p: any) => (p.netsis_stok_kodu ? String(p.netsis_stok_kodu).trim() : null))
-        .filter(Boolean) as string[]
-    )
-  );
-
-  const [stockMap, salesMap] = await Promise.all([
-    fetchLiveStockMap(codes, "prefix"),
-    fetchLiveSalesAgg(codes),
-  ]);
 
   const { data: sales10yRows } = await supabase
     .from("product_sales_10y_totals")
@@ -438,6 +350,27 @@ export default async function OrderPlanPage({
 
   const startIndex = startIndexProducts;
   const endIndex = totalCount ? Math.min(startIndexProducts + perPage, totalCount) : 0;
+  const orderPlanRows = productList.map((p: any) => {
+    const inTransit = inTransitByProduct[p.id] ?? 0;
+    const rfqQty = rfqByProduct.get(p.id) ?? 0;
+    const { lead, safety } = resolveLeadSafety((p as { group_id?: string | null })?.group_id);
+    const existing = planByProduct.get(p.id);
+    return {
+      id: String(p.id),
+      code: String(p.code ?? ""),
+      name: String(p.name ?? ""),
+      brand: p.brand ? String(p.brand) : null,
+      description: p.description ? String(p.description) : null,
+      groupName: groups?.find((g) => g.id === (p as { group_id?: string })?.group_id)?.name ?? "Kategori yok",
+      netsisCode: p.netsis_stok_kodu ? String(p.netsis_stok_kodu).trim() : "",
+      inTransit,
+      rfqQty,
+      sales10y: sales10yByProduct.get(p.id) ?? 0,
+      lead,
+      safety,
+      defaultValue: existing?.value ?? null,
+    };
+  });
 
   return (
     <section className="space-y-6">
@@ -672,136 +605,7 @@ export default async function OrderPlanPage({
 
       <div className="rounded-[30px] border border-black/10 bg-white p-6 shadow-sm">
         <div className="overflow-x-auto">
-          <PlanRowClickBinder />
-          <table className="min-w-[980px] border-separate border-spacing-y-4 text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-[0.28em] text-black/50">
-                <th className="px-3 text-center">
-                  <span className="sr-only">Seç</span>
-                </th>
-                <th className="px-4">Kod</th>
-                <th className="px-4">Ürün</th>
-                <th className="px-4 text-right">Stok</th>
-                <th className="px-4 text-right">Önceki 2 aylık satış</th>
-                <th className="px-4 text-right">Son 2 aylık satış</th>
-                <th className="px-4 text-right">4 aylık satış</th>
-                <th className="px-4 text-right">10 yıllık satış</th>
-                <th className="px-4 text-left">Miktarlar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productList.map((p) => {
-                const rowColors = rowColorsFromId(p.id);
-                const netsisCode = p.netsis_stok_kodu ? String(p.netsis_stok_kodu).trim() : "";
-                const stock = netsisCode ? stockMap.get(netsisCode) ?? 0 : 0;
-                const inTransit = inTransitByProduct[p.id] ?? 0;
-                const rfqQty = rfqByProduct.get(p.id) ?? 0;
-                const sales = netsisCode ? salesMap.get(netsisCode) : undefined;
-                const salesSafe = sales ?? {
-                  sales120: 0,
-                  sales60: 0,
-                  salesPrev60: 0,
-                  sales10y: 0,
-                };
-                const sales10y = sales10yByProduct.get(p.id) ?? salesSafe.sales10y;
-                const available_stock = stock + inTransit;
-                const { lead, safety } = resolveLeadSafety((p as { group_id?: string | null })?.group_id);
-                const plan = computePlan({
-                  available_stock,
-                  sales_last_4_months: salesSafe.sales120,
-                  sales_last_60_days: salesSafe.sales60,
-                  sales_previous_60_days: salesSafe.salesPrev60,
-                  lead_time_days: lead,
-                  safety_days: safety,
-                });
-                const existing = planByProduct.get(p.id);
-                if (needOnly && plan.base_order_quantity <= 0) return null;
-
-                return (
-                  <tr
-                    key={p.id}
-                    data-plan-row="1"
-                    className="group transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/10 [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl hover:[&>td]:bg-[linear-gradient(120deg,rgba(11,47,54,0.05),rgba(242,166,90,0.12))]"
-                    style={
-                      {
-                        ["--row-bg" as string]: rowColors.bg,
-                        ["--row-accent" as string]: rowColors.accent,
-                      } as React.CSSProperties
-                    }
-                  >
-                    <td className="px-3 py-4 text-center align-middle">
-                      <input
-                        type="checkbox"
-                        name="plan_select"
-                        value={p.id}
-                        className="h-4 w-4 rounded border-black/30 text-[var(--ocean)]"
-                      />
-                    </td>
-                    <td className="px-4 py-4 font-semibold text-black">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="h-9 w-1.5 rounded-full"
-                          style={{ backgroundColor: "var(--row-accent)" }}
-                        />
-                        {p.code}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-black">{p.name}</div>
-                      <div className="text-xs text-black/60">{p.brand ?? "-"}</div>
-                      <div className="text-xs text-black/50">{p.description ?? ""}</div>
-                      <div className="mt-1 text-[11px] uppercase tracking-[0.12em] text-black/45">
-                    {groups?.find((g) => g.id === (p as { group_id?: string })?.group_id)?.name ?? "Kategori yok"}
-                  </div>
-                </td>
-                    <td className="px-4 py-4 text-right text-sm text-black/80">
-                      <div className="text-[12px] text-black/70">Stok: {fmt(stock)}</div>
-                      <div className="text-[12px] text-black/70">Yolda: {fmt(inTransit)}</div>
-                      <div className="text-[12px] text-black/70">RFQ: {fmt(rfqQty)}</div>
-                      <div className="mt-1 text-base font-semibold text-black">
-                        Toplam: {fmt(stock + inTransit + rfqQty)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-right text-sm text-black/80">
-                      {fmt(salesSafe.salesPrev60)}
-                    </td>
-                    <td className="px-4 py-4 text-right text-sm text-black/80">
-                      {fmt(salesSafe.sales60)}
-                    </td>
-                    <td className="px-4 py-4 text-right text-sm text-black/80">
-                      {fmt(salesSafe.sales120)}
-                    </td>
-                    <td className="px-4 py-4 text-right text-sm text-black/80">
-                      {fmt(sales10y)}
-                    </td>
-                    <td className="px-4 py-4 text-left text-sm text-black">
-                      <div className="font-semibold text-black">
-                        İhtiyaç: {fmt(plan.base_order_quantity)}
-                      </div>
-                      <div className="text-black/70">
-                        Tavsiye: {fmt(plan.trend_based_suggestion)} (
-                        {plan.trend_direction === "increasing"
-                          ? "satış artıyor"
-                          : plan.trend_direction === "decreasing"
-                          ? "satış azalıyor"
-                          : "stabil"}
-                        )
-                      </div>
-                      <div className="text-[11px] text-black/50">
-                        Lead/Safety: {lead}g / {safety}g
-                      </div>
-                      <OrderPlanInput
-                        productId={p.id}
-                        need={plan.base_order_quantity}
-                        suggest={plan.trend_based_suggestion}
-                        defaultValue={existing?.value ?? null}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <OrderPlanLiveTable rows={orderPlanRows} needOnly={needOnly} />
         </div>
         {totalCount > perPage ? (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">

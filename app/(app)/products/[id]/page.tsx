@@ -3,8 +3,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { deleteProduct } from "@/app/actions/products";
 import { computeCosts, pickWeightKg, GtipRow } from "@/lib/gtipCost";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
-import { fetchLiveStockMap } from "@/lib/live-mssql";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
+import ProductLiveStockCard from "@/components/ProductLiveStockCard";
 import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -54,16 +54,6 @@ const fmtDate = (value: string | null | undefined) => {
   });
 };
 
-const fmtInt = (value: number | null | undefined) => {
-  if (value === null || value === undefined) return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  return num.toLocaleString("tr-TR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-};
-
 export default async function ProductDetailPage({
   params,
 }: {
@@ -93,10 +83,6 @@ export default async function ProductDetailPage({
   }
 
   const stockCode = product.netsis_stok_kodu ? String(product.netsis_stok_kodu).trim() : "";
-  const stockMap = stockCode ? await fetchLiveStockMap([stockCode], "exact") : new Map<string, number>();
-  const stockResult = stockCode
-    ? { value: stockMap.get(stockCode) ?? 0, error: null }
-    : { value: null, error: "Stok kodu yok" };
 
   const { data: group } = product.group_id
     ? await supabase
@@ -393,17 +379,7 @@ export default async function ProductDetailPage({
                 Stok kodu: {product.netsis_stok_kodu ?? "-"}
               </span>
             </div>
-            <div className="mt-3 inline-flex items-center gap-3 rounded-2xl border border-white/25 bg-white/15 px-4 py-3 text-sm backdrop-blur shadow-[0_14px_38px_-26px_rgba(15,61,62,0.8)]">
-              <div className="flex flex-col leading-tight">
-                <span className="text-[11px] uppercase tracking-[0.2em] text-white/70">Canlı stok</span>
-                <span className="text-2xl font-semibold text-white">{fmtInt(stockResult.value)}</span>
-              </div>
-              {stockResult.error ? (
-                <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-amber-100">
-                  {stockResult.error}
-                </span>
-              ) : null}
-            </div>
+            <ProductLiveStockCard stockCode={stockCode || null} />
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             {canSeeFinance ? (
