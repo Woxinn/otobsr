@@ -140,6 +140,8 @@ class AgentCore extends EventEmitter {
     this.pollIntervalMs = Math.max(250, Number(process.env.POLL_INTERVAL_MS || "1000"));
     this.heartbeatIntervalMs = Math.max(5000, Number(process.env.HEARTBEAT_INTERVAL_MS || "30000"));
     this.requestTimeoutMs = Math.max(5000, Number(process.env.REQUEST_TIMEOUT_MS || "60000"));
+    this.pollIntervalMaxMs = Math.max(this.pollIntervalMs, Number(process.env.POLL_INTERVAL_MAX_MS || "5000"));
+    this.pollBackoffStepMs = Math.max(100, Number(process.env.POLL_BACKOFF_STEP_MS || "250"));
     this.salesDbs = Array.from(
       new Set(
         String(process.env.MSSQL_DB_SALES_LIST || "")
@@ -165,6 +167,8 @@ class AgentCore extends EventEmitter {
       lastError: null,
       updatedAt: nowIso(),
     };
+    this.poolByDb = new Map();
+    this.currentPollDelayMs = this.pollIntervalMs;
   }
 
   validateConfig() {
@@ -267,14 +271,35 @@ class AgentCore extends EventEmitter {
     };
   }
 
-  async withPool(databaseName, fn) {
-    const pool = new sql.ConnectionPool(this.getSqlConfig(databaseName));
+  async getPool(databaseName) {
+    const dbKey = databaseName || String(process.env.MSSQL_DB).trim();
+    const existing = this.poolByDb.get(dbKey);
+    if (existing) return existing;
+    const pool = new sql.ConnectionPool(this.getSqlConfig(dbKey));
     pool.setMaxListeners(0);
     await pool.connect();
+    this.poolByDb.set(dbKey, pool);
+    return pool;
+  }
+
+  async closeAllPools() {
+    const entries = Array.from(this.poolByDb.entries());
+    this.poolByDb.clear();
+    await Promise.all(entries.map(([, pool]) => pool.close().catch(() => {})));
+  }
+
+  async withPool(databaseName, fn) {
+    const dbKey = databaseName || String(process.env.MSSQL_DB).trim();
+    const pool = await this.getPool(dbKey);
     try {
       return await fn(pool);
-    } finally {
-      await pool.close().catch(() => {});
+    } catch (error) {
+      const cached = this.poolByDb.get(dbKey);
+      if (cached === pool) {
+        this.poolByDb.delete(dbKey);
+        await pool.close().catch(() => {});
+      }
+      throw error;
     }
   }
 
@@ -352,33 +377,52 @@ class AgentCore extends EventEmitter {
       output[code] = { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
     }
 
+    const chunkSize = 60;
     for (const dbName of this.salesDbs) {
       await this.withPool(dbName, async (pool) => {
-        for (const code of codes) {
-          const row =
-            (
-              await pool
-                .request()
-                .input("start120", sql.DateTime, start120)
-                .input("start60", sql.DateTime, start60)
-                .input("startPrev60", sql.DateTime, startPrev60)
-                .input("start10y", sql.DateTime, start10y)
-                .input("code", sql.VarChar, `${code}%`)
-                .query(`
-                  SELECT
-                    SUM(CASE WHEN STHAR_TARIH >= @start120 THEN STHAR_GCMIK ELSE 0 END) AS sales120,
-                    SUM(CASE WHEN STHAR_TARIH >= @start60 THEN STHAR_GCMIK ELSE 0 END) AS sales60,
-                    SUM(CASE WHEN STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS salesPrev60,
-                    SUM(CASE WHEN STHAR_TARIH >= @start10y THEN STHAR_GCMIK ELSE 0 END) AS sales10y
-                  FROM TBLSTHAR
-                  WHERE LTRIM(RTRIM(STOK_KODU)) LIKE @code AND UPPER(STHAR_GCKOD) = 'C'
-                `)
-            ).recordset?.[0] || {};
+        for (let i = 0; i < codes.length; i += chunkSize) {
+          const part = codes.slice(i, i + chunkSize);
+          const request = pool
+            .request()
+            .input("start120", sql.DateTime, start120)
+            .input("start60", sql.DateTime, start60)
+            .input("startPrev60", sql.DateTime, startPrev60)
+            .input("start10y", sql.DateTime, start10y);
 
-          output[code].sales120 += Number(row.sales120 || 0);
-          output[code].sales60 += Number(row.sales60 || 0);
-          output[code].salesPrev60 += Number(row.salesPrev60 || 0);
-          output[code].sales10y += Number(row.sales10y || 0);
+          const selectSales120 = [];
+          const selectSales60 = [];
+          const selectSalesPrev60 = [];
+          const selectSales10y = [];
+          const where = [];
+
+          part.forEach((code, index) => {
+            const param = `code${index}`;
+            request.input(param, sql.VarChar, `${code}%`);
+            const match = `LTRIM(RTRIM(STOK_KODU)) LIKE @${param}`;
+            selectSales120.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start120 THEN STHAR_GCMIK ELSE 0 END) AS s120_${index}`);
+            selectSales60.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start60 THEN STHAR_GCMIK ELSE 0 END) AS s60_${index}`);
+            selectSalesPrev60.push(
+              `SUM(CASE WHEN ${match} AND STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS sp60_${index}`
+            );
+            selectSales10y.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start10y THEN STHAR_GCMIK ELSE 0 END) AS s10y_${index}`);
+            where.push(match);
+          });
+
+          const rs = await request.query(`
+            SELECT
+              ${[...selectSales120, ...selectSales60, ...selectSalesPrev60, ...selectSales10y].join(",\n              ")}
+            FROM TBLSTHAR
+            WHERE UPPER(STHAR_GCKOD) = 'C'
+              AND (${where.join(" OR ")})
+          `);
+
+          const row = rs.recordset?.[0] || {};
+          part.forEach((code, index) => {
+            output[code].sales120 += Number(row[`s120_${index}`] || 0);
+            output[code].sales60 += Number(row[`s60_${index}`] || 0);
+            output[code].salesPrev60 += Number(row[`sp60_${index}`] || 0);
+            output[code].sales10y += Number(row[`s10y_${index}`] || 0);
+          });
         }
       });
     }
@@ -548,6 +592,7 @@ class AgentCore extends EventEmitter {
       try {
         const request = await this.claimRequest();
         if (request) {
+          this.currentPollDelayMs = this.pollIntervalMs;
           await this.processRequest(request);
           continue;
         }
@@ -555,14 +600,22 @@ class AgentCore extends EventEmitter {
           state: "online",
           lastError: null,
         });
+        this.currentPollDelayMs = Math.min(
+          this.pollIntervalMaxMs,
+          this.currentPollDelayMs + this.pollBackoffStepMs
+        );
       } catch (error) {
         this.log("error", "claim fail", String(error));
         this.patchStatus({
           state: "error",
           lastError: error && error.stack ? error.stack : String(error),
         });
+        this.currentPollDelayMs = Math.min(
+          this.pollIntervalMaxMs,
+          this.currentPollDelayMs + this.pollBackoffStepMs * 2
+        );
       }
-      await sleep(this.pollIntervalMs);
+      await sleep(this.currentPollDelayMs);
     }
   }
 
@@ -576,9 +629,10 @@ class AgentCore extends EventEmitter {
     this.claimPromise = this.claimLoop();
   }
 
-  stop() {
+  async stop() {
     this.running = false;
     this.patchStatus({ state: "stopped" });
+    await this.closeAllPools();
   }
 }
 

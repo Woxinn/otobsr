@@ -24,6 +24,7 @@
   "build": {
     "appId": "com.otobasar.mssqlagent",
     "productName": "Otobsr MSSQL Agent",
+    "npmRebuild": false,
     "files": [
       "**/*",
       "!dist/**",
