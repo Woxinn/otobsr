@@ -1,3 +1,4 @@
+import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type UserRole = "Admin" | "Yonetim" | "Satis";
@@ -10,11 +11,18 @@ const normalizeRole = (value: string | null | undefined): UserRole => {
   return "Admin";
 };
 
-export async function getCurrentUserRole() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+type RoleClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+export async function getCurrentUserRole(
+  supabaseClient?: RoleClient,
+  currentUser?: User | null
+) {
+  const supabase = supabaseClient ?? (await createSupabaseServerClient());
+  const user =
+    currentUser ??
+    (
+      await supabase.auth.getUser()
+    ).data.user;
   if (!user) return { role: "Admin" as UserRole, userId: null };
 
   const { data } = await supabase

@@ -23,7 +23,7 @@ export default async function AppLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { role } = await getCurrentUserRole();
+  const { role } = await getCurrentUserRole(supabase, user);
   if (role !== "Satis") {
     await syncTasks();
   }

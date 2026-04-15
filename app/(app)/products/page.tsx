@@ -67,7 +67,10 @@ export default async function ProductsPage({
 }) {
   const resolvedParams = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const { role } = await getCurrentUserRole();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { role } = await getCurrentUserRole(supabase, user);
   const isSales = role === "Satis";
   const canSeeFinance = canViewFinance(role);
   const canEdit = role === "Admin";
@@ -200,7 +203,9 @@ export default async function ProductsPage({
     productIds.length > 0
       ? supabase
           .from("order_items")
-          .select("product_id, unit_price, created_at, order_id")
+          .select(
+            "product_id, unit_price, created_at, order_id, orders:order_id(suppliers:orders_supplier_id_fkey(country))"
+          )
           .in("product_id", productIds)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as any[], error: null }),
@@ -238,32 +243,13 @@ export default async function ProductsPage({
     }
   });
 
-  const latestOrderIds = Array.from(
-    new Set(
-      Array.from(latestPriceByProduct.values())
-        .map((item) => item.order_id)
-        .filter((value): value is string => Boolean(value))
-    )
-  );
-  const { data: latestOrdersWithSupplier, error: latestOrdersWithSupplierError } =
-    latestOrderIds.length > 0
-      ? await supabase
-          .from("orders")
-          .select("id, suppliers:orders_supplier_id_fkey(country)")
-          .in("id", latestOrderIds)
-      : { data: [] as any[], error: null };
-  logError("latest-orders-supplier-country", latestOrdersWithSupplierError);
-
-  const countryByOrderId = new Map<string, string | null>();
-  (latestOrdersWithSupplier ?? []).forEach((row: any) => {
-    const supplierRaw = row?.suppliers;
-    const supplier = Array.isArray(supplierRaw) ? supplierRaw[0] : supplierRaw;
-    countryByOrderId.set(row.id, supplier?.country ?? null);
-  });
-
   const latestCountryByProduct = new Map<string, string | null>();
   latestPriceByProduct.forEach((latestItem, productId) => {
-    const country = latestItem.order_id ? countryByOrderId.get(latestItem.order_id) ?? null : null;
+    const orderRaw = (latestItem as any).orders;
+    const order = Array.isArray(orderRaw) ? orderRaw[0] : orderRaw;
+    const supplierRaw = order?.suppliers;
+    const supplier = Array.isArray(supplierRaw) ? supplierRaw[0] : supplierRaw;
+    const country = supplier?.country ?? null;
     latestCountryByProduct.set(productId, country);
   });
 

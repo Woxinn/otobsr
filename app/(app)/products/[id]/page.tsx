@@ -61,7 +61,10 @@ export default async function ProductDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createSupabaseServerClient();
-  const { role } = await getCurrentUserRole();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { role } = await getCurrentUserRole(supabase, user);
   const isSales = role === "Satis";
   const canSeeFinance = canViewFinance(role);
   const canEdit = role === "Admin";
@@ -84,45 +87,56 @@ export default async function ProductDetailPage({
 
   const stockCode = product.netsis_stok_kodu ? String(product.netsis_stok_kodu).trim() : "";
 
-  const { data: group } = product.group_id
-    ? await supabase
-        .from("product_groups")
-        .select("id, name")
-        .eq("id", product.group_id)
-        .single()
-    : { data: null };
-
-  const { data: gtip } = product.gtip_id
-    ? await supabase.from("gtips").select("*").eq("id", product.gtip_id).single()
-    : { data: null };
-
-  const { data: countryRates } = product.gtip_id
-    ? await supabase
-        .from("gtip_country_rates")
-        .select("*")
-        .eq("gtip_id", product.gtip_id)
-        .order("country")
-    : { data: [] as any[] };
-
-  const { data: attributes } = product.group_id
-    ? await supabase
-        .from("product_attributes")
-        .select("id, name, unit, value_type, is_required, sort_order")
-        .eq("group_id", product.group_id)
-        .order("sort_order", { ascending: true })
-        .order("name")
-    : { data: [] };
-
-  const { data: values } = await supabase
-    .from("product_attribute_values")
-    .select("attribute_id, value_text, value_number")
-    .eq("product_id", product.id);
-
-  const { data: extraAttributes } = await supabase
-    .from("product_extra_attributes")
-    .select("id, name, unit, value_type, value_text, value_number")
-    .eq("product_id", product.id)
-    .order("created_at", { ascending: true });
+  const [
+    { data: group },
+    { data: gtip },
+    { data: countryRates },
+    { data: attributes },
+    { data: values },
+    { data: extraAttributes },
+    { data: orderItems },
+  ] = await Promise.all([
+    product.group_id
+      ? supabase
+          .from("product_groups")
+          .select("id, name")
+          .eq("id", product.group_id)
+          .single()
+      : Promise.resolve({ data: null }),
+    product.gtip_id
+      ? supabase.from("gtips").select("*").eq("id", product.gtip_id).single()
+      : Promise.resolve({ data: null }),
+    product.gtip_id
+      ? supabase
+          .from("gtip_country_rates")
+          .select("*")
+          .eq("gtip_id", product.gtip_id)
+          .order("country")
+      : Promise.resolve({ data: [] as any[] }),
+    product.group_id
+      ? supabase
+          .from("product_attributes")
+          .select("id, name, unit, value_type, is_required, sort_order")
+          .eq("group_id", product.group_id)
+          .order("sort_order", { ascending: true })
+          .order("name")
+      : Promise.resolve({ data: [] as any[] }),
+    supabase
+      .from("product_attribute_values")
+      .select("attribute_id, value_text, value_number")
+      .eq("product_id", product.id),
+    supabase
+      .from("product_extra_attributes")
+      .select("id, name, unit, value_type, value_text, value_number")
+      .eq("product_id", product.id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("order_items")
+      .select(
+        "order_id, product_id, unit_price, quantity, orders(id, name, created_at, extra_cost_percent, suppliers:orders_supplier_id_fkey(name, country))"
+      )
+      .eq("product_id", product.id),
+  ]);
 
   const valueByAttribute = new Map(
     (values ?? []).map((value) => [value.attribute_id, value])
@@ -175,13 +189,6 @@ export default async function ProductDetailPage({
   });
 
   const mergedAttributeCards = [...standardAttributeCards, ...extraAttributeCards];
-
-  const { data: orderItems } = await supabase
-    .from("order_items")
-    .select(
-      "order_id, product_id, unit_price, quantity, orders(id, name, created_at, extra_cost_percent, suppliers:orders_supplier_id_fkey(name, country))"
-    )
-    .eq("product_id", product.id);
 
   const linkedOrderIds = Array.from(
     new Set((orderItems ?? []).map((item) => item.order_id).filter(Boolean))

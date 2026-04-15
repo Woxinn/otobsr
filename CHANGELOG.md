@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.528 - 2026-04-15
+
+- Urunler listesi ve urun detayinda ayni request icindeki auth/rol tekrar sorgulari azaltildi
+- Urun detay sayfasinda bagimsiz Supabase sorgulari paralel hale getirildi; ilk HTML gecikmesi azaltildi
+- Urunler listesinde son siparis ulkesi icin ek `orders` sorgusu kaldirildi; veri ayni kalirken server yukunde dusus saglandi
+
 ## v0.3.527 - 2026-04-15
 
 - Siparis Plani ekraninda MSSQL stok/satis cekimi server renderdan ayrildi
