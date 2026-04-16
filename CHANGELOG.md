@@ -2,6 +2,13 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.529 - 2026-04-16
+
+- App layout icindeki bloklayici `syncTasks` calismasi request yolundan cikarildi
+- Gorev senkronizasyonu yeni `POST /api/tasks/sync` endpoint'i ile arka planda tetiklenir hale getirildi
+- Yeni `TaskSyncBoot` client komponenti eklendi (5 dk local throttle)
+- `TaskPanel` layout icinde `Suspense` altina alinarak ilk HTML render yolundan ayrildi
+
 ## v0.3.528 - 2026-04-15
 
 - Urunler listesi ve urun detayinda ayni request icindeki auth/rol tekrar sorgulari azaltildi

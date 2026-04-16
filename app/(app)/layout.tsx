@@ -1,12 +1,13 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canViewModule, getCurrentUserRole } from "@/lib/roles";
-import { syncTasks } from "@/lib/tasks";
 import SignOutButton from "@/components/SignOutButton";
 import TaskPanel from "@/components/TaskPanel";
 import { ToastProvider } from "@/components/ToastProvider";
 import Logo from "@/components/Logo";
 import AppVersionBadge from "@/components/AppVersionBadge";
+import TaskSyncBoot from "@/components/TaskSyncBoot";
 
 const roleLabel = (role: string) => {
   if (role === "Yonetim") return "Yönetim";
@@ -24,9 +25,6 @@ export default async function AppLayout({
     data: { user },
   } = await supabase.auth.getUser();
   const { role } = await getCurrentUserRole(supabase, user);
-  if (role !== "Satis") {
-    await syncTasks();
-  }
 
   return (
     <div className="min-h-screen text-[var(--ink)]">
@@ -92,14 +90,14 @@ export default async function AppLayout({
           ]
             .filter((item) => canViewModule(role, item.key))
             .map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-full border border-black/10 bg-white px-4 py-2 transition hover:-translate-y-0.5 hover:bg-[var(--sand)]"
-            >
-              {item.label}
-            </Link>
-          ))}
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-full border border-black/10 bg-white px-4 py-2 transition hover:-translate-y-0.5 hover:bg-[var(--sand)]"
+              >
+                {item.label}
+              </Link>
+            ))}
           {role === "Admin" ? (
             <Link
               href="/device-requests"
@@ -120,7 +118,13 @@ export default async function AppLayout({
           <main>{children}</main>
         </ToastProvider>
       </div>
-      {role !== "Satis" ? <TaskPanel /> : null}
+      {role !== "Satis" ? <TaskSyncBoot /> : null}
+      {role !== "Satis" ? (
+        <Suspense fallback={null}>
+          <TaskPanel />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
+
