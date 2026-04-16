@@ -8,6 +8,38 @@ type Props = {
   rfqId: string;
 };
 
+type ProductOption = { id: string; code: string; name: string | null };
+type CatalogChoice = {
+  code: string;
+  mode: "create" | "match";
+  query: string;
+  searching: boolean;
+  results: ProductOption[];
+  selected: ProductOption | null;
+};
+
+const buildCatalogChoices = (codes: string[], prev: CatalogChoice[] = []): CatalogChoice[] => {
+  const prevByCode = new Map(prev.map((item) => [item.code.toLowerCase(), item]));
+  return codes.map((code) => {
+    const existing = prevByCode.get(code.toLowerCase());
+    if (!existing) {
+      return {
+        code,
+        mode: "create",
+        query: code,
+        searching: false,
+        results: [],
+        selected: null,
+      };
+    }
+    return {
+      ...existing,
+      code,
+      searching: false,
+    };
+  });
+};
+
 export default function RfqImportModal({ rfqId }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -17,6 +49,7 @@ export default function RfqImportModal({ rfqId }: Props) {
   const [result, setResult] = useState<any>(null);
   const [pendingMissing, setPendingMissing] = useState<string[] | null>(null);
   const [missingCatalogProducts, setMissingCatalogProducts] = useState<string[] | null>(null);
+  const [catalogChoices, setCatalogChoices] = useState<CatalogChoice[]>([]);
   const [pendingAmbiguous, setPendingAmbiguous] = useState<
     { input: string; options: { id: string; name: string }[]; chosen?: string }[] | null
   >(null);
@@ -25,7 +58,8 @@ export default function RfqImportModal({ rfqId }: Props) {
   const handleImport = async (
     addMissing = false,
     supplierMap?: Record<string, string>,
-    createDraftProducts = false
+    createDraftProducts = false,
+    catalogProductMap?: Record<string, string>
   ) => {
     if (loading) return;
     setLoading(true);
@@ -48,6 +82,7 @@ export default function RfqImportModal({ rfqId }: Props) {
           add_missing_products: addMissing,
           create_missing_catalog_products: createDraftProducts,
           supplier_map: supplierMap,
+          catalog_product_map: catalogProductMap,
         }),
       });
       updateLoading({ detail: "Sunucu cevabı alınıyor", progress: 72 });
@@ -64,9 +99,10 @@ export default function RfqImportModal({ rfqId }: Props) {
         setMissingCatalogProducts(null);
         setMessage(data?.message ?? "Eksik ürünler var");
       } else if (res.status === 422 && data?.missing_catalog_products?.length) {
-        setMissingCatalogProducts(data.missing_catalog_products ?? []);
+        const codes = data.missing_catalog_products ?? [];
+        setMissingCatalogProducts(codes);
+        setCatalogChoices((prev) => buildCatalogChoices(codes, prev));
         setPendingMissing(null);
-        setPendingAmbiguous(null);
         setMessage(data?.error ?? "Sistemde ürün kartı bulunamayan kodlar var");
       } else if (res.status === 422 && data?.need_supplier_choice) {
         setPendingAmbiguous(
@@ -89,6 +125,7 @@ export default function RfqImportModal({ rfqId }: Props) {
         setPendingMissing(null);
         setPendingAmbiguous(null);
         setMissingCatalogProducts(null);
+        setCatalogChoices([]);
         updateLoading({ detail: "RFQ güncelleniyor", progress: 92 });
       }
     } catch (err: any) {
@@ -98,6 +135,53 @@ export default function RfqImportModal({ rfqId }: Props) {
       setLoading(false);
       stopLoading();
     }
+  };
+
+  const searchCatalogProducts = async (code: string, query: string) => {
+    const text = query.trim();
+    if (text.length < 2) {
+      setMessage("Arama icin en az 2 karakter girin");
+      return;
+    }
+    setCatalogChoices((prev) =>
+      prev.map((item) =>
+        item.code === code ? { ...item, searching: true, results: item.results ?? [] } : item
+      )
+    );
+    try {
+      const params = new URLSearchParams({ q: text, limit: "10" });
+      const res = await fetch(`/api/products/search?${params.toString()}`);
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? (data.items as ProductOption[]) : [];
+      setCatalogChoices((prev) =>
+        prev.map((item) => (item.code === code ? { ...item, searching: false, results: items } : item))
+      );
+    } catch {
+      setCatalogChoices((prev) =>
+        prev.map((item) => (item.code === code ? { ...item, searching: false, results: [] } : item))
+      );
+      setMessage("Urun aramasi yapilamadi");
+    }
+  };
+
+  const buildCatalogImportOptions = (): {
+    error?: string;
+    createDraftProducts: boolean;
+    catalogProductMap: Record<string, string>;
+  } => {
+    const map: Record<string, string> = {};
+    let createDraftProducts = false;
+    for (const choice of catalogChoices) {
+      if (choice.mode === "create") {
+        createDraftProducts = true;
+        continue;
+      }
+      if (!choice.selected?.id) {
+        return { error: `${choice.code} icin varolan urun secin`, createDraftProducts: false, catalogProductMap: {} };
+      }
+      map[choice.code.toLowerCase()] = choice.selected.id;
+    }
+    return { createDraftProducts, catalogProductMap: map };
   };
 
   return (
@@ -221,7 +305,7 @@ export default function RfqImportModal({ rfqId }: Props) {
                   <button
                     type="button"
                     className="rounded-xl bg-[var(--ocean)] px-3 py-1 text-xs font-semibold text-white"
-                    onClick={() => handleImport(true, pendingAmbiguousMap())}
+                    onClick={() => handleImport(true, pendingAmbiguousMap(pendingAmbiguous))}
                   >
                     Ekle ve devam et
                   </button>
@@ -244,13 +328,119 @@ export default function RfqImportModal({ rfqId }: Props) {
                 <div className="mt-3 rounded-xl border border-black/10 bg-white px-3 py-2 font-mono text-xs text-black/75">
                   {missingCatalogProducts.join(", ")}
                 </div>
+                <div className="mt-3 space-y-3">
+                  {catalogChoices.map((choice) => (
+                    <div key={choice.code} className="rounded-xl border border-black/10 bg-white p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs font-semibold text-black/70">{choice.code}</div>
+                        <div className="flex gap-3 text-xs">
+                          <label className="inline-flex items-center gap-1">
+                            <input
+                              type="radio"
+                              name={`catalog-mode-${choice.code}`}
+                              checked={choice.mode === "create"}
+                              onChange={() =>
+                                setCatalogChoices((prev) =>
+                                  prev.map((item) =>
+                                    item.code === choice.code ? { ...item, mode: "create" } : item
+                                  )
+                                )
+                              }
+                            />
+                            Yeni olustur
+                          </label>
+                          <label className="inline-flex items-center gap-1">
+                            <input
+                              type="radio"
+                              name={`catalog-mode-${choice.code}`}
+                              checked={choice.mode === "match"}
+                              onChange={() =>
+                                setCatalogChoices((prev) =>
+                                  prev.map((item) =>
+                                    item.code === choice.code ? { ...item, mode: "match" } : item
+                                  )
+                                )
+                              }
+                            />
+                            Varolanla eslestir
+                          </label>
+                        </div>
+                      </div>
+                      {choice.mode === "match" ? (
+                        <div className="mt-2">
+                          <div className="flex gap-2">
+                            <input
+                              value={choice.query}
+                              onChange={(e) =>
+                                setCatalogChoices((prev) =>
+                                  prev.map((item) =>
+                                    item.code === choice.code ? { ...item, query: e.target.value } : item
+                                  )
+                                )
+                              }
+                              className="w-full rounded-lg border border-black/15 px-2 py-1 text-xs"
+                              placeholder="Kod veya ad ile ara"
+                            />
+                            <button
+                              type="button"
+                              className="rounded-lg border border-black/15 px-2 py-1 text-xs font-semibold"
+                              onClick={() => searchCatalogProducts(choice.code, choice.query)}
+                            >
+                              Ara
+                            </button>
+                          </div>
+                          {choice.searching ? <div className="mt-1 text-[11px] text-black/50">Araniyor...</div> : null}
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {choice.results.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className={`rounded-full border px-2 py-1 text-[11px] ${
+                                  choice.selected?.id === item.id
+                                    ? "border-[var(--ocean)] bg-[var(--ocean)]/10"
+                                    : "border-black/15"
+                                }`}
+                                onClick={() =>
+                                  setCatalogChoices((prev) =>
+                                    prev.map((row) =>
+                                      row.code === choice.code ? { ...row, selected: item } : row
+                                    )
+                                  )
+                                }
+                              >
+                                {item.code} - {item.name ?? "-"}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-1 text-[11px] text-black/55">
+                            {choice.selected
+                              ? `Secilen: ${choice.selected.code} - ${choice.selected.name ?? "-"}`
+                              : "Devam icin urun secin"}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     className="rounded-xl bg-[var(--ocean)] px-3 py-1 text-xs font-semibold text-white"
-                    onClick={() => handleImport(true, pendingAmbiguousMap(), true)}
+                    onClick={() => {
+                      const options = buildCatalogImportOptions();
+                      if (options.error) {
+                        setMessage(options.error);
+                        return;
+                      }
+                      handleImport(
+                        true,
+                        pendingAmbiguousMap(pendingAmbiguous),
+                        options.createDraftProducts,
+                        options.catalogProductMap
+                      );
+                    }}
                   >
-                    Taslak ürünleri oluştur ve devam et
+                    Secimleri uygula ve devam et
                   </button>
                   <button
                     type="button"
@@ -269,7 +459,10 @@ export default function RfqImportModal({ rfqId }: Props) {
                   <button
                     type="button"
                     className="rounded-xl border border-black/15 px-3 py-1 text-xs font-semibold text-black/70"
-                    onClick={() => setMissingCatalogProducts(null)}
+                    onClick={() => {
+                      setMissingCatalogProducts(null);
+                      setCatalogChoices([]);
+                    }}
                   >
                     Kapat
                   </button>
@@ -308,7 +501,7 @@ export default function RfqImportModal({ rfqId }: Props) {
                     type="button"
                     className="rounded-xl bg-[var(--ocean)] px-3 py-1 text-xs font-semibold text-white"
                     onClick={() => {
-                      const map = pendingAmbiguousMap();
+                      const map = pendingAmbiguousMap(pendingAmbiguous);
                       if (!map) {
                         setMessage("Tüm tedarikçiler için seçim yapın");
                         return;

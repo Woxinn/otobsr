@@ -71,6 +71,10 @@ export async function POST(req: Request) {
   const rows: ImportRow[] = Array.isArray(body?.rows) ? body.rows : [];
   const wantCreateMissing = body?.add_missing_products === true;
   const wantCreateCatalogProducts = body?.create_missing_catalog_products === true;
+  const catalogProductMapInput =
+    body?.catalog_product_map && typeof body.catalog_product_map === "object"
+      ? (body.catalog_product_map as Record<string, string>)
+      : {};
   if (!rfqId || !rows.length) {
     return NextResponse.json({ error: "rfq_id veya satır yok" }, { status: 400 });
   }
@@ -170,30 +174,72 @@ export async function POST(req: Request) {
   });
 
   if (missingCatalogProducts.size) {
-    if (!wantCreateCatalogProducts) {
+    const mappedCatalogCodes = Array.from(missingCatalogProducts).filter((code) => {
+      const mappedId = catalogProductMapInput[code.toLowerCase()];
+      return Boolean(mappedId);
+    });
+
+    if (mappedCatalogCodes.length) {
+      const mappedIds = Array.from(
+        new Set(
+          mappedCatalogCodes
+            .map((code) => catalogProductMapInput[code.toLowerCase()])
+            .filter((value): value is string => Boolean(value))
+        )
+      );
+      const mappedProducts: any[] = [];
+      for (const idChunk of chunkArray(mappedIds, 400)) {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, code, name")
+          .in("id", idChunk);
+        if (error) {
+          console.error("[rfq-import] mapped products", error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+        mappedProducts.push(...(data ?? []));
+      }
+      const mappedProductById = new Map<string, any>();
+      mappedProducts.forEach((product) => mappedProductById.set(product.id, product));
+      mappedCatalogCodes.forEach((sourceCode) => {
+        const mappedId = catalogProductMapInput[sourceCode.toLowerCase()];
+        const product = mappedId ? mappedProductById.get(mappedId) : null;
+        if (product?.id) {
+          productByCode.set(sourceCode.toLowerCase(), product);
+        }
+      });
+    }
+
+    const unresolvedCatalogCodes = Array.from(missingCatalogProducts).filter(
+      (code) => !productByCode.get(code.toLowerCase())?.id
+    );
+
+    if (unresolvedCatalogCodes.length && !wantCreateCatalogProducts) {
       return NextResponse.json(
         {
           ok: false,
-          missing_catalog_products: Array.from(missingCatalogProducts),
-          error: `Urun karti bulunamayan kodlar var: ${Array.from(missingCatalogProducts).join(", ")}`,
+          missing_catalog_products: unresolvedCatalogCodes,
+          error: `Urun karti bulunamayan kodlar var: ${unresolvedCatalogCodes.join(", ")}`,
         },
         { status: 422 }
       );
     }
 
-    const draftProductsPayload = Array.from(missingCatalogProducts).map((code) => ({
+    const draftProductsPayload = unresolvedCatalogCodes.map((code) => ({
       code,
       name: code,
       notes: "RFQ import sırasında taslak ürün olarak oluşturuldu.",
     }));
 
-    const { error: draftInsertErr } = await supabase.from("products").insert(draftProductsPayload);
-    if (draftInsertErr && draftInsertErr.code !== "23505") {
-      console.error("[rfq-import] draft products insert err", draftInsertErr);
-      return NextResponse.json({ error: draftInsertErr.message, debug }, { status: 500 });
+    if (draftProductsPayload.length) {
+      const { error: draftInsertErr } = await supabase.from("products").insert(draftProductsPayload);
+      if (draftInsertErr && draftInsertErr.code !== "23505") {
+        console.error("[rfq-import] draft products insert err", draftInsertErr);
+        return NextResponse.json({ error: draftInsertErr.message, debug }, { status: 500 });
+      }
     }
 
-    const missingCatalogCodeChunks = chunkArray(Array.from(missingCatalogProducts), 400);
+    const missingCatalogCodeChunks = chunkArray(unresolvedCatalogCodes, 400);
     for (const codeChunk of missingCatalogCodeChunks) {
       const { data, error } = await supabase.from("products").select("id, code, name").in("code", codeChunk);
       if (error) {
@@ -205,15 +251,15 @@ export async function POST(req: Request) {
       });
     }
 
-    const unresolvedCatalogCodes = Array.from(missingCatalogProducts).filter(
+    const stillUnresolvedCatalogCodes = unresolvedCatalogCodes.filter(
       (code) => !productByCode.get(code.toLowerCase())?.id
     );
-    if (unresolvedCatalogCodes.length) {
+    if (stillUnresolvedCatalogCodes.length) {
       return NextResponse.json(
         {
           ok: false,
-          missing_catalog_products: unresolvedCatalogCodes,
-          error: `Taslak ürün oluşturulamadı: ${unresolvedCatalogCodes.join(", ")}`,
+          missing_catalog_products: stillUnresolvedCatalogCodes,
+          error: `Taslak ürün oluşturulamadı: ${stillUnresolvedCatalogCodes.join(", ")}`,
         },
         { status: 422 }
       );
