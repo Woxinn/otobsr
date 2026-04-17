@@ -267,6 +267,7 @@ export default async function OrderDeclarationLabPage({
     };
   });
   const totalFob = baseLines.reduce((sum, line) => sum + line.fobTotal, 0);
+  const totalQty = baseLines.reduce((sum, line) => sum + line.quantity, 0);
 
   const lines: DeclarationLine[] = baseLines.map((line) => {
     const warnings: string[] = [];
@@ -275,6 +276,21 @@ export default async function OrderDeclarationLabPage({
     const netKg = line.netKg;
     const grossKg = line.grossKg;
     warnings.push(...line.weightWarnings);
+
+    let surveillanceWeightKg = grossKg;
+    const fallbackGrossTotal = weightResolution.totals.fallbackGrossKg;
+    const grossLooksLikeNet =
+      grossKg > 0 && netKg > 0 && Math.abs(grossKg - netKg) <= 0.000001;
+    if ((surveillanceWeightKg <= 0 || grossLooksLikeNet) && fallbackGrossTotal > 0) {
+      if (totalFob > 0) {
+        surveillanceWeightKg = round((line.fobTotal / Math.max(totalFob, 1)) * fallbackGrossTotal, 6);
+      } else if (totalQty > 0) {
+        surveillanceWeightKg = round((line.quantity / totalQty) * fallbackGrossTotal, 6);
+      }
+      if (surveillanceWeightKg > 0 && Math.abs(surveillanceWeightKg - grossKg) > 0.0001) {
+        warnings.push("Gozetim brut agirligi ozetten paylastirildi");
+      }
+    }
 
     const freightBaseTotal =
       weightResolution.totals.fallbackNetKg > 0 ? weightResolution.totals.fallbackNetKg : totalFob;
@@ -299,8 +315,8 @@ export default async function OrderDeclarationLabPage({
 
     const cif = round(line.fobTotal + freightShare + insuranceShare, 6);
     const surveillanceBase =
-      gtip?.surveillance_applicable && netKg > 0
-        ? round(toNumber(gtip.surveillance_unit_value) * netKg, 6)
+      gtip?.surveillance_applicable && surveillanceWeightKg > 0
+        ? round(toNumber(gtip.surveillance_unit_value) * surveillanceWeightKg, 6)
         : 0;
     const customsBase = round(Math.max(cif, surveillanceBase), 6);
     const customsDutyRate = toNumber(gtip?.customs_duty_rate);
@@ -322,7 +338,8 @@ export default async function OrderDeclarationLabPage({
     if (line.quantity <= 0) warnings.push("Adet eksik");
     if (netKg <= 0) warnings.push("Net agirlik eksik");
     if (gtip?.anti_dumping_applicable && netKg <= 0) warnings.push("Anti-damping icin net agirlik gerekli");
-    if (gtip?.surveillance_applicable && netKg <= 0) warnings.push("Gozetim icin net agirlik gerekli");
+    if (gtip?.surveillance_applicable && surveillanceWeightKg <= 0)
+      warnings.push("Gozetim icin brut agirlik gerekli");
 
     return {
       id: line.id,

@@ -211,8 +211,17 @@ export default function OrderDeclarationTryLab({
         stampTaxTotal > 0 && extraCostBase > 0 ? stampTaxTotal * (line.fobTotal / extraCostBase) : 0;
 
       const cif = line.fobTotal + freightShare + insuranceShare;
+      let surveillanceWeightKg = line.grossKg;
+      if (surveillanceWeightKg <= 0 && baseTotals.grossKg > 0) {
+        surveillanceWeightKg =
+          baseTotals.fobTotal > 0
+            ? (line.fobTotal / Math.max(baseTotals.fobTotal, 1)) * baseTotals.grossKg
+            : 0;
+      }
       const surveillanceBase =
-        line.surveillanceApplicable && line.netKg > 0 ? line.surveillanceUnitValue * line.netKg : 0;
+        line.surveillanceApplicable && surveillanceWeightKg > 0
+          ? line.surveillanceUnitValue * surveillanceWeightKg
+          : 0;
       const customsBase = Math.max(cif, surveillanceBase);
       const customsDuty = customsBase * (line.customsDutyRate / 100);
       const additionalDuty = customsBase * (line.additionalDutyRate / 100);
@@ -306,7 +315,7 @@ export default function OrderDeclarationTryLab({
     );
 
     return { lines: nextLines, totals };
-  }, [ancillaryCostsTotal, baseTotals.fobTotal, baseTotals.netKg, freightTotal, insuranceTotal, lines, rate, stampTaxTotal]);
+  }, [ancillaryCostsTotal, baseTotals.fobTotal, baseTotals.grossKg, baseTotals.netKg, freightTotal, insuranceTotal, lines, rate, stampTaxTotal]);
 
   const totalsTry = useMemo(
     () => ({

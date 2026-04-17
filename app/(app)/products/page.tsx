@@ -458,18 +458,6 @@ export default async function ProductsPage({
     return queryString ? `?${queryString}` : "";
   };
 
-  const toggleGroupQuery = (groupId: string) => {
-    const nextGroups = selectedGroupIds.includes(groupId)
-      ? selectedGroupIds.filter((id) => id !== groupId)
-      : [...selectedGroupIds, groupId];
-    return buildQuery({ group: nextGroups, page: "1" });
-  };
-
-  const selectedGroupDetails = selectedGroupIds.map((id) => ({
-    id,
-    name: groups?.find((group) => group.id === id)?.name ?? id,
-  }));
-
   return (
     <section className="space-y-6">
       <ProductsListToast />
@@ -530,32 +518,17 @@ export default async function ProductsPage({
         ) : null}
       </div>
 
-      <form className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+      <form className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
         <input type="hidden" name="page" value="1" />
-        <div className="grid gap-4 lg:grid-cols-5">
+        <div className={`grid gap-3 ${isSales ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
           <label className="text-sm font-medium">
             Arama
             <input
               name="q"
               defaultValue={resolvedParams.q ?? ""}
-              placeholder="Ürün kodu, adı, not (birden fazla kelime yazabilirsin)"
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+              placeholder="Ürün kodu, adı, not"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             />
-          </label>
-          <label className="text-sm font-medium">
-            Kategori
-            <select
-              name="group"
-              multiple
-              defaultValue={selectedGroupIds}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              {groups?.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
           </label>
           {!isSales ? (
             <label className="text-sm font-medium">
@@ -563,7 +536,7 @@ export default async function ProductsPage({
               <select
                 name="supplier"
                 defaultValue={effectiveSupplierFilter ?? ""}
-                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
               >
                 <option value="">Hepsi</option>
                 {suppliers?.map((supplier) => (
@@ -579,7 +552,7 @@ export default async function ProductsPage({
             <select
               name="gtip"
               defaultValue={resolvedParams.gtip ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
               <option value="none">GTIP yok</option>
@@ -595,7 +568,7 @@ export default async function ProductsPage({
             <select
               name="netsis"
               defaultValue={resolvedParams.netsis ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
               <option value="none">Stok kodu yok</option>
@@ -607,7 +580,7 @@ export default async function ProductsPage({
             <select
               name="perPage"
               defaultValue={String(perPage)}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               {perPageOptions.map((option) => (
                 <option key={option} value={option}>
@@ -617,7 +590,39 @@ export default async function ProductsPage({
             </select>
           </label>
         </div>
-        <div className="mt-6 flex flex-wrap gap-2">
+        <details
+          className="mt-3 rounded-2xl border border-black/10 bg-[var(--mint)]/15 p-2"
+          open={selectedGroupIds.length > 0}
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl px-2 py-1 text-xs font-semibold text-black/65">
+            <span className="uppercase tracking-[0.2em]">Kategori filtresi</span>
+            <span className="rounded-full bg-white/80 px-2 py-[2px] text-[11px] font-bold text-[var(--ocean)]">
+              {selectedGroupIds.length ? `${selectedGroupIds.length} secili` : "Hepsi"}
+            </span>
+          </summary>
+          <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto px-1 pb-1">
+            {groupStats.map((group) => {
+              return (
+                <label key={group.id} className="inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    name="group"
+                    value={group.id}
+                    defaultChecked={selectedGroupIds.includes(group.id)}
+                    className="peer sr-only"
+                  />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-2.5 py-1 text-[11px] text-black/70 transition hover:border-[var(--ocean)]/40 peer-checked:border-[var(--ocean)] peer-checked:bg-[var(--ocean)]/12 peer-checked:text-[var(--ocean)]">
+                    <span className="font-semibold">{group.name}</span>
+                    <span className="rounded-full bg-black/10 px-1.5 py-[1px] text-[10px] font-semibold text-black/60 peer-checked:bg-[var(--ocean)]/20 peer-checked:text-[var(--ocean)]/80">
+                      {group.count}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </details>
+        <div className="mt-3 flex flex-wrap gap-2">
           <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
             Filtrele
           </button>
@@ -629,69 +634,6 @@ export default async function ProductsPage({
           </Link>
         </div>
       </form>
-
-      <div className="rounded-3xl border border-black/10 bg-white p-5 text-sm shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-              Ürün istatistikleri
-            </p>
-            <p className="text-lg font-semibold text-black">
-              Toplam ürün: {totalProductsCount ?? 0}
-            </p>
-          </div>
-          <div className="text-xs text-black/60">
-            Gosterilen: {totalCount ? `${startIndex + 1}-${endIndex}` : "0"} /
-            {` ${totalCount}`}
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-black/70">
-          {groupStats.map((group) => (
-            <Link
-              href={`/products${toggleGroupQuery(group.id)}`}
-              key={group.id}
-              className={`rounded-full border px-3 py-1 transition ${
-                selectedGroupIds.includes(group.id)
-                  ? "border-[var(--ocean)] bg-[var(--ocean)]/10 text-[var(--ocean)]"
-                  : "border-black/10 bg-[var(--mint)]/40 text-black/70 hover:border-[var(--ocean)]/40"
-              }`}
-            >
-              {group.name}: {group.count}
-            </Link>
-          ))}
-          {uncategorizedCount ? (
-            <span className="rounded-full border border-black/10 bg-[var(--peach)] px-3 py-1">
-              Kategorisiz: {uncategorizedCount}
-            </span>
-          ) : null}
-        </div>
-        {selectedGroupDetails.length ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-black/60">Seçili kategoriler:</span>
-            {selectedGroupDetails.map((group) => (
-              <Link
-                key={group.id}
-                href={`/products${buildQuery({
-                  group: selectedGroupIds.filter((id) => id !== group.id),
-                  page: "1",
-                })}`}
-                className="group inline-flex items-center gap-2 rounded-full bg-[var(--ocean)]/10 px-3 py-1 font-semibold text-[var(--ocean)]"
-              >
-                {group.name}
-                <span className="rounded-full bg-[var(--ocean)]/20 px-2 py-[2px] text-[10px] font-bold text-[var(--ocean)]/80 group-hover:bg-[var(--ocean)]/30">
-                  ×
-                </span>
-              </Link>
-            ))}
-            <Link
-              href="/products"
-              className="rounded-full border border-black/20 px-3 py-1 font-semibold text-black/70"
-            >
-              Temizle
-            </Link>
-          </div>
-        ) : null}
-      </div>
 
       <div className="rounded-[36px] border border-black/10 bg-[radial-gradient(circle_at_top_left,#ffffff,#f6f7fb)] p-6 shadow-[0_40px_80px_-50px_rgba(12,45,52,0.7)]">
         {totalCount ? (

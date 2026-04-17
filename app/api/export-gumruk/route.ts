@@ -511,11 +511,23 @@ export async function GET(req: NextRequest) {
     const code = product.code ?? "";
     const codeKey = normalizeCode(code);
     const orderQty = Number(oi.quantity ?? 0) || 0;
+    const productCardWeightPerUnit = weightByProduct.get(product.id) ?? null;
+    const productCardWeightTotal =
+      productCardWeightPerUnit !== null && productCardWeightPerUnit > 0
+        ? productCardWeightPerUnit * orderQty
+        : null;
     const packing = consumePacking(product.id, codeKey, orderQty);
     const amountQty = orderQty; // tutarlar sipariş adedi üzerinden
     const resolved = weightResolution?.items.get(String(oi.id));
-    const netExport = resolved ? resolved.netKg : packing ? packing.net : "";
-    const grossExport = resolved ? resolved.grossKg : packing ? packing.gross : "";
+    let netExport = resolved ? resolved.netKg : packing ? packing.net : "";
+    let grossExport = resolved ? resolved.grossKg : packing ? packing.gross : "";
+    // WEIGHT_ENGINE_V2 aktifken: kalem+packing+summary fallbackleri de boş kalırsa ürün kartı ağırlığını kullan.
+    if (USE_WEIGHT_ENGINE_V2 && productCardWeightTotal !== null) {
+      const netNum = Number(netExport || 0);
+      const grossNum = Number(grossExport || 0);
+      if (!Number.isFinite(netNum) || netNum <= 0) netExport = productCardWeightTotal;
+      if (!Number.isFinite(grossNum) || grossNum <= 0) grossExport = productCardWeightTotal;
+    }
     const boxesExport = packing ? packing.boxes : 0;
     const tipKey = typeByProduct.get(product.id) ?? product.product_type?.name ?? "Belirtilecek";
     const comp = pickCompliance(product.product_type_id, product.product_type?.name ?? tipKey);
