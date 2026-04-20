@@ -134,22 +134,23 @@ export function resolveOrderItemWeights(params: {
     let grossSource: WeightResolutionSource = "missing";
     const warnings: string[] = [];
 
-    if (directNet > 0) {
-      netKg = directNet;
-      netSource = "direct";
-    } else if (packingAgg && packingAgg.net > 0) {
+    // Gumrukcu Excel'i (packing import) agirliklari varsa once onu baz al.
+    if (packingAgg && packingAgg.net > 0) {
       netKg = round(packingAgg.net * qtyShare, 4);
       netSource = "packing_item_share";
-      warnings.push("Net agirlik packing payindan dagitildi");
+      warnings.push("Net agirlik packing import payindan dagitildi");
+    } else if (directNet > 0) {
+      netKg = directNet;
+      netSource = "direct";
     }
 
-    if (directGross > 0) {
-      grossKg = directGross;
-      grossSource = "direct";
-    } else if (packingAgg && packingAgg.gross > 0) {
+    if (packingAgg && packingAgg.gross > 0) {
       grossKg = round(packingAgg.gross * qtyShare, 4);
       grossSource = "packing_item_share";
-      warnings.push("Brut agirlik packing payindan dagitildi");
+      warnings.push("Brut agirlik packing import payindan dagitildi");
+    } else if (directGross > 0) {
+      grossKg = directGross;
+      grossSource = "direct";
     }
 
     return {

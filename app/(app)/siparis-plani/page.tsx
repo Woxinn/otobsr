@@ -14,9 +14,12 @@ type SearchParams = {
   q?: string;
   page?: string;
   perPage?: string;
+  sortBy?: string;
+  sortDir?: string;
   group?: string | string[];
   supplier?: string;
   gtip?: string;
+  tip?: string;
   filledOnly?: string;
   needOnly?: string;
   quantityFilter?: string;
@@ -99,6 +102,12 @@ const fetchTransitByProduct = async (supabase: any, productIds: string[]) => {
   return totals;
 };
 
+const chunkIds = (ids: string[], size = 500) => {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) chunks.push(ids.slice(i, i + size));
+  return chunks;
+};
+
 
 export const metadata: Metadata = {
   title: "Sipariş Planı",
@@ -133,20 +142,12 @@ export default async function OrderPlanPage({
     .order("name");
 
   const { data: gtips } = await supabase.from("gtips").select("id, code").order("code");
+  const { data: productTypes } = await supabase.from("product_types").select("id, name").order("name");
 
   const { data: groupStatsRaw } = await supabase
     .from("product_groups")
     .select("id, name, products(count)")
     .order("name");
-
-  const { count: totalProductsCount } = await supabase
-    .from("products")
-    .select("id", { count: "exact", head: true });
-
-  const { count: uncategorizedCount } = await supabase
-    .from("products")
-    .select("id", { count: "exact", head: true })
-    .is("group_id", null);
 
   const query = resolvedParams.q?.trim();
   const safeQuery = query ? query.replace(/,/g, " ") : "";
@@ -157,8 +158,16 @@ export default async function OrderPlanPage({
         .filter(Boolean)
     : [];
   const perPageOptions = [10, 20, 50, 100, 250, 500, 1000];
+  const sortByOptions = ["created_at", "code", "name"] as const;
+  const sortDirOptions = ["asc", "desc"] as const;
   const perPageParam = Number(resolvedParams.perPage ?? "");
   const perPage = perPageOptions.includes(perPageParam) ? perPageParam : 100;
+  const sortBy = sortByOptions.includes((resolvedParams.sortBy as any) ?? "")
+    ? (resolvedParams.sortBy as (typeof sortByOptions)[number])
+    : "created_at";
+  const sortDir = sortDirOptions.includes((resolvedParams.sortDir as any) ?? "")
+    ? (resolvedParams.sortDir as (typeof sortDirOptions)[number])
+    : "desc";
   const requestedPage = Math.max(1, Number(resolvedParams.page ?? "1") || 1);
   const quantityFilter = resolvedParams.quantityFilter ?? "";
   const filledOnly =
@@ -195,14 +204,13 @@ export default async function OrderPlanPage({
 
   const buildProductsQuery = (forCount: boolean) => {
     const baseSelect =
-      "id, code, name, brand, description, netsis_stok_kodu, group_id, gtip_id";
+      "id, code, name, brand, description, netsis_stok_kodu, group_id, gtip_id, product_type_id";
     const select = resolvedParams.supplier
       ? `${baseSelect}, supplier_product_aliases!inner(supplier_id)`
       : baseSelect;
     let queryBuilder = supabase
       .from("products")
-      .select(select, { count: "exact", head: forCount })
-      .order("created_at", { ascending: false });
+      .select(select, { count: "exact", head: forCount });
 
     if (queryTokens.length) {
       if (queryTokens.length === 1) {
@@ -231,8 +239,20 @@ export default async function OrderPlanPage({
         queryBuilder = queryBuilder.eq("gtip_id", resolvedParams.gtip);
       }
     }
+    if (resolvedParams.tip) {
+      if (resolvedParams.tip === "none") {
+        queryBuilder = queryBuilder.is("product_type_id", null);
+      } else {
+        queryBuilder = queryBuilder.eq("product_type_id", resolvedParams.tip);
+      }
+    }
     if (filledOnly && filledProductIds.length > 0) {
       queryBuilder = queryBuilder.in("id", filledProductIds);
+    }
+    queryBuilder = queryBuilder.order("product_type_id", { ascending: true, nullsFirst: false });
+    queryBuilder = queryBuilder.order(sortBy, { ascending: sortDir === "asc" });
+    if (sortBy !== "created_at") {
+      queryBuilder = queryBuilder.order("created_at", { ascending: false });
     }
     return queryBuilder;
   };
@@ -258,38 +278,48 @@ export default async function OrderPlanPage({
 
   const productIds = Array.from(new Set(productList.map((p: any) => p.id).filter(Boolean)));
 
-  const { data: sales10yRows } = await supabase
-    .from("product_sales_10y_totals")
-    .select("product_id, total_10y");
-
   const sales10yByProduct = new Map<string, number>();
-  (sales10yRows ?? []).forEach((row) => {
-    if (row.product_id) sales10yByProduct.set(row.product_id, Number(row.total_10y ?? 0));
-  });
+  for (const ids of chunkIds(productIds)) {
+    const { data: sales10yRows } = await supabase
+      .from("product_sales_10y_totals")
+      .select("product_id, total_10y")
+      .in("product_id", ids);
+    (sales10yRows ?? []).forEach((row) => {
+      if (row.product_id) sales10yByProduct.set(row.product_id, Number(row.total_10y ?? 0));
+    });
+  }
 
   const inTransitByProduct = await fetchTransitByProduct(supabase, productIds);
 
   // RFQ'da bekleyen miktarlar (kapatildi/closed hariç)
-  const { data: rfqItems } = await supabase
-    .from("rfq_items")
-    .select("product_id, quantity, rfqs!inner(status)")
-    .not("rfqs.status", "in", "(kapatildi,closed)");
   const rfqByProduct = new Map<string, number>();
-  (rfqItems ?? []).forEach((row) => {
-    const pid = row.product_id as string | null;
-    if (!pid) return;
-    const qty = Number(row.quantity ?? 0);
-    rfqByProduct.set(pid, (rfqByProduct.get(pid) ?? 0) + qty);
-  });
+  for (const ids of chunkIds(productIds)) {
+    const { data: rfqItems } = await supabase
+      .from("rfq_items")
+      .select("product_id, quantity, rfqs!inner(status)")
+      .in("product_id", ids)
+      .not("rfqs.status", "in", "(kapatildi,closed)");
+    (rfqItems ?? []).forEach((row) => {
+      const pid = row.product_id as string | null;
+      if (!pid) return;
+      const qty = Number(row.quantity ?? 0);
+      rfqByProduct.set(pid, (rfqByProduct.get(pid) ?? 0) + qty);
+    });
+  }
 
-  const { data: planEntries } = await supabase.from("order_plan_entries").select("*");
   const planByProduct = new Map<
     string,
     { value?: number | null; need_qty?: number | null; suggest_qty?: number | null }
   >();
-  (planEntries ?? []).forEach((row) => {
-    planByProduct.set(row.product_id, row);
-  });
+  for (const ids of chunkIds(productIds)) {
+    const { data: planEntries } = await supabase
+      .from("order_plan_entries")
+      .select("*")
+      .in("product_id", ids);
+    (planEntries ?? []).forEach((row) => {
+      planByProduct.set(row.product_id, row);
+    });
+  }
 
   const buildQuery = (overrides: Partial<SearchParams>) => {
     const params = new URLSearchParams();
@@ -302,6 +332,7 @@ export default async function OrderPlanPage({
       : [];
     const supplier = overrides.supplier ?? resolvedParams.supplier;
     const gtip = overrides.gtip ?? resolvedParams.gtip;
+    const tip = overrides.tip ?? resolvedParams.tip;
     const quantityFilterValue = overrides.quantityFilter ?? resolvedParams.quantityFilter ?? "";
     let filledOnlyValue = overrides.filledOnly ?? resolvedParams.filledOnly;
     let needOnlyValue = overrides.needOnly ?? resolvedParams.needOnly;
@@ -316,25 +347,23 @@ export default async function OrderPlanPage({
       needOnlyValue = "1";
     }
     const perPageValue = overrides.perPage ?? String(perPage);
+    const sortByValue = overrides.sortBy ?? sortBy;
+    const sortDirValue = overrides.sortDir ?? sortDir;
     const pageValue = overrides.page ?? String(currentPage);
     if (q) params.set("q", q);
     if (normalizedGroups.length) params.set("group", normalizedGroups.join(","));
     if (supplier) params.set("supplier", supplier);
     if (gtip) params.set("gtip", gtip);
+    if (tip) params.set("tip", tip);
     if (quantityFilterValue) params.set("quantityFilter", quantityFilterValue);
     if (filledOnlyValue === "1") params.set("filledOnly", "1");
     if (needOnlyValue === "1") params.set("needOnly", "1");
     if (perPageValue) params.set("perPage", String(perPageValue));
+    if (sortByValue) params.set("sortBy", String(sortByValue));
+    if (sortDirValue) params.set("sortDir", String(sortDirValue));
     if (pageValue && Number(pageValue) > 1) params.set("page", String(pageValue));
     const qs = params.toString();
     return qs ? `?${qs}` : "";
-  };
-
-  const toggleGroupQuery = (groupId: string) => {
-    const nextGroups = selectedGroupIds.includes(groupId)
-      ? selectedGroupIds.filter((id) => id !== groupId)
-      : [...selectedGroupIds, groupId];
-    return buildQuery({ group: nextGroups, page: "1" });
   };
 
   const groupStats = (groupStatsRaw ?? []).map((group) => {
@@ -348,8 +377,6 @@ export default async function OrderPlanPage({
     };
   });
 
-  const startIndex = startIndexProducts;
-  const endIndex = totalCount ? Math.min(startIndexProducts + perPage, totalCount) : 0;
   const orderPlanRows = productList.map((p: any) => {
     const inTransit = inTransitByProduct[p.id] ?? 0;
     const rfqQty = rfqByProduct.get(p.id) ?? 0;
@@ -444,99 +471,24 @@ export default async function OrderPlanPage({
         </div>
       )}
 
-      <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-black/40">Ürün istatistikleri</p>
-            <p className="text-lg font-semibold text-black">
-              Toplam ürün: {totalProductsCount ?? 0}
-            </p>
-          </div>
-          <div className="text-xs text-black/60">
-            Gösterilen: {totalCount ? `${startIndex + 1}-${endIndex}` : "0"} / {` ${totalCount}`}
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-black/70">
-          {groupStats.map((group) => (
-            <Link
-              href={`/siparis-plani${toggleGroupQuery(group.id)}`}
-              key={group.id}
-              className={`rounded-full border px-3 py-1 transition ${
-                selectedGroupIds.includes(group.id)
-                  ? "border-[var(--ocean)] bg-[var(--ocean)]/10 text-[var(--ocean)]"
-                  : "border-black/10 bg-[var(--mint)]/40 text-black/70 hover:border-[var(--ocean)]/40"
-              }`}
-            >
-              {group.name}: {group.count}
-            </Link>
-          ))}
-          {uncategorizedCount ? (
-            <span className="rounded-full border border-black/10 bg-[var(--peach)] px-3 py-1">
-              Kategorisiz: {uncategorizedCount}
-            </span>
-          ) : null}
-        </div>
-        {selectedGroupIds.length ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-black/60">Seçili kategoriler:</span>
-            {selectedGroupIds.map((gid) => (
-              <Link
-                key={gid}
-                href={`/siparis-plani${buildQuery({
-                  group: selectedGroupIds.filter((id) => id !== gid),
-                  page: "1",
-                })}`}
-                className="group inline-flex items-center gap-2 rounded-full bg-[var(--ocean)]/10 px-3 py-1 font-semibold text-[var(--ocean)]"
-              >
-                {groups?.find((g) => g.id === gid)?.name ?? gid}
-                <span className="rounded-full bg-[var(--ocean)]/20 px-2 py-[2px] text-[10px] font-bold text-[var(--ocean)]/80 group-hover:bg-[var(--ocean)]/30">
-                  ×
-                </span>
-              </Link>
-            ))}
-            <Link
-              href="/siparis-plani"
-              className="rounded-full border border-black/20 px-3 py-1 font-semibold text-black/70"
-            >
-              Temizle
-            </Link>
-          </div>
-        ) : null}
-      </div>
-
-      <form className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+      <form className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
         <input type="hidden" name="page" value="1" />
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <label className="text-sm font-medium text-black/70">
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-8">
+          <label className="text-sm font-medium">
             Arama
             <input
               name="q"
               defaultValue={resolvedParams.q ?? ""}
               placeholder="Ürün kodu, adı, marka"
-            className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
           />
         </label>
-          <label className="text-sm font-medium text-black/70">
-            Kategori
-            <select
-              name="group"
-              multiple
-              defaultValue={selectedGroupIds}
-              className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
-            >
-              {groups?.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium text-black/70">
+          <label className="text-sm font-medium">
             Tedarikçi
             <select
               name="supplier"
               defaultValue={resolvedParams.supplier ?? ""}
-              className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
               {suppliers?.map((s) => (
@@ -546,12 +498,12 @@ export default async function OrderPlanPage({
               ))}
             </select>
           </label>
-          <label className="text-sm font-medium text-black/70">
+          <label className="text-sm font-medium">
             GTIP
             <select
               name="gtip"
               defaultValue={resolvedParams.gtip ?? ""}
-              className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
               <option value="none">GTIP yok</option>
@@ -562,12 +514,28 @@ export default async function OrderPlanPage({
               ))}
             </select>
           </label>
-          <label className="text-sm font-medium text-black/70">
+          <label className="text-sm font-medium">
+            Tip
+            <select
+              name="tip"
+              defaultValue={resolvedParams.tip ?? ""}
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Hepsi</option>
+              <option value="none">Tip yok</option>
+              {productTypes?.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium">
             Miktar filtresi
             <select
               name="quantityFilter"
               defaultValue={quantityFilterDefault}
-              className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               <option value="">Hepsi</option>
               <option value="filled">Sadece inputu dolu olanlar</option>
@@ -575,12 +543,12 @@ export default async function OrderPlanPage({
               <option value="both">Inputu dolu VE ihtiyacı &gt; 0 olanlar</option>
             </select>
           </label>
-          <label className="text-sm font-medium text-black/70">
+          <label className="text-sm font-medium">
             Sayfada
             <select
               name="perPage"
               defaultValue={String(perPage)}
-              className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
             >
               {perPageOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -589,14 +557,67 @@ export default async function OrderPlanPage({
               ))}
             </select>
           </label>
+          <label className="text-sm font-medium">
+            Sıralama
+            <select
+              name="sortBy"
+              defaultValue={sortBy}
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+            >
+              <option value="created_at">Oluşturma tarihi</option>
+              <option value="code">Ürün kodu</option>
+              <option value="name">Ürün adı</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Yön
+            <select
+              name="sortDir"
+              defaultValue={sortDir}
+              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+            >
+              <option value="desc">Azalan</option>
+              <option value="asc">Artan</option>
+            </select>
+          </label>
         </div>
-        <div className="mt-4 flex gap-2">
+        <details
+          className="mt-3 rounded-2xl border border-black/10 bg-[var(--mint)]/15 p-2"
+          open={selectedGroupIds.length > 0}
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl px-2 py-1 text-xs font-semibold text-black/65">
+            <span className="uppercase tracking-[0.2em]">Kategori filtresi</span>
+            <span className="rounded-full bg-white/80 px-2 py-[2px] text-[11px] font-bold text-[var(--ocean)]">
+              {selectedGroupIds.length ? `${selectedGroupIds.length} secili` : "Hepsi"}
+            </span>
+          </summary>
+          <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto px-1 pb-1">
+            {groupStats.map((group) => (
+              <label key={group.id} className="inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  name="group"
+                  value={group.id}
+                  defaultChecked={selectedGroupIds.includes(group.id)}
+                  className="peer sr-only"
+                />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-2.5 py-1 text-[11px] text-black/70 transition hover:border-[var(--ocean)]/40 peer-checked:border-[var(--ocean)] peer-checked:bg-[var(--ocean)]/12 peer-checked:text-[var(--ocean)]">
+                  <span className="font-semibold">{group.name}</span>
+                  <span className="rounded-full bg-black/10 px-1.5 py-[1px] text-[10px] font-semibold text-black/60 peer-checked:bg-[var(--ocean)]/20 peer-checked:text-[var(--ocean)]/80">
+                    {group.count}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </details>
+        <div className="mt-3 flex flex-wrap gap-2">
           <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
             Filtrele
           </button>
           <Link
             href="/siparis-plani"
-            className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold text-black/70"
+            className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
           >
             Temizle
           </Link>

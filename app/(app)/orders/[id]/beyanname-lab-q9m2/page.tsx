@@ -77,6 +77,14 @@ const formatMoney = (value: Numberish, currency: string | null | undefined, digi
 const pct = (value: Numberish) => toNumber(value) / 100;
 
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
+const normalizeCountry = (value: string | null | undefined) => (value ?? "").trim().toLocaleLowerCase("tr-TR");
+const countryKey = (value: string | null | undefined) =>
+  normalizeCountry(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+const preferValue = <T,>(countryValue: T | null | undefined, baseValue: T | null | undefined) =>
+  countryValue ?? baseValue ?? null;
 
 export default async function OrderDeclarationLabPage({
   params,
@@ -146,10 +154,17 @@ export default async function OrderDeclarationLabPage({
     );
   }
 
-  const [{ data: supplier }, { data: orderItemsRaw }, { data: packingItemsRaw }, { data: packingSummary }, { data: orderDocumentsRaw }] =
+  const [
+    { data: supplier },
+    { data: orderItemsRaw },
+    { data: orderPackingItemsRaw },
+    { data: packingSummary },
+    { data: orderDocumentsRaw },
+    { data: packingListsRaw },
+  ] =
     await Promise.all([
       order.supplier_id
-        ? supabase.from("suppliers").select("id, name").eq("id", order.supplier_id).maybeSingle()
+        ? supabase.from("suppliers").select("id, name, country").eq("id", order.supplier_id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase
         .from("order_items")
@@ -184,11 +199,88 @@ export default async function OrderDeclarationLabPage({
           "id, file_name, insurance_amount, insurance_currency, freight_amount, freight_currency, document_types(code, name)"
         )
         .eq("order_id", order.id),
+      supabase.from("packing_lists").select("id").eq("order_id", order.id),
     ]);
 
   const orderItems = (orderItemsRaw ?? []) as any[];
-  const packingItems = (packingItemsRaw ?? []) as any[];
+  const packingListIds = ((packingListsRaw ?? []) as any[]).map((row) => row.id).filter(Boolean) as string[];
+  let packingImportItems: any[] = [];
+  if (packingListIds.length) {
+    const { data: packingImportLinesRaw } = await supabase
+      .from("packing_list_lines")
+      .select("product_id, product_name_raw, quantity, net_weight, gross_weight")
+      .in("packing_list_id", packingListIds);
+    packingImportItems = ((packingImportLinesRaw ?? []) as any[]).map((line) => ({
+      product_id: line.product_id ?? null,
+      product_code: line.product_name_raw ?? null,
+      quantity: line.quantity ?? 0,
+      net_weight_kg: line.net_weight ?? 0,
+      gross_weight_kg: line.gross_weight ?? 0,
+      weight_kg: null,
+    }));
+  }
+  const packingItems =
+    packingImportItems.length > 0 ? packingImportItems : ((orderPackingItemsRaw ?? []) as any[]);
   const orderDocuments = (orderDocumentsRaw ?? []) as any[];
+  const supplierCountryLabel = String((supplier as any)?.country ?? "").trim();
+  const supplierCountry = normalizeCountry((supplier as any)?.country ?? null);
+  const supplierCountryKey = countryKey((supplier as any)?.country ?? null);
+
+  const gtipIds = Array.from(
+    new Set(
+      orderItems
+        .map((item: any) => {
+          const product = takeOne<any>(item.products);
+          const gtip = takeOne<any>(product?.gtip);
+          return gtip?.id ? String(gtip.id) : null;
+        })
+        .filter(Boolean) as string[]
+    )
+  );
+
+  const { data: gtipCountryRatesRaw } =
+    supplierCountry && gtipIds.length
+      ? await supabase
+          .from("gtip_country_rates")
+          .select(
+            "gtip_id, country, customs_duty_rate, additional_duty_rate, vat_rate, anti_dumping_applicable, anti_dumping_rate, surveillance_applicable, surveillance_unit_value"
+          )
+          .in("gtip_id", gtipIds)
+      : { data: [] as any[] };
+
+  const gtipCountryRates = (gtipCountryRatesRaw ?? []) as any[];
+  const gtipRateById = new Map<string, any>();
+  const gtipRateCountryById = new Map<string, string>();
+  const ratesByGtip = new Map<string, Map<string, any>>();
+
+  for (const row of gtipCountryRates) {
+    const rowGtipId = row?.gtip_id ? String(row.gtip_id) : "";
+    const key = countryKey(row?.country ?? null);
+    if (!rowGtipId || !key) continue;
+    if (!ratesByGtip.has(rowGtipId)) ratesByGtip.set(rowGtipId, new Map<string, any>());
+    ratesByGtip.get(rowGtipId)!.set(key, row);
+  }
+
+  if (supplierCountryKey) {
+    for (const [gtipId, rateRows] of ratesByGtip.entries()) {
+      let match = rateRows.get(supplierCountryKey);
+      if (!match) {
+        for (const [key, row] of rateRows.entries()) {
+          if (key.includes(supplierCountryKey) || supplierCountryKey.includes(key)) {
+            match = row;
+            break;
+          }
+        }
+      }
+      if (!match && rateRows.size === 1) {
+        match = Array.from(rateRows.values())[0] ?? null;
+      }
+      if (match) {
+        gtipRateById.set(gtipId, match);
+        gtipRateCountryById.set(gtipId, String(match.country ?? ""));
+      }
+    }
+  }
 
   const orderCurrency = order.currency ?? "USD";
   const currencyWarnings: string[] = [];
@@ -271,7 +363,37 @@ export default async function OrderDeclarationLabPage({
 
   const lines: DeclarationLine[] = baseLines.map((line) => {
     const warnings: string[] = [];
-    const gtip = line.gtip;
+    const countryRate = line.gtip?.id ? gtipRateById.get(String(line.gtip.id)) : null;
+    const matchedCountry = line.gtip?.id ? gtipRateCountryById.get(String(line.gtip.id)) ?? null : null;
+    const gtip = countryRate
+      ? {
+          ...line.gtip,
+          customs_duty_rate: preferValue(countryRate.customs_duty_rate, line.gtip?.customs_duty_rate),
+          additional_duty_rate: preferValue(countryRate.additional_duty_rate, line.gtip?.additional_duty_rate),
+          vat_rate: preferValue(countryRate.vat_rate, line.gtip?.vat_rate),
+          anti_dumping_applicable: preferValue(
+            countryRate.anti_dumping_applicable,
+            line.gtip?.anti_dumping_applicable
+          ),
+          anti_dumping_rate: preferValue(countryRate.anti_dumping_rate, line.gtip?.anti_dumping_rate),
+          surveillance_applicable: preferValue(
+            countryRate.surveillance_applicable,
+            line.gtip?.surveillance_applicable
+          ),
+          surveillance_unit_value: preferValue(
+            countryRate.surveillance_unit_value,
+            line.gtip?.surveillance_unit_value
+          ),
+        }
+      : line.gtip;
+
+    if (countryRate && matchedCountry) {
+      warnings.push(`Oran kaynagi: GTIP ulke (${matchedCountry})`);
+    } else if (line.gtip?.id && supplierCountryLabel) {
+      warnings.push(`Oran kaynagi: GTIP genel (ulke eslesmesi yok: ${supplierCountryLabel})`);
+    } else {
+      warnings.push("Oran kaynagi: GTIP genel");
+    }
 
     const netKg = line.netKg;
     const grossKg = line.grossKg;
@@ -279,9 +401,7 @@ export default async function OrderDeclarationLabPage({
 
     let surveillanceWeightKg = grossKg;
     const fallbackGrossTotal = weightResolution.totals.fallbackGrossKg;
-    const grossLooksLikeNet =
-      grossKg > 0 && netKg > 0 && Math.abs(grossKg - netKg) <= 0.000001;
-    if ((surveillanceWeightKg <= 0 || grossLooksLikeNet) && fallbackGrossTotal > 0) {
+    if (surveillanceWeightKg <= 0 && fallbackGrossTotal > 0) {
       if (totalFob > 0) {
         surveillanceWeightKg = round((line.fobTotal / Math.max(totalFob, 1)) * fallbackGrossTotal, 6);
       } else if (totalQty > 0) {
@@ -445,6 +565,12 @@ export default async function OrderDeclarationLabPage({
               </span>
               <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
                 Siparis para birimi: {orderCurrency}
+              </span>
+              <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
+                Oran ulkesi:{" "}
+                {supplierCountryLabel
+                  ? `${supplierCountryLabel}${gtipRateById.size ? ` (${gtipRateById.size} GTIP ulke override)` : " (GTIP genel fallback)"}`
+                  : "GTIP genel (tedarikci ulkesi yok)"}
               </span>
               <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
                 Siparis toplami: {formatMoney(order.total_amount, orderCurrency)}

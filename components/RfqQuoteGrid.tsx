@@ -35,11 +35,13 @@ export default function RfqQuoteGrid({
   currency,
   items,
   suppliers,
+  readOnly = false,
 }: {
   rfqId: string;
   currency?: string | null;
   items: QuoteItem[];
   suppliers: QuoteSupplier[];
+  readOnly?: boolean;
 }) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [value, setValue] = useState<string>("");
@@ -57,6 +59,7 @@ export default function RfqQuoteGrid({
   };
 
   const startEdit = (supplierId: string, itemId: string, current?: number | null) => {
+    if (readOnly) return;
     const key = `${supplierId}-${itemId}`;
     setEditingKey(key);
     setValue(current != null ? String(current) : "");
@@ -68,6 +71,7 @@ export default function RfqQuoteGrid({
   };
 
   const save = async (supplierId: string, itemId: string) => {
+    if (readOnly) return;
     const key = `${supplierId}-${itemId}`;
     if (saving === key) return;
     setSaving(key);
@@ -194,6 +198,14 @@ export default function RfqQuoteGrid({
     return used ? total : null;
   }, [items]);
 
+  const totalQuantity = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const qty = Number(item.quantity ?? 0);
+      if (!Number.isFinite(qty)) return sum;
+      return sum + qty;
+    }, 0);
+  }, [items]);
+
   const totalBaseline = useMemo<Baseline>(() => {
     const totals = suppliers
       .map((sup) => getTotalForSupplier(sup))
@@ -241,7 +253,9 @@ export default function RfqQuoteGrid({
     return (
       <button
         type="button"
-        onDoubleClick={() => startEdit(sup.id, item.id, current)}
+        onDoubleClick={() => {
+          if (!readOnly) startEdit(sup.id, item.id, current);
+        }}
         className={`w-full rounded-xl border px-2.5 py-2 text-right transition ${
           current != null
             ? "border-emerald-200 bg-emerald-50/50 hover:border-emerald-300"
@@ -349,6 +363,7 @@ export default function RfqQuoteGrid({
     <div className="overflow-x-auto rounded-2xl border border-black/10 bg-white shadow-sm">
       <div className="border-b border-black/10 px-4 py-3 text-[11px] text-black/45">
         Fark %: birden fazla teklifte en dusuk teklif, tek teklifte hedef fiyat baz alinir.
+        {readOnly ? " (Yonetim rolunde duzenleme kapali)" : ""}
       </div>
       <table className="w-full table-fixed text-sm">
         <colgroup>
@@ -467,7 +482,9 @@ export default function RfqQuoteGrid({
             <td className="sticky left-0 z-20 border-t border-r border-black/10 bg-[#f1f3f4] px-4 py-4 font-semibold text-black shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)]">
               Toplam
             </td>
-            <td className="border-t border-r border-black/10 px-3 py-4 text-right text-black/45">Adet x fiyat</td>
+            <td className="border-t border-r border-black/10 px-3 py-4 text-right font-semibold text-black/75">
+              {formatNumber(totalQuantity, 2)}
+            </td>
             <td className="border-t border-r border-black/10 px-3 py-4 text-right font-semibold text-black/75">
               {targetTotal != null ? `${formatNumber(targetTotal, 2)} ${currency ?? ""}` : "-"}
             </td>

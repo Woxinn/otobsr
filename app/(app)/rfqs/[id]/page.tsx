@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation";
 import { deleteDocument } from "@/app/actions/documents";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { canViewModule, getCurrentUserRole } from "@/lib/roles";
+import { canEdit, canViewModule, getCurrentUserRole } from "@/lib/roles";
 import RfqActionBar from "@/components/RfqActionBar";
 import QuoteModal from "@/components/QuoteModal";
 import RfqImportModal from "@/components/RfqImportModal";
@@ -34,6 +34,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const supabase = await createSupabaseServerClient();
   const { role } = await getCurrentUserRole();
+  const canEditPage = canEdit(role);
   if (!canViewModule(role, "rfqs")) {
     return <div className="p-6 text-sm text-red-600">Erişim yok.</div>;
   }
@@ -312,43 +313,47 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         >
           Listeye dön
         </Link>
-        <RfqImportModal rfqId={rfq.id} />
+        {canEditPage ? <RfqImportModal rfqId={rfq.id} /> : null}
         <Link
           href={`/api/rfq/export?rfq_id=${rfq.id}`}
           className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70 hover:bg-black/5"
         >
           Excel export
         </Link>
-        <RfqConvertModal
-          rfqId={rfq.id}
-          supplierId={(rfq as any).selected_supplier_id ?? null}
-          currency={rfq.currency ?? null}
-          items={(rfq.rfq_items ?? []).map((it: any) => {
-            const quote = (rfq.rfq_quotes ?? []).find((q: any) => q.supplier_id === (rfq as any).selected_supplier_id);
-            const qi = quote?.rfq_quote_items?.find((x: any) => x.rfq_item_id === it.id);
-            return {
-              id: it.id,
-              product_code: it.product_code,
-              product_name: it.product_name,
-              quantity: it.quantity,
-              price: qi?.unit_price ?? null,
-            };
-          })}
-        />
+        {canEditPage ? (
+          <RfqConvertModal
+            rfqId={rfq.id}
+            supplierId={(rfq as any).selected_supplier_id ?? null}
+            currency={rfq.currency ?? null}
+            items={(rfq.rfq_items ?? []).map((it: any) => {
+              const quote = (rfq.rfq_quotes ?? []).find((q: any) => q.supplier_id === (rfq as any).selected_supplier_id);
+              const qi = quote?.rfq_quote_items?.find((x: any) => x.rfq_item_id === it.id);
+              return {
+                id: it.id,
+                product_code: it.product_code,
+                product_name: it.product_name,
+                quantity: it.quantity,
+                price: qi?.unit_price ?? null,
+              };
+            })}
+          />
+        ) : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm md:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-black/70">Ürünler</h2>
-            <QuoteModal
-              rfqId={rfq.id}
-              rfqItems={rfq.rfq_items ?? []}
-              suppliers={(rfq.rfq_suppliers ?? []).map((s: any) => ({
-                id: s.supplier_id,
-                name: s.suppliers?.name ?? s.supplier_id,
-              }))}
-            />
+            {canEditPage ? (
+              <QuoteModal
+                rfqId={rfq.id}
+                rfqItems={rfq.rfq_items ?? []}
+                suppliers={(rfq.rfq_suppliers ?? []).map((s: any) => ({
+                  id: s.supplier_id,
+                  name: s.suppliers?.name ?? s.supplier_id,
+                }))}
+              />
+            ) : null}
           </div>
           <table className="w-full text-sm">
             <thead className="text-left text-[11px] uppercase tracking-[0.28em] text-black/50">
@@ -357,7 +362,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                 <th className="px-3 py-2">Ürün</th>
                 <th className="px-3 py-2 text-right">Miktar</th>
                 <th className="px-3 py-2 text-right">Hedef fiyat</th>
-                <th className="px-3 py-2 text-right">Aksiyon</th>
+                {canEditPage ? <th className="px-3 py-2 text-right">Aksiyon</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -368,20 +373,28 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                     <td className="px-3 py-3">{item.product_name ?? "-"}</td>
                     <td className="px-3 py-3 text-right">{fmtNum(item.quantity, 2)}</td>
                     <td className="px-3 py-3 text-right">
-                      <RfqTargetPriceField
-                        rfqId={rfq.id}
-                        rfqItemId={item.id}
-                        value={item.target_unit_price ?? null}
-                        currency={rfq.currency ?? null}
-                      />
+                      {canEditPage ? (
+                        <RfqTargetPriceField
+                          rfqId={rfq.id}
+                          rfqItemId={item.id}
+                          value={item.target_unit_price ?? null}
+                          currency={rfq.currency ?? null}
+                        />
+                      ) : (
+                        <span className="text-black/75">
+                          {item.target_unit_price != null ? `${item.target_unit_price} ${rfq.currency ?? ""}` : "-"}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-3 py-3 text-right">
-                      <RfqItemDeleteButton
-                        rfqId={rfq.id}
-                        rfqItemId={item.id}
-                        productCode={item.product_code ?? null}
-                      />
-                    </td>
+                    {canEditPage ? (
+                      <td className="px-3 py-3 text-right">
+                        <RfqItemDeleteButton
+                          rfqId={rfq.id}
+                          rfqItemId={item.id}
+                          productCode={item.product_code ?? null}
+                        />
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}
@@ -390,7 +403,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         </div>
 
         <div className="space-y-3 rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
-          <RfqActionBar rfqId={rfq.id} status={rfq.status} />
+          {canEditPage ? <RfqActionBar rfqId={rfq.id} status={rfq.status} /> : null}
           <div className="flex justify-between text-sm">
             <span>Durum</span>
             <span className="font-semibold capitalize">{rfq.status}</span>
@@ -406,16 +419,19 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           <div>
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-black/50">Tedarikçiler</h3>
             <div className="mb-3">
-              <RfqSupplierAdder
-                rfqId={rfq.id}
-                suppliers={availableSuppliers.map((row: any) => ({
-                  id: String(row.id),
-                  name: row.name ?? String(row.id),
-                }))}
-              />
+              {canEditPage ? (
+                <RfqSupplierAdder
+                  rfqId={rfq.id}
+                  suppliers={availableSuppliers.map((row: any) => ({
+                    id: String(row.id),
+                    name: row.name ?? String(row.id),
+                  }))}
+                />
+              ) : null}
             </div>
             <SupplierQuoteList
               rfqId={rfq.id}
+              readOnly={!canEditPage}
               suppliers={(rfq.rfq_suppliers ?? []).map((row: any) => ({
                 id: row.supplier_id,
                 name: row.suppliers?.name ?? row.supplier_id ?? "-",
@@ -435,6 +451,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         </div>
         <RfqQuoteGrid
           rfqId={rfq.id}
+          readOnly={!canEditPage}
           currency={rfq.currency ?? null}
           items={rfq.rfq_items ?? []}
           suppliers={Array.from(
@@ -467,16 +484,18 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                 </div>
                 <div className="flex items-center gap-2">
                   {doc.storage_path ? <DocumentDownloadButton storagePath={doc.storage_path} label="Gor" /> : null}
-                  <ConfirmActionForm
-                    action={deleteDocument}
-                    confirmText="Bu belgeyi silmek istiyor musun?"
-                    buttonText="Sil"
-                    className="contents"
-                    buttonClassName="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
-                  >
-                    <input type="hidden" name="document_id" value={doc.id} />
-                    <input type="hidden" name="rfq_id" value={rfq.id} />
-                  </ConfirmActionForm>
+                  {canEditPage ? (
+                    <ConfirmActionForm
+                      action={deleteDocument}
+                      confirmText="Bu belgeyi silmek istiyor musun?"
+                      buttonText="Sil"
+                      className="contents"
+                      buttonClassName="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
+                    >
+                      <input type="hidden" name="document_id" value={doc.id} />
+                      <input type="hidden" name="rfq_id" value={rfq.id} />
+                    </ConfirmActionForm>
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -484,11 +503,13 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           </ul>
         </div>
         <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm md:col-span-2">
-          {proformaDocType ? (
+          {canEditPage && proformaDocType ? (
             <DocumentUploader rfqId={rfq.id} documentTypes={[{ id: proformaDocType.id, name: proformaDocType.name }]} />
           ) : (
             <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-              Proforma belge tipi bulunamadi. `document_types` tablosunda `Proforma` kaydi gerekli.
+              {proformaDocType
+                ? "Belge yukleme yalnizca admin rolu icin aciktir."
+                : "Proforma belge tipi bulunamadi. `document_types` tablosunda `Proforma` kaydi gerekli."}
             </div>
           )}
         </div>

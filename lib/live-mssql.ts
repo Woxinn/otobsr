@@ -21,9 +21,12 @@ const BRIDGE_TIMEOUT_MS = Math.max(5000, Number(process.env.MSSQL_BRIDGE_TIMEOUT
 const BRIDGE_POLL_MS = Math.max(250, Number(process.env.MSSQL_BRIDGE_POLL_MS ?? "500"));
 const STOCK_CACHE_TTL_MS = Math.max(0, Number(process.env.MSSQL_STOCK_CACHE_TTL_MS ?? "15000"));
 type StockSource = "sthar" | "stokhar";
+type SalesSource = "sthar" | "stokhar";
 
 const getStockSource = (): StockSource =>
   (String(process.env.MSSQL_STOCK_SOURCE ?? "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar");
+const getSalesSource = (): SalesSource =>
+  (String(process.env.MSSQL_SALES_SOURCE ?? "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar");
 
 const stockCache = new Map<string, { expiresAt: number; result: Map<string, number> }>();
 type DirectPool = InstanceType<typeof sql.ConnectionPool>;
@@ -274,6 +277,7 @@ async function fetchDirectSalesAgg(codes: string[]) {
   const result = new Map<string, SalesAgg>();
   const dbs = getSalesDbs();
   const pools: any[] = [];
+  const salesSource = getSalesSource();
 
   for (const dbName of dbs) {
     const pool = await connectDirectMssql(dbName);
@@ -295,40 +299,103 @@ async function fetchDirectSalesAgg(codes: string[]) {
   const start10y = new Date(today);
   start10y.setHours(0, 0, 0, 0);
   start10y.setDate(start10y.getDate() - 3650);
+  const chunkSize = 60;
+
+  codes.forEach((code) => {
+    result.set(code.trim(), { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 });
+  });
 
   try {
-    for (const code of codes) {
-      const key = code.trim();
-      const agg = { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
-      for (const pool of pools) {
-        const query = `
-          SELECT
-            SUM(CASE WHEN STHAR_TARIH >= @start120 THEN STHAR_GCMIK ELSE 0 END) AS sales120,
-            SUM(CASE WHEN STHAR_TARIH >= @start60 THEN STHAR_GCMIK ELSE 0 END) AS sales60,
-            SUM(CASE WHEN STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS salesPrev60,
-            SUM(CASE WHEN STHAR_TARIH >= @start10y THEN STHAR_GCMIK ELSE 0 END) AS sales10y
-          FROM TBLSTHAR
-          WHERE LTRIM(RTRIM(STOK_KODU)) LIKE @code AND UPPER(STHAR_GCKOD) = 'C'
-        `;
+    for (const pool of pools) {
+      if (salesSource === "stokhar") {
+        for (let i = 0; i < codes.length; i += chunkSize) {
+          const part = codes.slice(i, i + chunkSize).map((code) => code.trim()).filter(Boolean);
+          if (!part.length) continue;
 
-        const row =
-          (
-            await pool
-              .request()
-              .input("start120", sql.DateTime, start120)
-              .input("start60", sql.DateTime, start60)
-              .input("startPrev60", sql.DateTime, startPrev60)
-              .input("start10y", sql.DateTime, start10y)
-              .input("code", sql.VarChar, `${key}%`)
-              .query(query)
-          ).recordset?.[0] ?? {};
+          const request = pool
+            .request()
+            .input("start120", sql.DateTime, start120)
+            .input("start60", sql.DateTime, start60)
+            .input("startPrev60", sql.DateTime, startPrev60);
 
-        agg.sales120 += Number(row.sales120 ?? 0);
-        agg.sales60 += Number(row.sales60 ?? 0);
-        agg.salesPrev60 += Number(row.salesPrev60 ?? 0);
-        agg.sales10y += Number(row.sales10y ?? 0);
+          const selectSales120: string[] = [];
+          const selectSales60: string[] = [];
+          const selectSalesPrev60: string[] = [];
+          const where: string[] = [];
+
+          part.forEach((code, index) => {
+            const param = `code${index}`;
+            request.input(param, sql.VarChar, `${code}%`);
+            const match = `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
+            selectSales120.push(
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start120 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
+            );
+            selectSales60.push(
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
+            );
+            selectSalesPrev60.push(
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @startPrev60 AND T2.TARIH < @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS sp60_${index}`
+            );
+            where.push(match);
+          });
+
+          const rs = await request.query(`
+            SELECT
+              ${[...selectSales120, ...selectSales60, ...selectSalesPrev60].join(",\n              ")}
+            FROM TBLSTOKSB T1
+            LEFT JOIN TBLSTOKHAR T2
+              ON T2.STOKID = T1.ID
+             AND T2.KAYITTIPI = 0
+             AND T2.ISLEMTIPI IN (0,1)
+            WHERE ${where.join(" OR ")}
+          `);
+
+          const row = rs.recordset?.[0] ?? {};
+          part.forEach((code, index) => {
+            const prev = result.get(code) ?? { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
+            prev.sales120 += Number((row as Record<string, unknown>)[`s120_${index}`] ?? 0);
+            prev.sales60 += Number((row as Record<string, unknown>)[`s60_${index}`] ?? 0);
+            prev.salesPrev60 += Number((row as Record<string, unknown>)[`sp60_${index}`] ?? 0);
+            result.set(code, prev);
+          });
+        }
+      } else {
+        for (const code of codes) {
+          const key = code.trim();
+          if (!key) continue;
+          const query = `
+            SELECT
+              SUM(CASE WHEN STHAR_TARIH >= @start120 THEN STHAR_GCMIK ELSE 0 END) AS sales120,
+              SUM(CASE WHEN STHAR_TARIH >= @start60 THEN STHAR_GCMIK ELSE 0 END) AS sales60,
+              SUM(CASE WHEN STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS salesPrev60,
+              SUM(CASE WHEN STHAR_TARIH >= @start10y THEN STHAR_GCMIK ELSE 0 END) AS sales10y
+            FROM TBLSTHAR
+            WHERE LTRIM(RTRIM(STOK_KODU)) LIKE @code AND UPPER(STHAR_GCKOD) = 'C'
+          `;
+
+          const row =
+            (
+              await pool
+                .request()
+                .input("start120", sql.DateTime, start120)
+                .input("start60", sql.DateTime, start60)
+                .input("startPrev60", sql.DateTime, startPrev60)
+                .input("start10y", sql.DateTime, start10y)
+                .input("code", sql.VarChar, `${key}%`)
+                .query(query)
+            ).recordset?.[0] ?? {};
+
+          const prev = result.get(key) ?? { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
+          prev.sales120 += Number(row.sales120 ?? 0);
+          prev.sales60 += Number(row.sales60 ?? 0);
+          prev.salesPrev60 += Number(row.salesPrev60 ?? 0);
+          prev.sales10y += Number(row.sales10y ?? 0);
+          result.set(key, prev);
+        }
       }
-      result.set(key, agg);
+
+      // stokhar modunda 10y icin ek MSSQL sorgusu calistirmiyoruz.
+      // 10y gosterimi uygulamada mevcut supabase toplamindan okunmaya devam eder.
     }
   } finally {
     await Promise.all(pools.map((pool) => pool.close()));

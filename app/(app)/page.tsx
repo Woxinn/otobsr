@@ -2,22 +2,9 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
-import { getCurrentUserRole, canViewFinance } from "@/lib/roles";
+import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import MonthlyOrdersChart from "@/components/MonthlyOrdersChart";
 import SupplierDonutChart from "@/components/SupplierDonutChart";
-
-function getWeekRange() {
-  const today = new Date();
-  const day = today.getDay();
-  const diffToMonday = (day + 6) % 7;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - diffToMonday);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return { monday, sunday };
-}
 
 export const metadata: Metadata = {
   title: "Gösterge Paneli",
@@ -26,13 +13,13 @@ export const metadata: Metadata = {
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const { role } = await getCurrentUserRole();
+  const canSeeFinance = canViewFinance(role);
   const isSales = role === "Satis";
   if (isSales) {
     return (
       <meta httpEquiv="refresh" content="0; url=/products" />
     );
   }
-  const canSeeFinance = canViewFinance(role);
   const { data: documentTypes } = await supabase
     .from("document_types")
     .select("id, name, is_required, is_critical, applies_to");
@@ -79,17 +66,6 @@ export default async function DashboardPage() {
       .select("shipment_id, orders(id)")
       .in("shipment_id", shipmentIds)
     : { data: [] };
-
-  const orderIds = shipmentOrders
-    ?.flatMap((row) => {
-      const orderList = row.orders
-        ? Array.isArray(row.orders)
-          ? row.orders
-          : [row.orders]
-        : [];
-      return orderList.map((order) => order.id);
-    })
-    .filter(Boolean);
 
   const allOrderIds = orders?.map((order) => order.id) ?? [];
   const { data: orderDocuments } = allOrderIds.length
@@ -158,7 +134,6 @@ export default async function DashboardPage() {
 
   const totalOpen = shipments?.length ?? 0;
   const delayed = flags?.filter((item) => item.flags.overdue).length ?? 0;
-  const problematicDocs = flags?.filter((item) => item.flags.hasProblematic).length ?? 0;
 
   const normalizeStatus = (value: string | null | undefined) =>
     (value ?? "")
@@ -310,14 +285,6 @@ export default async function DashboardPage() {
     },
   ];
 
-  const { monday, sunday } = getWeekRange();
-  const etaThisWeek =
-    shipments?.filter((item) => {
-      if (!item.eta_current) return false;
-      const eta = new Date(item.eta_current);
-      return eta >= monday && eta <= sunday;
-    }).length ?? 0;
-
   const orderMissingByOrder = new Map<string, string[]>();
   (orders ?? []).forEach((order) => {
     const docs = orderDocumentsByOrder.get(order.id) ?? [];
@@ -349,7 +316,6 @@ export default async function DashboardPage() {
       return aDate - bDate;
     });
   const ordersWithMissing = allOrdersWithMissing;
-  const missingDocs = allOrdersWithMissing.length;
   const nowMonth = new Date();
   const monthStart = new Date(nowMonth.getFullYear(), nowMonth.getMonth(), 1);
   const monthEnd = new Date(nowMonth.getFullYear(), nowMonth.getMonth() + 1, 0);
@@ -387,6 +353,30 @@ export default async function DashboardPage() {
     const paid = paidByOrder.get(order.id) ?? 0;
     return acc + Math.max(0, total - paid);
   }, 0);
+
+  const paymentMonthlyData = (() => {
+    if (!canSeeFinance) return [] as { month: string; count: number }[];
+    const TR_MONTHS = ["Oca", "Sub", "Mar", "Nis", "May", "Haz", "Tem", "Agu", "Eyl", "Eki", "Kas", "Ara"];
+    const nowChart = new Date();
+    const monthlyMap = new Map<string, number>();
+    for (let i = 5; i >= 0; i -= 1) {
+      const d = new Date(nowChart.getFullYear(), nowChart.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      monthlyMap.set(key, 0);
+    }
+    (orderPayments ?? []).forEach((payment) => {
+      if (payment.status !== "Odendi" || !payment.payment_date) return;
+      const d = new Date(payment.payment_date);
+      if (Number.isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      if (!monthlyMap.has(key)) return;
+      monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + paymentAmount(payment.amount));
+    });
+    return Array.from(monthlyMap.entries()).map(([key, total]) => {
+      const [, m] = key.split("-");
+      return { month: TR_MONTHS[Number(m)], count: Math.round(total) };
+    });
+  })();
 
   const formatMoney = (value: number) =>
     value.toLocaleString("tr-TR", {
@@ -614,6 +604,49 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {canSeeFinance ? (
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.28em] text-black/45">Finans Ozet</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              {[
+                {
+                  label: "Bu ay yapilan odeme",
+                  value: `${formatMoney(monthlyPaid)} USD`,
+                  tone: "bg-emerald-50",
+                },
+                {
+                  label: "Bekleyen odeme",
+                  value: `${formatMoney(pendingPayments)} USD`,
+                  tone: "bg-amber-50",
+                },
+                {
+                  label: "Kalan odeme",
+                  value: `${formatMoney(remainingPayments)} USD`,
+                  tone: "bg-rose-50",
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className={`rounded-2xl border border-black/10 ${item.tone} p-4`}
+                >
+                  <p className="text-xs uppercase tracking-widest text-black/50">
+                    {item.label}
+                  </p>
+                  <p className="mt-3 text-xl font-semibold">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.28em] text-black/45 mb-4">
+              Yapilan Odemelerin Aylik Dagilimi
+            </p>
+            <MonthlyOrdersChart data={paymentMonthlyData} />
+          </div>
+        </div>
+      ) : null}
+
       {/* ---- Grafikler ---- */}
       {!isSales ? (() => {
         const TR_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
@@ -661,80 +694,7 @@ export default async function DashboardPage() {
         );
       })() : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        {!isSales ? (
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { label: "Toplam acik shipment", value: totalOpen },
-                { label: "Bu hafta ETA", value: etaThisWeek },
-                { label: "Evrak eksik", value: missingDocs },
-                { label: "Evrak sorunlu", value: problematicDocs },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-2xl border border-black/10 bg-[var(--sky)] p-4"
-                >
-                  <p className="text-xs uppercase tracking-widest text-black/50">
-                    {item.label}
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold">{item.value}</p>
-                </div>
-              ))}
-            </div>
-            {canSeeFinance ? (
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                {[
-                  {
-                    label: "Bu ay yapilan odeme",
-                    value: `${formatMoney(monthlyPaid)} USD`,
-                    tone: "bg-emerald-50",
-                  },
-                  {
-                    label: "Bekleyen odeme",
-                    value: `${formatMoney(pendingPayments)} USD`,
-                    tone: "bg-amber-50",
-                  },
-                  {
-                    label: "Kalan odeme",
-                    value: `${formatMoney(remainingPayments)} USD`,
-                    tone: "bg-rose-50",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className={`rounded-2xl border border-black/10 ${item.tone} p-4`}
-                  >
-                    <p className="text-xs uppercase tracking-widest text-black/50">
-                      {item.label}
-                    </p>
-                    <p className="mt-3 text-xl font-semibold">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { label: "Toplam siparis", value: orders?.length ?? 0 },
-                { label: "Eksik evrakli siparis", value: missingDocs },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-4"
-                >
-                  <p className="text-xs uppercase tracking-widest text-black/50">
-                    {item.label}
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+      <div className="grid gap-6">
         <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold">Operasyon Notlari</p>
           <div className="mt-4 rounded-2xl border border-rose-200/60 bg-gradient-to-br from-rose-50 to-white p-4">

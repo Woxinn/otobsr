@@ -219,6 +219,18 @@ export async function GET(req: NextRequest) {
       .eq("order_id", orderId)
       .maybeSingle();
 
+    const packingItemsForResolution =
+      (packingLines ?? []).length > 0
+        ? (packingLines ?? []).map((line: any) => ({
+            product_id: line.product_id ?? null,
+            product_code: line.product_name_raw ?? null,
+            quantity: line.quantity ?? 0,
+            net_weight_kg: line.net_weight ?? 0,
+            gross_weight_kg: line.gross_weight ?? 0,
+            weight_kg: null,
+          }))
+        : ((orderPackingItems ?? []) as any[]);
+
     weightResolution = resolveOrderItemWeights({
       orderItems: (orderItems ?? []).map((oi: any) => {
         const product = Array.isArray(oi.products) ? oi.products[0] : oi.products;
@@ -233,7 +245,7 @@ export async function GET(req: NextRequest) {
           productCode: product?.code ?? null,
         };
       }),
-      packingItems: (orderPackingItems ?? []) as any[],
+      packingItems: packingItemsForResolution as any[],
       summary: (orderPackingSummary ?? null) as any,
     });
   }

@@ -190,9 +190,7 @@ export default function OrderDeclarationTryLab({
 
   const computed = useMemo(() => {
     const freightBase = baseTotals.netKg > 0 ? baseTotals.netKg : baseTotals.fobTotal;
-    const extraCostBase = baseTotals.fobTotal;
-
-    const nextLines = lines.map((line) => {
+    const preLines = lines.map((line) => {
       const freightShare =
         freightTotal > 0 && freightBase > 0
           ? freightTotal *
@@ -205,10 +203,6 @@ export default function OrderDeclarationTryLab({
         insuranceTotal > 0 && baseTotals.fobTotal > 0
           ? insuranceTotal * (line.fobTotal / baseTotals.fobTotal)
           : 0;
-      const extraCostShare =
-        ancillaryCostsTotal > 0 && extraCostBase > 0 ? ancillaryCostsTotal * (line.fobTotal / extraCostBase) : 0;
-      const stampTaxShare =
-        stampTaxTotal > 0 && extraCostBase > 0 ? stampTaxTotal * (line.fobTotal / extraCostBase) : 0;
 
       const cif = line.fobTotal + freightShare + insuranceShare;
       let surveillanceWeightKg = line.grossKg;
@@ -227,24 +221,40 @@ export default function OrderDeclarationTryLab({
       const additionalDuty = customsBase * (line.additionalDutyRate / 100);
       const antiDumping =
         line.antiDumpingApplicable && line.netKg > 0 ? line.antiDumpingRate * line.netKg : 0;
-      const vatBase = customsBase + customsDuty + additionalDuty + antiDumping + extraCostShare + stampTaxShare;
-      const vat = vatBase * (line.vatRate / 100);
-      const totalTaxes = customsDuty + additionalDuty + antiDumping + vat + stampTaxShare;
-      const landedTotal = cif + extraCostShare + totalTaxes;
-      const landedUnit = line.quantity > 0 ? landedTotal / line.quantity : 0;
 
       return {
         ...line,
         freightShare,
         insuranceShare,
-        extraCostShare,
-        stampTaxShare,
         cif,
         surveillanceBase,
         customsBase,
         customsDuty,
         additionalDuty,
         antiDumping,
+      };
+    });
+
+    const customsBaseTotal = preLines.reduce((sum, line) => sum + line.customsBase, 0);
+    const extraCostBase = customsBaseTotal > 0 ? customsBaseTotal : baseTotals.fobTotal;
+    const stampTaxBase = baseTotals.fobTotal;
+
+    const nextLines = preLines.map((line) => {
+      const extraCostShare =
+        ancillaryCostsTotal > 0 && extraCostBase > 0 ? ancillaryCostsTotal * (line.customsBase / extraCostBase) : 0;
+      const stampTaxShare =
+        stampTaxTotal > 0 && stampTaxBase > 0 ? stampTaxTotal * (line.fobTotal / stampTaxBase) : 0;
+
+      const vatBase = line.customsBase + line.customsDuty + line.additionalDuty + line.antiDumping + extraCostShare + stampTaxShare;
+      const vat = vatBase * (line.vatRate / 100);
+      const totalTaxes = line.customsDuty + line.additionalDuty + line.antiDumping + vat + stampTaxShare;
+      const landedTotal = line.cif + extraCostShare + totalTaxes;
+      const landedUnit = line.quantity > 0 ? landedTotal / line.quantity : 0;
+
+      return {
+        ...line,
+        extraCostShare,
+        stampTaxShare,
         vatBase,
         vat,
         totalTaxes,
@@ -252,16 +262,16 @@ export default function OrderDeclarationTryLab({
         landedUnit,
         unitPriceTry: line.unitPrice * rate,
         fobTotalTry: line.fobTotal * rate,
-        freightShareTry: freightShare * rate,
-        insuranceShareTry: insuranceShare * rate,
+        freightShareTry: line.freightShare * rate,
+        insuranceShareTry: line.insuranceShare * rate,
         extraCostShareTry: extraCostShare * rate,
         stampTaxShareTry: stampTaxShare * rate,
-        cifTry: cif * rate,
-        surveillanceBaseTry: surveillanceBase * rate,
-        customsBaseTry: customsBase * rate,
-        customsDutyTry: customsDuty * rate,
-        additionalDutyTry: additionalDuty * rate,
-        antiDumpingTry: antiDumping * rate,
+        cifTry: line.cif * rate,
+        surveillanceBaseTry: line.surveillanceBase * rate,
+        customsBaseTry: line.customsBase * rate,
+        customsDutyTry: line.customsDuty * rate,
+        additionalDutyTry: line.additionalDuty * rate,
+        antiDumpingTry: line.antiDumping * rate,
         vatBaseTry: vatBase * rate,
         vatTry: vat * rate,
         totalTaxesTry: totalTaxes * rate,
@@ -338,6 +348,147 @@ export default function OrderDeclarationTryLab({
         computed.totals.quantity > 0 ? (computed.totals.landedTotal / computed.totals.quantity) * rate : 0,
     }),
     [computed.totals, rate]
+  );
+
+  const gtipRows = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        id: string;
+        gtipCode: string;
+        lineCount: number;
+        quantity: number;
+        netKg: number;
+        grossKg: number;
+        fobTotalTry: number;
+        freightShareTry: number;
+        insuranceShareTry: number;
+        cifTry: number;
+        customsBaseTry: number;
+        extraCostShareTry: number;
+        stampTaxShareTry: number;
+        vatBaseTry: number;
+        surveillanceBaseTry: number;
+        customsDutyTry: number;
+        additionalDutyTry: number;
+        antiDumpingTry: number;
+        vatTry: number;
+        totalTaxesTry: number;
+        landedTotalTry: number;
+        customsDutyRates: Set<string>;
+        additionalDutyRates: Set<string>;
+        vatRates: Set<string>;
+        warnings: Set<string>;
+      }
+    >();
+
+    for (const line of computed.lines) {
+      const gtipCode = line.gtipCode ?? "GTIP yok";
+      const key = gtipCode;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: key,
+          gtipCode,
+          lineCount: 0,
+          quantity: 0,
+          netKg: 0,
+          grossKg: 0,
+          fobTotalTry: 0,
+          freightShareTry: 0,
+          insuranceShareTry: 0,
+          cifTry: 0,
+          customsBaseTry: 0,
+          extraCostShareTry: 0,
+          stampTaxShareTry: 0,
+          vatBaseTry: 0,
+          surveillanceBaseTry: 0,
+          customsDutyTry: 0,
+          additionalDutyTry: 0,
+          antiDumpingTry: 0,
+          vatTry: 0,
+          totalTaxesTry: 0,
+          landedTotalTry: 0,
+          customsDutyRates: new Set<string>(),
+          additionalDutyRates: new Set<string>(),
+          vatRates: new Set<string>(),
+          warnings: new Set<string>(),
+        });
+      }
+      const row = grouped.get(key)!;
+      row.lineCount += 1;
+      row.quantity += line.quantity;
+      row.netKg += line.netKg;
+      row.grossKg += line.grossKg;
+      row.fobTotalTry += line.fobTotalTry;
+      row.freightShareTry += line.freightShareTry;
+      row.insuranceShareTry += line.insuranceShareTry;
+      row.cifTry += line.cifTry;
+      row.customsBaseTry += line.customsBaseTry;
+      row.extraCostShareTry += line.extraCostShareTry;
+      row.stampTaxShareTry += line.stampTaxShareTry;
+      row.vatBaseTry += line.vatBaseTry;
+      row.surveillanceBaseTry += line.surveillanceBaseTry;
+      row.customsDutyTry += line.customsDutyTry;
+      row.additionalDutyTry += line.additionalDutyTry;
+      row.antiDumpingTry += line.antiDumpingTry;
+      row.vatTry += line.vatTry;
+      row.totalTaxesTry += line.totalTaxesTry;
+      row.landedTotalTry += line.landedTotalTry;
+      row.customsDutyRates.add(formatNumber(line.customsDutyRate, 2));
+      row.additionalDutyRates.add(formatNumber(line.additionalDutyRate, 2));
+      row.vatRates.add(formatNumber(line.vatRate, 2));
+      line.warnings.forEach((warning) => row.warnings.add(warning));
+    }
+
+    return Array.from(grouped.values()).sort((a, b) => a.gtipCode.localeCompare(b.gtipCode, "tr"));
+  }, [computed.lines]);
+
+  const gtipTotalsTry = useMemo(
+    () =>
+      gtipRows.reduce(
+        (acc, row) => {
+          acc.lineCount += row.lineCount;
+          acc.quantity += row.quantity;
+          acc.netKg += row.netKg;
+          acc.grossKg += row.grossKg;
+          acc.fobTotalTry += row.fobTotalTry;
+          acc.freightShareTry += row.freightShareTry;
+          acc.insuranceShareTry += row.insuranceShareTry;
+          acc.cifTry += row.cifTry;
+          acc.customsBaseTry += row.customsBaseTry;
+          acc.extraCostShareTry += row.extraCostShareTry;
+          acc.stampTaxShareTry += row.stampTaxShareTry;
+          acc.vatBaseTry += row.vatBaseTry;
+          acc.customsDutyTry += row.customsDutyTry;
+          acc.additionalDutyTry += row.additionalDutyTry;
+          acc.antiDumpingTry += row.antiDumpingTry;
+          acc.vatTry += row.vatTry;
+          acc.totalTaxesTry += row.totalTaxesTry;
+          acc.landedTotalTry += row.landedTotalTry;
+          return acc;
+        },
+        {
+          lineCount: 0,
+          quantity: 0,
+          netKg: 0,
+          grossKg: 0,
+          fobTotalTry: 0,
+          freightShareTry: 0,
+          insuranceShareTry: 0,
+          cifTry: 0,
+          customsBaseTry: 0,
+          extraCostShareTry: 0,
+          stampTaxShareTry: 0,
+          vatBaseTry: 0,
+          customsDutyTry: 0,
+          additionalDutyTry: 0,
+          antiDumpingTry: 0,
+          vatTry: 0,
+          totalTaxesTry: 0,
+          landedTotalTry: 0,
+        }
+      ),
+    [gtipRows]
   );
 
   const summaryCards = [
@@ -523,15 +674,15 @@ export default function OrderDeclarationTryLab({
 
       <div className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
         <div className="border-b border-black/8 px-5 py-4">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">Kalem bazlı hesap</p>
-          <h2 className="mt-2 text-lg font-semibold text-black">Beyanname kalemleri (TL)</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">GTIP bazlı hesap</p>
+          <h2 className="mt-2 text-lg font-semibold text-black">Beyanname GTIP toplamları (TL)</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-[2080px] table-fixed text-sm">
             <thead className="bg-[var(--paper)]/80 text-left text-[11px] uppercase tracking-[0.18em] text-black/45">
               <tr>
-                <th className="sticky left-0 z-20 w-[270px] border-b border-r border-black/8 bg-[var(--paper)]/95 px-4 py-3">Urun</th>
-                <th className="w-[120px] border-b border-r border-black/8 px-3 py-3">GTIP</th>
+                <th className="sticky left-0 z-20 w-[270px] border-b border-r border-black/8 bg-[var(--paper)]/95 px-4 py-3">GTIP</th>
+                <th className="w-[120px] border-b border-r border-black/8 px-3 py-3 text-right">Kalem</th>
                 <th className="w-[90px] border-b border-r border-black/8 px-3 py-3 text-right">Adet</th>
                 <th className="w-[110px] border-b border-r border-black/8 px-3 py-3 text-right">Net kg</th>
                 <th className="w-[110px] border-b border-r border-black/8 px-3 py-3 text-right">Brut kg</th>
@@ -539,7 +690,7 @@ export default function OrderDeclarationTryLab({
                 <th className="w-[140px] border-b border-r border-black/8 px-3 py-3 text-right">FOB</th>
                 <th className="w-[140px] border-b border-r border-black/8 px-3 py-3 text-right">Navlun</th>
                 <th className="w-[140px] border-b border-r border-black/8 px-3 py-3 text-right">Sigorta</th>
-                <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">CIF</th>
+                <th className="w-[170px] border-b border-r border-black/8 px-3 py-3 text-right">CIF / Gumruk matrahi</th>
                 <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">Ek gider</th>
                 <th className="w-[150px] border-b border-r border-black/8 px-3 py-3 text-right">Damga</th>
                 <th className="w-[160px] border-b border-r border-black/8 px-3 py-3 text-right">KDV matrahı</th>
@@ -553,15 +704,15 @@ export default function OrderDeclarationTryLab({
               </tr>
             </thead>
             <tbody>
-              {computed.lines.map((line, index) => (
+              {gtipRows.map((line, index) => (
                 <tr key={line.id} className={index % 2 === 0 ? "bg-white" : "bg-black/[0.015]"}>
                   <td className="sticky left-0 z-10 border-b border-r border-black/8 bg-inherit px-4 py-4 align-top">
                     <div className="space-y-1">
-                      <p className="font-semibold text-black">{line.code}</p>
-                      <p className="text-black/65">{line.name}</p>
-                      {line.warnings.length ? (
+                      <p className="font-semibold text-black">{line.gtipCode}</p>
+                      <p className="text-black/65">Toplam {formatNumber(line.lineCount, 0)} kalem</p>
+                      {line.warnings.size ? (
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          {line.warnings.map((warning) => (
+                          {Array.from(line.warnings).slice(0, 4).map((warning) => (
                             <span
                               key={`${line.id}-${warning}`}
                               className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-900"
@@ -573,47 +724,70 @@ export default function OrderDeclarationTryLab({
                       ) : null}
                     </div>
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 align-top text-black/70">{line.gtipCode ?? "-"}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.lineCount, 0)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.quantity, 0)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.netKg, 3)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.grossKg, 3)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.unitPriceTry, 6)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                    {formatTry(line.quantity > 0 ? line.fobTotalTry / line.quantity : 0, 6)}
+                  </td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.fobTotalTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.freightShareTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.insuranceShareTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.cifTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                    <div>
+                      <p>{formatTry(line.customsBaseTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">CIF: {formatTry(line.cifTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">Gozetim: {formatTry(line.surveillanceBaseTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">Kural: max(CIF, Gozetim)</p>
+                    </div>
+                  </td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.extraCostShareTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.stampTaxShareTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">
                     <div>
                       {formatTry(line.vatBaseTry)}
+                      <p className="mt-1 text-[11px] text-black/45">Gumruk matrahi: {formatTry(line.customsBaseTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">+ GV: {formatTry(line.customsDutyTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">+ Ilave vergi: {formatTry(line.additionalDutyTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">+ Anti-damping: {formatTry(line.antiDumpingTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">+ Ek gider: {formatTry(line.extraCostShareTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">+ Damga: {formatTry(line.stampTaxShareTry)}</p>
                       {line.surveillanceBaseTry > 0 ? (
-                        <p className="mt-1 text-[11px] text-black/45">Gözetim tabanı: {formatTry(line.surveillanceBaseTry)}</p>
+                        <p className="mt-1 text-[11px] text-black/45">Gozetim tabani: {formatTry(line.surveillanceBaseTry)}</p>
                       ) : null}
                     </div>
                   </td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">
                     <div>
                       {formatTry(line.customsDutyTry)}
-                      <p className="mt-1 text-[11px] text-black/45">%{formatNumber(line.customsDutyRate, 2)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">
+                        %{line.customsDutyRates.size === 1 ? Array.from(line.customsDutyRates)[0] : "karma"}
+                      </p>
                     </div>
                   </td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">
                     <div>
                       {formatTry(line.additionalDutyTry)}
-                      <p className="mt-1 text-[11px] text-black/45">%{formatNumber(line.additionalDutyRate, 2)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">
+                        %{line.additionalDutyRates.size === 1 ? Array.from(line.additionalDutyRates)[0] : "karma"}
+                      </p>
                     </div>
                   </td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.antiDumpingTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right">
                     <div>
                       {formatTry(line.vatTry)}
-                      <p className="mt-1 text-[11px] text-black/45">%{formatNumber(line.vatRate, 2)} | Matrah {formatTry(line.vatBaseTry)}</p>
+                      <p className="mt-1 text-[11px] text-black/45">
+                        %{line.vatRates.size === 1 ? Array.from(line.vatRates)[0] : "karma"} | Matrah {formatTry(line.vatBaseTry)}
+                      </p>
                     </div>
                   </td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right font-medium">{formatTry(line.totalTaxesTry)}</td>
                   <td className="border-b border-r border-black/8 px-3 py-4 text-right font-semibold text-black">{formatTry(line.landedTotalTry)}</td>
-                  <td className="border-b border-black/8 px-3 py-4 text-right font-semibold text-black">{formatTry(line.landedUnitTry, 6)}</td>
+                  <td className="border-b border-black/8 px-3 py-4 text-right font-semibold text-black">
+                    {formatTry(line.quantity > 0 ? line.landedTotalTry / line.quantity : 0, 6)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -621,24 +795,26 @@ export default function OrderDeclarationTryLab({
               <tr className="font-semibold text-black">
                 <td className="sticky left-0 z-10 border-r border-t border-black/8 bg-[var(--paper)]/95 px-4 py-4">Toplam</td>
                 <td className="border-r border-t border-black/8 px-3 py-4 text-black/50">-</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(computed.totals.quantity, 0)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(computed.totals.netKg, 3)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(computed.totals.grossKg, 3)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(gtipTotalsTry.quantity, 0)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(gtipTotalsTry.netKg, 3)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(gtipTotalsTry.grossKg, 3)}</td>
                 <td className="border-r border-t border-black/8 px-3 py-4 text-right">-</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.fobTotal)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.freightShare)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.insuranceShare)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.cif)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.extraCostShare)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.stampTaxShare)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.vatBase)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.customsDuty)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.additionalDuty)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.antiDumping)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.vat)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.totalTaxes)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.landedTotal)}</td>
-                <td className="border-t border-black/8 px-3 py-4 text-right">{formatTry(totalsTry.landedUnit, 6)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.fobTotalTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.freightShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.insuranceShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.customsBaseTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.extraCostShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.stampTaxShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.vatBaseTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.customsDutyTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.additionalDutyTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.antiDumpingTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.vatTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.totalTaxesTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.landedTotalTry)}</td>
+                <td className="border-t border-black/8 px-3 py-4 text-right">
+                  {formatTry(gtipTotalsTry.quantity > 0 ? gtipTotalsTry.landedTotalTry / gtipTotalsTry.quantity : 0, 6)}
+                </td>
               </tr>
             </tfoot>
           </table>

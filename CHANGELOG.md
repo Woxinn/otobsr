@@ -2,6 +2,264 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.571 - 2026-04-20
+
+- Beyanname Lab GTIP toplu satirinda gumruk/gozetim degerleri line-toplam modele geri alindi
+- GTIP satir degerleri artik tekrar kalem bazli hesaplanan degerlerin dogrudan toplami olarak gosterilir (ekstra yeniden hesap yok)
+
+## v0.3.570 - 2026-04-20
+
+- Beyanname Lab GTIP toplu hesapta gumruk matrahi birikimi hatasi duzeltildi
+- Bu duzeltme ile GTIP satirlarindaki GV/ilave vergi/KDV degerlerinin yanlis sifira dusmesi engellendi
+
+## v0.3.569 - 2026-04-20
+
+- Beyanname Lab GTIP toplu tablonun `Toplam` satiri guncellendi
+- Toplamlar artik satir gorunumunde hesaplanan GTIP degerlerinin toplami uzerinden uretilir
+- Boylece ozellikle `Toplam KDV` ve `Toplam vergi` alanlari GTIP satirlarinin toplami ile birebir uyumlu gosterilir
+
+## v0.3.568 - 2026-04-20
+
+- Beyanname Lab GTIP toplu tabloda gosterilen `Gumruk matrahi` degeri hesaplamalara da baglandi
+- `GV`, `ilave vergi`, `KDV matrahi`, `KDV`, `toplam vergi` ve `vergili toplam` artik bu GTIP gumruk matrahi uzerinden yeniden uretilir
+
+## v0.3.567 - 2026-04-20
+
+- Beyanname Lab ek gider dagitimi guncellendi
+- `Ek gider` tutari artik FOB yerine `gumruk matrahi` payina gore GTIP satirlarina dagitilir
+- Damga dagitimi mevcut FOB payi davranisiyla korunur
+
+## v0.3.566 - 2026-04-20
+
+- Beyanname Lab GTIP toplu tabloda `KDV matrahi` hesaplama akisi gumruk matrahiyla hizalandi
+- GTIP satirinda KDV matrahi artik `gumruk matrahi + GV + ilave vergi + anti-damping + ek gider + damga` formuluyle yeniden uretilir
+- Boylece `GV/ek gider = 0` durumunda KDV matrahi de gumruk matrahiyla birebir ayni gorunur
+
+## v0.3.565 - 2026-04-20
+
+- Beyanname Lab GTIP toplu tabloda `Gumruk matrahi` hesabi revize edildi
+- GTIP satirinda gumruk matrahi artik `max(toplam CIF, toplam gozetim)` olarak gosterilir
+- Boylece hucrede yazan `Kural: max(CIF, Gozetim)` ifadesiyle birebir ayni hesap gorunur
+
+## v0.3.564 - 2026-04-20
+
+- Beyanname Lab GTIP tablosunda `KDV matrahi` sutunu detaylandirildi
+- KDV matrahini olusturan tum bilesenler ayni hucrede alt kirilim olarak gosterilir:
+  `gumruk matrahi + GV + ilave vergi + anti-damping + ek gider + damga`
+- `CIF / Gumruk matrahi` sutunu da detaylandirildi:
+  `CIF`, `gozetim tabani` ve secilen `max(CIF, Gozetim)` degeri ayni hucrede gosterilir
+
+## v0.3.563 - 2026-04-20
+
+- Beyanname Lab agirlik cozumlemesinde kaynak onceligi guncellendi: once packing list import (`packing_list_lines`), yoksa `order_packing_list_items`
+- Gumruk Excel exportta `WEIGHT_ENGINE_V2=1` iken de ayni oncelik uygulandi; packing import varsa agirliklar buradan alinir
+- Boylece packing import yapilan siparislerde hem Beyanname Lab hem Gumruk export ayni agirlik kaynagini kullanir
+
+## v0.3.562 - 2026-04-20
+
+- Beyanname Lab gozetim brut agirligi fallback kurali sertlestirildi
+- Artik brut kg mevcutsa (packing importtan gelse bile) ozetten yeniden paylastirma yapilmaz
+- Boylece gereksiz `Gozetim brut agirligi ozetten paylastirildi` uyarisi ve olasi hatali override engellendi
+
+## v0.3.561 - 2026-04-20
+
+- Beyanname Lab ve gumruk export agirlik cozumlemesinde kaynak onceligi guncellendi
+- Artik packing import (gumrukcu excel) verisi varsa satir agirliklari once buradan dagitilir
+- Packing verisi yoksa once satirdaki direkt agirlik, sonra summary fallback akisi calisir
+
+## v0.3.560 - 2026-04-20
+
+- Beyanname Lab alt tablo urun/kalem bazli gorunumden GTIP bazli toplamlara cevrildi
+- GTIP satirlarinda adet, kilo, FOB, masraf paylari, matrah, vergi ve vergili maliyet toplamlari gosterilir
+- Karisik oranli GTIP satirlarinda oran etiketi `karma` olarak gosterilir
+
+## v0.3.559 - 2026-04-20
+
+- Beyanname Lab vergi oranlari tedarikci ulkesine gore `gtip_country_rates` tablosundan okunacak sekilde guncellendi
+- Ulkeye ozel oran kaydi yoksa mevcut GTIP temel oranlarina otomatik fallback korunur
+- Ulke override satirinda bos gelen alanlarin vergileri sifirlamamasi icin alan bazli fallback guclendirildi
+- Beyanname Lab ustunde oranlarin hangi ulkeye gore cekildigini gosteren bilgi etiketi eklendi
+- Ulke eslesmesinde normalize + yakin eslesme (`icerir`) desteklenerek `Cin` / `Çin Halk Cumhuriyeti` gibi varyasyonlarda oran kacirma riski azaltildi
+- Kalem uyarilarina `Oran kaynagi` bilgisi eklendi (`GTIP ulke` veya `GTIP genel`)
+- Tedarikci ulkesiyle eslesme bulunamazsa ve GTIP icin tek bir ulke satiri varsa bu satira otomatik fallback eklenerek vergi hesaplarinin sifira dusmesi engellendi
+
+## v0.3.558 - 2026-04-20
+
+- Dashboarda yapilan odemelerin aylara gore dagilimini gosteren yeni finans grafigi eklendi
+- Finans bolumu iki parcaya ayrildi: ozet kartlar + son 6 ay odeme trend grafigi
+
+## v0.3.557 - 2026-04-20
+
+- Dashboard orta alana finans ozet kartlari eklendi
+- Kartlar: `Bu ay yapilan odeme`, `Bekleyen odeme`, `Kalan odeme`
+- Finans verisi `order_payments` + `orders` kaynaklarindan toplanarak gosterilir
+
+## v0.3.556 - 2026-04-20
+
+- Dashboarddaki `Toplam acik shipment`, `Bu hafta ETA`, `Evrak eksik`, `Evrak sorunlu` ozet kartlari kaldirildi
+- Dashboard ana paneli operasyon notlari odagina sadeleştirildi
+
+## v0.3.555 - 2026-04-20
+
+- Dashboarddaki shipment ozet kartlari altindaki odeme kartlari kaldirildi
+- `Bu ay yapilan odeme`, `Bekleyen odeme`, `Kalan odeme` metrikleri ana panelden cikarildi
+
+## v0.3.554 - 2026-04-20
+
+- RFQ teklif karsilastirma tablosuna alt satirda toplam adet alani eklendi
+- `RFQ adet` sutununun toplam degeri artik footer satirinda gosteriliyor
+
+## v0.3.553 - 2026-04-20
+
+- RFQ detayinda yonetim rolunde de `Masraf %` ve `Kar %` inputlari tekrar gorunur hale getirildi
+- Yonetimde teklif duzenleme/silme kapali kalirken maliyet simulasyonu icin bu iki alan kullanilabilir oldu
+
+## v0.3.552 - 2026-04-20
+
+- Teklif Talepleri modulunde yonetim rolunden duzenleme/ekleme/silme aksiyonlari gizlendi
+- RFQ listesinde `Yeni RFQ` ve satir bazli silme aksiyonu artik sadece adminde gorunur
+- RFQ detayinda import, donusturme, teklif girisi, hedef fiyat duzenleme, satir silme, durum degistirme, tedarikci ekleme, teklif silme/kazanan secme ve belge yukleme/silme aksiyonlari admin rolune alindi
+- `rfqs/new` sayfasi da admin duzenleme yetkisine kapatildi
+
+## v0.3.551 - 2026-04-20
+
+- Siparis detayinda yonetim rolunden su aksiyonlar gizlendi: `Gumruk Excel'i indir`, `Navlun sigortasi formu`, `Sigorta e-postasi hazirla`
+- Bu uc aksiyon artik yalnizca admin duzenleme yetkisi (`canEdit`) olan kullanicilara gosterilir
+
+## v0.3.550 - 2026-04-18
+
+- Siparis plani satir yuksekligini buyuten ic elementler kompaktlandi (stok/miktar metinleri ve input alani daraltildi)
+- Satir ici ikincil bilgiler tek satira toplanarak gereksiz dikey uzama azaltildi
+- Kayit durumu metni sadece aktifken gosterilecek sekilde duzenlendi (idle durumda ekstra satir yuksekligi kaldirildi)
+
+## v0.3.549 - 2026-04-18
+
+- Siparis plani tablo satirlari daha kompakt hale getirildi (hucre dikey bosluklari daraltildi)
+- Satirlarin birbirine yapisik gorunumu azaltildi (dikey satir araligi hafif acildi)
+
+## v0.3.548 - 2026-04-18
+
+- Siparis plani urun listesi tip bazli siralamaya alindi
+- Liste artik once `product_type_id` (tip), sonra secili ikincil siralama alanina gore akar
+
+## v0.3.547 - 2026-04-18
+
+- Siparis plani tablosundaki scrolla bagli sanallastirma akisi kaldirildi
+- Tablo, sayfa bazli (server pagination) modelle native liste renderina alindi; scroll titreme/takilma riski azaltildi
+- Satirlar kompakt ve sabit akista kalacak sekilde tablo yerlesimi sadeleştirildi
+
+## v0.3.546 - 2026-04-18
+
+- Siparis plani sayfasindan `Urun istatistikleri` blogu kaldirildi
+- Filtre paneline yeni `Tip` filtresi eklendi (`Hepsi` / `Tip yok` / kayitli tipler)
+- Tip filtresi sorgu katmanina baglandi (`products.product_type_id`)
+
+## v0.3.545 - 2026-04-18
+
+- Siparis plani filtre bolumu, urunler sayfasindaki form diliyle hizalandi (kart yapisi, input/select gorunumu, buton stili)
+- Kategori secimi coklu select yerine acilir `Kategori filtresi` chip/checkbox yapisina tasindi
+- Filtre deneyimi urunler modulundeki kullanim desenleriyle ayni akisa getirildi
+
+## v0.3.544 - 2026-04-18
+
+- Siparis plani tablosuna yerel hizli filtreler eklendi (`Sadece 0 stok`, `Sadece degisenler`, `Sadece secili`) ve secimler localStorage ile korunur hale getirildi
+- Tablo ustune operasyonel KPI ozet kartlari eklendi (ihtiyacli urun, toplam ihtiyac, toplam tavsiye, 0 stok urun)
+- Secili satirlara toplu aksiyon akisi eklendi (`Seciliye tavsiye uygula`, `Seciliyi sifirla`) ve yeni endpoint tanimlandi: `POST /api/order-plan/bulk`
+- Siparis plani satir inputu debounce kayit modeline gecirildi; hizli veri girisinde istek yogunlugu azaltilip kayit durumu gorunur yapildi
+- Gorunen tablo sonucunu anlik CSV olarak disari alma aksiyonu eklendi
+
+## v0.3.543 - 2026-04-18
+
+- Siparis plani listesine server-side siralama parametreleri eklendi (`sortBy`, `sortDir`)
+- Filtre paneline `Siralama` ve `Yon` secimleri eklendi (olusturma tarihi / urun kodu / urun adi)
+- Canli metrik istemci yuklemesi chunk + sinirli paralellik (400 kod/chunk, 3 worker) modeline alindi
+- Buyuk veri setlerinde tek istekte buyuk payload gonderimi azaltilarak ilk metrik dolumu daha dayanikli hale getirildi
+
+## v0.3.542 - 2026-04-18
+
+- Siparis plani server sorgularinda veri yukleri sayfaya ozel urun ID listesine daraltildi
+- `product_sales_10y_totals`, `rfq_items` ve `order_plan_entries` okumalarinda tum tablo taramasi yerine chunk'li `in(product_id, ...)` yaklasimi eklendi
+- Boyuk veri setlerinde ilk yukte gereksiz satir cekimi azaltilarak 1000+ satir senaryosunda backend gecikmesi dusuruldu
+
+## v0.3.541 - 2026-04-18
+
+- Siparis plani tablosunda 1000+ satir gorunumu icin ilk performans adimi olarak satir sanallastirma (virtualized windowing) eklendi
+- Tabloda sadece gorunen satirlar ve yakin cevresi render edilir; ust/alt spacer yaklasimi ile kaydirma akici hale getirildi
+- Tablo basligi kaydirma alaninda sticky yapildi, uzun listede kolon basliklari gorunur kalir
+
+## v0.3.540 - 2026-04-18
+
+- Siparis plani ekraninin 1000+ satirda olceklendirilmesi icin teknik yol haritasi dokumani eklendi
+- Yeni dokuman: `docs/siparis-plani-1000-satir-roadmap.md` (P0/P1/P2/P3 backlog + kabul kriterleri + uygulama sirasi)
+
+## v0.3.539 - 2026-04-18
+
+- `MSSQL_SALES_SOURCE=stokhar` modunda siparis plani canli satis hesaplarinda kalan `TBLSTHAR` bagimliligi kaldirildi
+- Boylece `Invalid object name 'TBLSTHAR'` hatasi veren ortamlarda `son 60 / onceki 60 / son 120` satis metrikleri yalnizca `TBLSTOKSB + TBLSTOKHAR` ile calisir
+- 10 yillik satis icin MSSQL ek sorgusu kapatildi; sayfadaki mevcut Supabase toplam degeri korunur
+
+## v0.3.538 - 2026-04-18
+
+- Siparis plani canli satis metrikleri icin geri alinabilir kaynak secimi eklendi (`MSSQL_SALES_SOURCE=sthar|stokhar`)
+- `MSSQL_SALES_SOURCE=stokhar` iken `son 60`, `onceki 60` ve `son 120` satislar `TBLSTOKSB + TBLSTOKHAR` uzerinden hesaplanir
+- `10 yillik satis` davranisi degistirilmedi; mevcut `TBLSTHAR` tabanli hesap oldugu gibi korunur
+- Ayni kaynak secimi bridge agent tarafina da tasinarak direct/agent sonuclari uyumlu hale getirildi
+
+## v0.3.537 - 2026-04-17
+
+- Konteyner planlama havuzuna hizli kullanim filtreleri eklendi: arama, tedarikci ve `sadece 0 kg` filtresi
+- Manuel agirlik override kullanimlari daha gorunur hale getirildi (`manuel` / `manuel siparis kg` badge)
+- Tum manuel override degerlerini tek tikla sifirlayan `Override temizle` aksiyonu eklendi
+- Sayfadaki gorev plani, yeni backlog sirasina gore guncellendi
+
+## v0.3.536 - 2026-04-17
+
+- Konteyner planlama tahtasina sayfaya-ozel manuel agirlik override destegi eklendi
+- Kalem kartina cift tiklanarak sadece o kalem icin brut kg girilebilir
+- Siparis kartina cift tiklanarak siparis toplam brut kg girilebilir; deger siparis kalemlerine dagitilir
+- Bu agirlik override'lari kalici DB yazimi yapmaz, sadece mevcut ekran oturumunda kullanilir
+
+## v0.3.535 - 2026-04-17
+
+- Konteyner planlamada siparis durum filtreleme DB `in(...)` eslesmesinden uygulama katmanindaki normalize filtreye tasindi
+- Boylece Turkce karakter/farkli yazim varyasyonlarinda (`Sipariş`, `Üretimde`, `Hazır` vb.) eslesen siparislerin kalemleri eksik kalmaz
+
+## v0.3.534 - 2026-04-17
+
+- Konteyner planlama veri akisi order_items tabanli cekimden order-oncelikli cekime alindi
+- Artik once `orders` tablosundan hedef durumdaki siparisler okunuyor, sonra sadece bu siparislerin `order_items` kalemleri getiriliyor
+- Kalan `loads.slice(0, 180)` kisiti kaldirildi; havuza tum eslesen kalemler gelir
+
+## v0.3.533 - 2026-04-17
+
+- Konteyner planlama sayfasinda `order_items` fetch limiti kaldirildi
+- Havuz verisi artik sabit satir limiti olmadan cekilir
+
+## v0.3.532 - 2026-04-17
+
+- Konteyner planlama havuzuna gelen siparis kalemlerinde durum filtresi daraltildi
+- Artik sadece su siparis durumlari dahil ediliyor: `Siparis Verildi`, `Proforma Geldi`, `Uretimde`, `Hazir`
+- Bu liste disindaki tum durumlar havuzdan otomatik elenir
+
+## v0.3.531 - 2026-04-17
+
+- Konteyner planlama havuzu siparis bazli collapse yapisina cevrildi
+- Her siparis karti tek parca surukle-birak ile konteynere tasinabilir hale getirildi
+- Siparis karti acildiginda alt urun kalemleri tek tek suruklenerek siparis bolme destegi eklendi
+- Konteyner icinde de siparis gruplu gorunum eklendi; tum siparisi konteynerler arasi tek hamlede tasima akisi acildi
+
+## v0.3.530 - 2026-04-17
+
+- Yeni sayfa eklendi: `Konteyner Planlama` (`/konteyner-planlama`)
+- İlk MVP konteyner planlayıcı devreye alındı:
+  - Yük havuzu
+  - Konteyner oluşturma (`20GP`, `40HC`, `LCL`)
+  - Sürükle-bırak yerleştirme
+  - Brüt kg / CBM limit kontrolü
+  - Otomatik yerleşim önerisi (first-fit)
+- Üst navigasyona `Konteyner Planlama` bağlantısı eklendi
+- Beyanname lab tarafında gözetim tabanı brüt ağırlık odaklı hesap akışı güncellendi
+
 ## v0.3.529 - 2026-04-16
 
 - App layout icindeki bloklayici `syncTasks` calismasi request yolundan cikarildi

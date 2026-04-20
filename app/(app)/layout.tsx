@@ -76,6 +76,7 @@ export default async function AppLayout({
             { key: "orders", href: "/orders", label: "Siparişler" },
             { key: "products", href: "/products", label: "Ürünler" },
             { key: "order-plan", href: "/siparis-plani", label: "Sipariş Planı" },
+            { key: "order-plan", href: "/konteyner-planlama", label: "Konteyner Planlama" },
             { key: "rfqs", href: "/rfqs", label: "Teklif Talepleri" },
             { key: "proformas", href: "/proformalar", label: "Proformalar" },
             { key: "product-groups", href: "/product-groups", label: "Ürün Kategorileri" },

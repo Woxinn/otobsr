@@ -11,14 +11,16 @@ type SupplierRow = {
 export default function SupplierQuoteList({
   rfqId,
   suppliers,
+  readOnly = false,
   onWinnerChange,
 }: {
   rfqId: string;
   suppliers: SupplierRow[];
+  readOnly?: boolean;
   onWinnerChange?: () => void;
 }) {
   const handleDelete = async (supplierId: string) => {
-    const ok = window.confirm("Bu tedarikçinin tüm tekliflerini silmek istiyor musun?");
+    const ok = window.confirm("Bu tedarikcinin tum tekliflerini silmek istiyor musun?");
     if (!ok) return;
     try {
       await fetch("/api/rfq/quote", {
@@ -29,11 +31,11 @@ export default function SupplierQuoteList({
       window.location.reload();
     } catch (e) {
       console.error("[supplier-quote-delete]", e);
-      alert("Silme sırasında hata oluştu");
+      alert("Silme sirasinda hata olustu");
     }
   };
 
-  if (!suppliers?.length) return <div className="text-black/40 text-sm">Tanımlı tedarikçi yok</div>;
+  if (!suppliers?.length) return <div className="text-sm text-black/40">Tanimli tedarikci yok</div>;
 
   return (
     <ul className="space-y-2 text-sm text-black/80">
@@ -52,13 +54,14 @@ export default function SupplierQuoteList({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={readOnly}
                 className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
                   s.isSelected
                     ? "border border-emerald-300 bg-emerald-50 text-emerald-700"
                     : "border border-black/10 bg-white text-black/70 hover:border-[var(--ocean)] hover:text-[var(--ocean)]"
-                }`}
+                } ${readOnly ? "pointer-events-none opacity-70" : ""}`}
                 onClick={async () => {
-                  if (s.isSelected) return;
+                  if (readOnly || s.isSelected) return;
                   const res = await fetch("/api/rfq/select-winner", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -66,7 +69,7 @@ export default function SupplierQuoteList({
                   });
                   const data = await res.json();
                   if (!res.ok) {
-                    alert(data?.error ?? "Seçilemedi");
+                    alert(data?.error ?? "Secilemedi");
                     return;
                   }
                   onWinnerChange?.();
@@ -75,13 +78,15 @@ export default function SupplierQuoteList({
               >
                 {s.isSelected ? "Kazanan" : "Kazanan yap"}
               </button>
-              <button
-                type="button"
-                className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100"
-                onClick={() => handleDelete(s.id)}
-              >
-                Teklifleri sil
-              </button>
+              {!readOnly ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100"
+                  onClick={() => handleDelete(s.id)}
+                >
+                  Teklifleri sil
+                </button>
+              ) : null}
             </div>
           ) : (
             <span className="rounded-full bg-black/5 px-3 py-1 text-[11px] text-black/50">Teklif yok</span>
@@ -91,3 +96,4 @@ export default function SupplierQuoteList({
     </ul>
   );
 }
+

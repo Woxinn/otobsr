@@ -1,11 +1,11 @@
 ﻿import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { canViewModule, getCurrentUserRole } from "@/lib/roles";
+import { canEdit, canViewModule, getCurrentUserRole } from "@/lib/roles";
 import RfqCreateForm from "@/components/RfqCreateForm";
 
 export default async function RfqNewPage() {
   const supabase = await createSupabaseServerClient();
   const { role } = await getCurrentUserRole();
-  if (!canViewModule(role, "rfqs")) {
+  if (!canViewModule(role, "rfqs") || !canEdit(role)) {
     return <div className="p-6 text-sm text-red-600">Erişim yok.</div>;
   }
 

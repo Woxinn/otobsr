@@ -1,7 +1,7 @@
 ﻿import Link from "next/link";
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { canViewModule, getCurrentUserRole } from "@/lib/roles";
+import { canEdit, canViewModule, getCurrentUserRole } from "@/lib/roles";
 import RfqDeleteButton from "@/components/RfqDeleteButton";
 
 export const metadata: Metadata = {
@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 export default async function RfqListPage() {
   const supabase = await createSupabaseServerClient();
   const { role } = await getCurrentUserRole();
+  const canEditPage = canEdit(role);
   if (!canViewModule(role, "rfqs")) {
     return <div className="p-6 text-sm text-red-600">Erişim yok.</div>;
   }
@@ -30,12 +31,14 @@ export default async function RfqListPage() {
           <h1 className="text-2xl font-semibold [font-family:var(--font-display)]">RFQ Listesi</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/rfqs/new"
-            className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white shadow-sm"
-          >
-            Yeni RFQ
-          </Link>
+          {canEditPage ? (
+            <Link
+              href="/rfqs/new"
+              className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white shadow-sm"
+            >
+              Yeni RFQ
+            </Link>
+          ) : null}
           <Link
             href="/siparis-plani"
             className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70"
@@ -57,7 +60,7 @@ export default async function RfqListPage() {
               <th className="px-3 py-2">Para/Incoterm</th>
               <th className="px-3 py-2">Son Yanıt</th>
               <th className="px-3 py-2">Oluşturma</th>
-              {role !== "Satis" ? <th className="px-3 py-2 text-right">Aksiyon</th> : null}
+              {canEditPage ? <th className="px-3 py-2 text-right">Aksiyon</th> : null}
             </tr>
           </thead>
           <tbody className="align-top">
@@ -79,7 +82,7 @@ export default async function RfqListPage() {
                 <td className="px-3 py-3 text-black/70">
                   {new Date(rfq.created_at).toLocaleString("tr-TR")}
                 </td>
-                {role !== "Satis" ? (
+                {canEditPage ? (
                   <td className="px-3 py-3 text-right">
                     <RfqDeleteButton rfqId={rfq.id} />
                   </td>
