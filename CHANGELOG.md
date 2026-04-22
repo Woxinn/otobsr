@@ -2,6 +2,55 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.580 - 2026-04-22
+
+- Forwarder detay teklif tablosunda aktif olmayan/silinmis shipment referanslari `Shipment silindi` badge'i ile gosterilir
+- Bu satirlarda shipment linki kapatildi ve `Sec` aksiyonu devre disi birakildi
+- Forwarder detaydaki shipment secim/veri listesi arsivlenmis (`archived_at` dolu) shipmentleri dislayacak sekilde daraltildi
+
+## v0.3.579 - 2026-04-22
+
+- Forwarder teklif tablosundaki badge stilleri duzenlendi; yarim/kesik gorunum sorunu giderildi
+- Tum badge'lerde `inline-flex + whitespace-nowrap + line-height` standardi ile sabit okunurluk saglandi
+- Tablo min-genisligi artirilarak hucre iceriklerinin dar alanda kirpilmasi azaltildi
+
+## v0.3.578 - 2026-04-22
+
+- Forwarder detay `Mevcut teklifler` tablosu daha modern/okunur tasarimla yenilendi
+- Badge tabanli renkli gosterimler eklendi (tutar, konteyner, free time, rota, gecerlilik)
+- Shipment hucresi belirgin tiklanabilir chip tasarimina alindi; satirlar hover ve secili durumda daha net ayrisir
+
+## v0.3.577 - 2026-04-22
+
+- Forwarder detaydaki `Mevcut teklifler` tablosuna shipment icin `Kalkis limani` ve `Varis limani` sutunlari eklendi
+- `Mevcut teklifler` tablosundaki shipment hucresi tiklanabilir hale getirildi; artik ilgili shipment detayina gider
+
+## v0.3.576 - 2026-04-22
+
+- Siparis kalemi duzenleme ekrani yeniden tasarlandi
+- Duzenleme ekraninda mevcut urun kodu/ad artik acikca gosterilir ve varsayilan olarak korunur
+- Urun degistirme akisi opsiyonel hale getirildi (`Urunu degistir` secimi); secilmezse mevcut bagli urun korunur
+- Sayisal alanlarda `type=number` + uygun `step` degerleriyle veri girisi daha hizli ve tutarli hale getirildi
+
+## v0.3.574 - 2026-04-21
+
+- Siparis plani Excel cikti akisina job tabanli hazirlama modeli eklendi (`/api/order-plan-export/jobs`)
+- Kategori gibi genis filtrelerde once tum satirlar DB snapshotina alinir, sonra MSSQL metrikleri chunk (300 kod) halinde islenir
+- UI'ya `Excel Hazirla` + durum/progress + `Excel Indir` akisi eklendi; export artik MSSQL gecikmesinde anlik 0'li dosya uretmek yerine hazir olunca indirilir
+- Yeni tablolar eklendi: `order_plan_export_jobs`, `order_plan_export_job_rows`, `order_plan_export_job_codes`
+
+## v0.3.573 - 2026-04-21
+
+- Siparis plani hesaplarina `faturaya donusmemis proforma acik` miktari eklendi
+- `Ihtiyac` ve `tavsiye` hesaplarindaki kullanilabilir stok tabani artik `stok + yolda + proforma acik` formuluyle calisir
+- Siparis plani tablosu ve export dosyasina `Proforma acik` sutunu eklendi; `Toplam` degeri bu alanla birlikte hesaplanir
+
+## v0.3.572 - 2026-04-21
+
+- Siparis plani exportunda MSSQL bridge timeout durumunda 500 yerine sifirli fallback akisi eklendi
+- `fetchLiveSalesAgg`/`fetchLiveStockMap` hatalarinda export devam eder; canli metrikler `0` ile doldurulur
+- `sales!.sales120` non-null assertion kaldirilarak `undefined` kaynakli runtime patlamasi engellendi
+
 ## v0.3.571 - 2026-04-20
 
 - Beyanname Lab GTIP toplu satirinda gumruk/gozetim degerleri line-toplam modele geri alindi

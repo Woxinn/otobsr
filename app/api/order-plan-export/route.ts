@@ -70,6 +70,65 @@ const fetchTransitByProduct = async (supabase: any, productIds: string[]) => {
   return totals;
 };
 
+const fetchOpenProformaByProduct = async (
+  supabase: any,
+  productIds: string[],
+  supplierId?: string
+) => {
+  const proformaByProduct: Record<string, number> = {};
+  const invoicedByProduct: Record<string, number> = {};
+  if (!productIds.length) return proformaByProduct;
+
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("proforma_items")
+      .select("product_id, quantity, proformas!inner(status, supplier_id)")
+      .in("product_id", productIds)
+      .neq("proformas.status", "iptal")
+      .range(from, to);
+    if (supplierId) query = query.eq("proformas.supplier_id", supplierId);
+    const { data, error } = await query;
+    if (error) break;
+    if (!data?.length) break;
+    (data as any[]).forEach((row) => {
+      const pid = row.product_id as string | null;
+      if (!pid) return;
+      const qty = Number(row.quantity ?? 0);
+      proformaByProduct[pid] = (proformaByProduct[pid] ?? 0) + qty;
+    });
+    if (data.length < pageSize) break;
+  }
+
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("order_items")
+      .select("product_id, quantity, orders!inner(supplier_id)")
+      .in("product_id", productIds)
+      .range(from, to);
+    if (supplierId) query = query.eq("orders.supplier_id", supplierId);
+    const { data, error } = await query;
+    if (error) break;
+    if (!data?.length) break;
+    (data as any[]).forEach((row) => {
+      const pid = row.product_id as string | null;
+      if (!pid) return;
+      const qty = Number(row.quantity ?? 0);
+      invoicedByProduct[pid] = (invoicedByProduct[pid] ?? 0) + qty;
+    });
+    if (data.length < pageSize) break;
+  }
+
+  const openByProduct: Record<string, number> = {};
+  productIds.forEach((pid) => {
+    const open = (proformaByProduct[pid] ?? 0) - (invoicedByProduct[pid] ?? 0);
+    openByProduct[pid] = open > 0 ? open : 0;
+  });
+  return openByProduct;
+};
+
 const computeTrend = (sales60: number, salesPrev60: number) => {
   if (salesPrev60 === 0) return { trend_direction: "stable", multiplier: 1 };
   const change_ratio = (sales60 - salesPrev60) / salesPrev60;
@@ -79,6 +138,7 @@ const computeTrend = (sales60: number, salesPrev60: number) => {
 };
 
 const ceil = (n: number) => Math.ceil(n);
+const EMPTY_SALES = { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
 
 export async function GET(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
@@ -184,10 +244,16 @@ export async function GET(req: NextRequest) {
     )
   );
 
-  const [stockMap, salesMap] = await Promise.all([
-    fetchLiveStockMap(codes, "prefix"),
-    fetchLiveSalesAgg(codes),
-  ]);
+  let stockMap = new Map<string, number>();
+  let salesMap = new Map<string, typeof EMPTY_SALES>();
+  try {
+    [stockMap, salesMap] = await Promise.all([
+      fetchLiveStockMap(codes, "prefix"),
+      fetchLiveSalesAgg(codes),
+    ]);
+  } catch (error) {
+    console.error("[order-plan-export] live mssql fetch failed, fallback zeros", error);
+  }
 
   const { data: sales10yRows } = await supabase
     .from("product_sales_10y_totals")
@@ -198,6 +264,7 @@ export async function GET(req: NextRequest) {
   });
 
   const inTransitByProduct = await fetchTransitByProduct(supabase, productIds);
+  const openProformaByProduct = await fetchOpenProformaByProduct(supabase, productIds, supplier);
 
   const { data: rfqItems } = await supabase
     .from("rfq_items")
@@ -225,6 +292,7 @@ export async function GET(req: NextRequest) {
     { header: "Kategori", key: "group", width: 18 },
     { header: "Stok", key: "stock", width: 12 },
     { header: "Yolda", key: "transit", width: 12 },
+    { header: "Proforma Acik", key: "proforma_open", width: 14 },
     { header: "RFQ", key: "rfq", width: 12 },
     { header: "Toplam", key: "total_stock", width: 14 },
     { header: "Önceki 2A", key: "sales_prev60", width: 14 },
@@ -243,12 +311,13 @@ export async function GET(req: NextRequest) {
     const netsisCode = p.netsis_stok_kodu ? String(p.netsis_stok_kodu).trim() : "";
     const stock = netsisCode ? stockMap.get(netsisCode) ?? 0 : 0;
     const inTransit = inTransitByProduct[p.id] ?? 0;
+    const proformaOpen = openProformaByProduct[p.id] ?? 0;
     const rfqQty = rfqByProduct.get(p.id) ?? 0;
     const sales = netsisCode
       ? salesMap.get(netsisCode)
-      : { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
+      : EMPTY_SALES;
     const sales10y = sales10yByProduct.get(p.id) ?? sales?.sales10y ?? 0;
-    const available_stock = stock + inTransit;
+    const available_stock = stock + inTransit + proformaOpen;
     const { lead, safety, groupName } = resolveLeadSafety(p.group_id);
 
     const trend = computeTrend(sales?.sales60 ?? 0, sales?.salesPrev60 ?? 0);
@@ -256,7 +325,7 @@ export async function GET(req: NextRequest) {
     if (available_stock < (sales?.sales120 ?? 0)) {
       need = sales?.sales120 ?? 0;
     } else if (available_stock >= (sales?.sales120 ?? 0) && lead + safety >= 120) {
-      need = sales!.sales120 * 2 - available_stock;
+      need = (sales?.sales120 ?? 0) * 2 - available_stock;
     }
     if (need < 0) need = 0;
     need = ceil(need);
@@ -268,8 +337,9 @@ export async function GET(req: NextRequest) {
       group: groupName || "Kategori yok",
       stock: fmt0(stock),
       transit: fmt0(inTransit),
+      proforma_open: fmt0(proformaOpen),
       rfq: fmt0(rfqQty),
-      total_stock: fmt0(stock + inTransit + rfqQty),
+      total_stock: fmt0(stock + inTransit + proformaOpen + rfqQty),
       sales_prev60: fmt0(sales?.salesPrev60 ?? 0),
       sales_60: fmt0(sales?.sales60 ?? 0),
       sales_120: fmt0(sales?.sales120 ?? 0),

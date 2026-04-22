@@ -484,7 +484,9 @@ export async function updateOrderItem(formData: FormData) {
   const orderItemId = String(formData.get("order_item_id") ?? "");
   if (!orderId || !orderItemId) return;
 
-  const productId = nullIfEmpty(formData.get("product_id"));
+  const currentProductId = nullIfEmpty(formData.get("product_id"));
+  const nextProductId = nullIfEmpty(formData.get("next_product_id"));
+  const productId = nextProductId ?? currentProductId;
   const product = productId
     ? await resolveProductBySearch(supabase, productId, null, null)
     : null;

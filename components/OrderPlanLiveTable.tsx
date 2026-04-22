@@ -21,6 +21,7 @@ type PlanRow = {
   groupName: string;
   netsisCode: string;
   inTransit: number;
+  proformaOpen: number;
   rfqQty: number;
   sales10y: number;
   lead: number;
@@ -61,7 +62,10 @@ const rowColorsFromId = (id: string) => {
 
 const ceil = (n: number) => Math.ceil(n);
 
-const computeTrend = (sales60: number, salesPrev60: number) => {
+const computeTrend = (
+  sales60: number,
+  salesPrev60: number
+): { trend_direction: PreparedRow["plan"]["trend_direction"]; multiplier: number } => {
   if (salesPrev60 === 0) return { trend_direction: "stable", multiplier: 1 };
   const change_ratio = (sales60 - salesPrev60) / salesPrev60;
   if (change_ratio > 0.1) return { trend_direction: "increasing", multiplier: 1.15 };
@@ -83,7 +87,7 @@ const computePlan = ({
   sales_previous_60_days: number;
   lead_time_days: number;
   safety_days: number;
-}) => {
+}): PreparedRow["plan"] => {
   let base_order_quantity = 0;
   if (available_stock < sales_last_4_months) {
     base_order_quantity = sales_last_4_months;
@@ -199,7 +203,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
           ? metrics.get(row.netsisCode) ?? { stock: 0, sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 }
           : { stock: 0, sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
 
-        const available_stock = metric.stock + row.inTransit;
+        const available_stock = metric.stock + row.inTransit + row.proformaOpen;
         const plan = computePlan({
           available_stock,
           sales_last_4_months: metric.sales120,
@@ -341,6 +345,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
       "Grup",
       "Stok",
       "Yolda",
+      "Proforma acik",
       "RFQ",
       "Onceki 60",
       "Son 60",
@@ -354,6 +359,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
       row.groupName,
       metric.stock,
       row.inTransit,
+      row.proformaOpen,
       row.rfqQty,
       metric.salesPrev60,
       metric.sales60,
@@ -541,9 +547,11 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
                   <div className={`text-[11px] text-black/70 ${loading && row.netsisCode ? "animate-pulse" : ""}`}>
                     Stok: {fmt(metric.stock)}
                   </div>
-                  <div className="text-[11px] text-black/70">Yolda: {fmt(row.inTransit)} · RFQ: {fmt(row.rfqQty)}</div>
+                  <div className="text-[11px] text-black/70">
+                    Yolda: {fmt(row.inTransit)} · Proforma acik: {fmt(row.proformaOpen)} · RFQ: {fmt(row.rfqQty)}
+                  </div>
                   <div className="mt-0.5 text-sm font-semibold text-black">
-                    Toplam: {fmt(metric.stock + row.inTransit + row.rfqQty)}
+                    Toplam: {fmt(metric.stock + row.inTransit + row.proformaOpen + row.rfqQty)}
                   </div>
                 </td>
                 <td className={`px-3 py-1 text-right text-sm text-black/80 ${loading && row.netsisCode ? "animate-pulse" : ""}`}>

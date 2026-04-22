@@ -26,7 +26,10 @@ export default async function ForwarderDetailPage({
 
   const { data: shipments } = await supabase
     .from("shipments")
-    .select("id, file_no, reference")
+    .select(
+      "id, file_no, reference, origin_port:ports!origin_port_id(name), destination_port:ports!destination_port_id(name)"
+    )
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   const { data: quotes } = await supabase

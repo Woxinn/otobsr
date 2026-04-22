@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ToastProvider";
@@ -8,6 +9,22 @@ import { useToast } from "@/components/ToastProvider";
 type ShipmentOption = {
   id: string;
   file_no: string | null;
+  origin_port:
+    | {
+        name: string | null;
+      }
+    | {
+        name: string | null;
+      }[]
+    | null;
+  destination_port:
+    | {
+        name: string | null;
+      }
+    | {
+        name: string | null;
+      }[]
+    | null;
 };
 
 type Quote = {
@@ -42,6 +59,9 @@ export default function ForwarderQuotesClient({
   shipments,
   quotes,
 }: Props) {
+  const badgeBaseClass =
+    "inline-flex items-center whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold leading-5";
+
   const formatMoney = (
     value: number | string | null | undefined,
     currency: string | null | undefined
@@ -93,8 +113,65 @@ export default function ForwarderQuotesClient({
 
   const getShipmentLabel = (id: string | null) => {
     const shipment = shipments.find((item) => item.id === id);
-    if (!shipment) return "-";
+    if (!shipment) return "Shipment silindi";
     return `${shipment.file_no ?? "-"}`;
+  };
+
+  const hasShipment = (id: string | null) =>
+    Boolean(id) && shipments.some((item) => item.id === id);
+
+  const getShipmentPort = (
+    id: string | null,
+    side: "origin_port" | "destination_port"
+  ) => {
+    const shipment = shipments.find((item) => item.id === id);
+    if (!shipment) return "-";
+    const port = shipment[side];
+    if (Array.isArray(port)) return port[0]?.name ?? "-";
+    return port?.name ?? "-";
+  };
+
+  const getContainerBadgeClass = (value: string | null) => {
+    const token = String(value ?? "").toUpperCase();
+    if (token.includes("40")) return "bg-indigo-50 text-indigo-700 border-indigo-200";
+    if (token.includes("20")) return "bg-sky-50 text-sky-700 border-sky-200";
+    return "bg-slate-50 text-slate-700 border-slate-200";
+  };
+
+  const getRouteBadgeClass = (value: string | null) => {
+    const token = String(value ?? "").toLowerCase();
+    if (token.includes("suveys")) return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    if (token.includes("umit")) return "bg-amber-50 text-amber-700 border-amber-200";
+    return "bg-slate-50 text-slate-700 border-slate-200";
+  };
+
+  const getValidityMeta = (value: string | null) => {
+    if (!value) {
+      return {
+        label: "-",
+        className: "bg-slate-50 text-slate-700 border-slate-200",
+      };
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const validDate = new Date(value);
+    validDate.setHours(0, 0, 0, 0);
+    if (Number.isNaN(validDate.getTime())) {
+      return {
+        label: value,
+        className: "bg-slate-50 text-slate-700 border-slate-200",
+      };
+    }
+    if (validDate < today) {
+      return {
+        label: `${value} (suresi doldu)`,
+        className: "bg-rose-50 text-rose-700 border-rose-200",
+      };
+    }
+    return {
+      label: value,
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
   };
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -329,37 +406,61 @@ export default function ForwarderQuotesClient({
             Toplam: {quotesState.length}
           </span>
         </div>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-black/10">
           {quotesState.length ? (
-            <table className="w-full min-w-[1080px] border-separate border-spacing-y-2 text-sm">
+            <table className="w-full min-w-[1380px] text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40">
-                  <th className="px-3 py-2">Shipment</th>
-                  <th className="px-3 py-2">Tutar (USD)</th>
-                  <th className="px-3 py-2">Konteyner</th>
-                  <th className="px-3 py-2">Free time</th>
-                  <th className="px-3 py-2">Rota</th>
-                  <th className="px-3 py-2">Transit</th>
-                  <th className="px-3 py-2">Gecerlilik</th>
-                  <th className="px-3 py-2">Not</th>
-                  <th className="px-3 py-2 text-right">Islem</th>
+                <tr className="bg-slate-50 text-left text-[11px] uppercase tracking-[0.18em] text-black/55">
+                  <th className="px-3 py-3">Shipment</th>
+                  <th className="px-3 py-3">Kalkis limani</th>
+                  <th className="px-3 py-3">Varis limani</th>
+                  <th className="px-3 py-3">Tutar (USD)</th>
+                  <th className="px-3 py-3">Konteyner</th>
+                  <th className="px-3 py-3">Free time</th>
+                  <th className="px-3 py-3">Rota</th>
+                  <th className="px-3 py-3">Transit</th>
+                  <th className="px-3 py-3">Gecerlilik</th>
+                  <th className="px-3 py-3">Not</th>
+                  <th className="px-3 py-3 text-right">Islem</th>
                 </tr>
               </thead>
               <tbody>
                 {quotesState.map((quote) => {
                   const isEditing = editId === quote.id;
                   const formId = `quote-form-${quote.id}`;
+                  const validity = getValidityMeta(quote.valid_until);
                   return (
                     <tr
                       key={quote.id}
-                      className={`rounded-2xl border border-black/10 ${
+                      className={`border-t border-black/10 transition-colors hover:bg-black/[0.02] ${
                         quote.is_selected
-                          ? "bg-[var(--mint)]"
-                          : "bg-[var(--sky)]"
+                          ? "bg-emerald-50/60"
+                          : "bg-white"
                       }`}
                     >
                       <td className="px-3 py-3 font-semibold">
-                        {getShipmentLabel(quote.shipment_id)}
+                        {quote.shipment_id && hasShipment(quote.shipment_id) ? (
+                          <Link
+                            href={`/shipments/${quote.shipment_id}`}
+                            className={`${badgeBaseClass} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100`}
+                          >
+                            {getShipmentLabel(quote.shipment_id)}
+                          </Link>
+                        ) : (
+                          <span className={`${badgeBaseClass} border-rose-200 bg-rose-50 text-rose-700`}>
+                            {getShipmentLabel(quote.shipment_id)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`${badgeBaseClass} border-black/10 bg-slate-50 text-slate-700`}>
+                          {getShipmentPort(quote.shipment_id, "origin_port")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`${badgeBaseClass} border-black/10 bg-slate-50 text-slate-700`}>
+                          {getShipmentPort(quote.shipment_id, "destination_port")}
+                        </span>
                       </td>
                       <td className="px-3 py-3">
                         {isEditing ? (
@@ -370,7 +471,7 @@ export default function ForwarderQuotesClient({
                             className="w-28 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                           />
                         ) : (
-                          <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-semibold">
+                          <span className={`${badgeBaseClass} border-emerald-200 bg-emerald-50 text-emerald-700`}>
                             {formatMoney(quote.amount, quote.currency ?? "USD")}
                           </span>
                         )}
@@ -384,7 +485,11 @@ export default function ForwarderQuotesClient({
                             className="w-28 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                           />
                         ) : (
-                          <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-semibold">
+                          <span
+                            className={`${badgeBaseClass} ${getContainerBadgeClass(
+                              quote.container_size
+                            )}`}
+                          >
                             {quote.container_size ?? "-"}
                           </span>
                         )}
@@ -398,7 +503,7 @@ export default function ForwarderQuotesClient({
                             className="w-20 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                           />
                         ) : (
-                          <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-semibold">
+                          <span className={`${badgeBaseClass} border-violet-200 bg-violet-50 text-violet-700`}>
                             {quote.free_time_days !== null &&
                             quote.free_time_days !== undefined
                               ? `${quote.free_time_days} gun`
@@ -419,7 +524,11 @@ export default function ForwarderQuotesClient({
                             <option value="Umit Burnu">Umit Burnu</option>
                           </select>
                         ) : (
-                          <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-semibold">
+                          <span
+                            className={`${badgeBaseClass} ${getRouteBadgeClass(
+                              quote.route_option
+                            )}`}
+                          >
                             {quote.route_option ?? "-"}
                           </span>
                         )}
@@ -433,7 +542,9 @@ export default function ForwarderQuotesClient({
                             className="w-20 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                           />
                         ) : (
-                          quote.transit_days ?? "-"
+                          <span className={`${badgeBaseClass} border-black/10 bg-white text-black/70`}>
+                            {quote.transit_days ?? "-"}
+                          </span>
                         )}
                       </td>
                       <td className="px-3 py-3">
@@ -446,7 +557,9 @@ export default function ForwarderQuotesClient({
                             className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                           />
                         ) : (
-                          quote.valid_until ?? "-"
+                          <span className={`${badgeBaseClass} ${validity.className}`}>
+                            {validity.label}
+                          </span>
                         )}
                       </td>
                       <td className="px-3 py-3">
@@ -458,7 +571,7 @@ export default function ForwarderQuotesClient({
                             className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                           />
                         ) : (
-                          quote.notes ?? "-"
+                          <span className="text-black/70">{quote.notes ?? "-"}</span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-right">
@@ -508,7 +621,7 @@ export default function ForwarderQuotesClient({
                               </button>
                               <button
                                 type="button"
-                                disabled={loading}
+                                disabled={loading || !hasShipment(quote.shipment_id)}
                                 onClick={() => handleSelect(quote)}
                                 className="rounded-full border border-black/20 px-3 py-1 text-xs font-semibold disabled:opacity-60"
                               >

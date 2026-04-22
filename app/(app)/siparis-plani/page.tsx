@@ -5,6 +5,7 @@ import { getCurrentUserRole, canViewModule } from "@/lib/roles";
 import Sales10ySyncButton from "@/components/Sales10ySyncButton";
 import RfqCreateModal from "@/components/RfqCreateModal";
 import OrderPlanLiveTable from "@/components/OrderPlanLiveTable";
+import OrderPlanExportJobButton from "@/components/OrderPlanExportJobButton";
 import { updateOrderPlanDefaults } from "@/app/actions/order-plan";
 
 const FALLBACK_LEAD_TIME_DAYS = 105;
@@ -100,6 +101,69 @@ const fetchTransitByProduct = async (supabase: any, productIds: string[]) => {
   });
 
   return totals;
+};
+
+const fetchOpenProformaByProduct = async (
+  supabase: any,
+  productIds: string[],
+  supplierId?: string
+) => {
+  const proformaByProduct = new Map<string, number>();
+  const invoicedByProduct = new Map<string, number>();
+  if (!productIds.length) return proformaByProduct;
+
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("proforma_items")
+      .select("product_id, quantity, proformas!inner(status, supplier_id)")
+      .in("product_id", productIds)
+      .neq("proformas.status", "iptal")
+      .range(from, to);
+    if (supplierId) query = query.eq("proformas.supplier_id", supplierId);
+    const { data, error } = await query;
+    if (error) {
+      console.error("[siparis-plani] proforma query error", error);
+      break;
+    }
+    if (!data?.length) break;
+    (data as any[]).forEach((row) => {
+      const pid = row.product_id ? String(row.product_id) : "";
+      if (!pid) return;
+      proformaByProduct.set(pid, (proformaByProduct.get(pid) ?? 0) + Number(row.quantity ?? 0));
+    });
+    if (data.length < pageSize) break;
+  }
+
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("order_items")
+      .select("product_id, quantity, orders!inner(supplier_id)")
+      .in("product_id", productIds)
+      .range(from, to);
+    if (supplierId) query = query.eq("orders.supplier_id", supplierId);
+    const { data, error } = await query;
+    if (error) {
+      console.error("[siparis-plani] invoice(order_items) query error", error);
+      break;
+    }
+    if (!data?.length) break;
+    (data as any[]).forEach((row) => {
+      const pid = row.product_id ? String(row.product_id) : "";
+      if (!pid) return;
+      invoicedByProduct.set(pid, (invoicedByProduct.get(pid) ?? 0) + Number(row.quantity ?? 0));
+    });
+    if (data.length < pageSize) break;
+  }
+
+  const openByProduct = new Map<string, number>();
+  productIds.forEach((pid) => {
+    const open = (proformaByProduct.get(pid) ?? 0) - (invoicedByProduct.get(pid) ?? 0);
+    openByProduct.set(pid, open > 0 ? open : 0);
+  });
+  return openByProduct;
 };
 
 const chunkIds = (ids: string[], size = 500) => {
@@ -290,6 +354,11 @@ export default async function OrderPlanPage({
   }
 
   const inTransitByProduct = await fetchTransitByProduct(supabase, productIds);
+  const openProformaByProduct = await fetchOpenProformaByProduct(
+    supabase,
+    productIds,
+    resolvedParams.supplier
+  );
 
   // RFQ'da bekleyen miktarlar (kapatildi/closed hariç)
   const rfqByProduct = new Map<string, number>();
@@ -379,6 +448,7 @@ export default async function OrderPlanPage({
 
   const orderPlanRows = productList.map((p: any) => {
     const inTransit = inTransitByProduct[p.id] ?? 0;
+    const proformaOpen = openProformaByProduct.get(p.id) ?? 0;
     const rfqQty = rfqByProduct.get(p.id) ?? 0;
     const { lead, safety } = resolveLeadSafety((p as { group_id?: string | null })?.group_id);
     const existing = planByProduct.get(p.id);
@@ -391,6 +461,7 @@ export default async function OrderPlanPage({
       groupName: groups?.find((g) => g.id === (p as { group_id?: string })?.group_id)?.name ?? "Kategori yok",
       netsisCode: p.netsis_stok_kodu ? String(p.netsis_stok_kodu).trim() : "",
       inTransit,
+      proformaOpen,
       rfqQty,
       sales10y: sales10yByProduct.get(p.id) ?? 0,
       lead,
@@ -408,12 +479,7 @@ export default async function OrderPlanPage({
         </div>
         <div className="flex items-center gap-3">
           <RfqCreateModal suppliers={suppliers ?? []} />
-          <Link
-            href={`/api/order-plan-export${buildQuery({})}`}
-            className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/70"
-          >
-            Excel Dışa Aktar
-          </Link>
+          <OrderPlanExportJobButton queryString={buildQuery({})} />
           <Link
             href={`/api/order-plan-export-bydb${buildQuery({})}`}
             className="rounded-full border border-[var(--ocean)] px-4 py-2 text-sm font-semibold text-[var(--ocean)] hover:bg-[var(--ocean)]/10"

@@ -40,6 +40,13 @@ export default async function OrderItemEditPage({
     .select("id, code, name")
     .order("code");
 
+  const currentProduct = Array.isArray(item.products)
+    ? item.products[0]
+    : item.products;
+  const currentProductCode = currentProduct?.code ? String(currentProduct.code) : "-";
+  const currentProductName = currentProduct?.name ? String(currentProduct.name) : (item.name ?? "-");
+  const currentTotal = Number(item.total_amount ?? 0);
+
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -74,18 +81,40 @@ export default async function OrderItemEditPage({
           </div>
         </div>
 
-        <form action={updateOrderItem} className="mt-6 space-y-4 text-sm">
+        <form action={updateOrderItem} className="mt-6 space-y-5 text-sm">
           <input type="hidden" name="order_id" value={order.id} />
           <input type="hidden" name="order_item_id" value={item.id} />
+          <input type="hidden" name="product_id" value={item.product_id ?? ""} />
+
+          <div className="rounded-2xl border border-black/10 bg-[var(--sand)]/40 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-black/45">
+              Bagli urun
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/70">
+                Kod: {currentProductCode}
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/70">
+                Ad: {currentProductName}
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/70">
+                Mevcut toplam: {currentTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-black/55">
+              Urun kodu artik varsayilan olarak korunur. Yalnizca degistirmek istersen asagidan sec.
+            </p>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-3">
-            <label className="text-sm font-medium lg:col-span-2">
-              Ürün kodu
+            <label className="text-sm font-medium lg:col-span-3">
+              Urunu degistir (opsiyonel)
               <select
-                name="product_id"
-                defaultValue={item.product_id ?? ""}
+                name="next_product_id"
+                defaultValue=""
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
               >
-                <option value="">Ürün seciniz</option>
+                <option value="">Mevcut urunu koru</option>
                 {products?.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.code} - {product.name}
@@ -104,6 +133,8 @@ export default async function OrderItemEditPage({
             <label className="text-sm font-medium">
               Adet
               <input
+                type="number"
+                step="1"
                 name="quantity"
                 defaultValue={item.quantity ?? ""}
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
@@ -112,6 +143,8 @@ export default async function OrderItemEditPage({
             <label className="text-sm font-medium">
               Birim fiyat
               <input
+                type="number"
+                step="any"
                 name="unit_price"
                 defaultValue={item.unit_price ?? ""}
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
@@ -120,6 +153,8 @@ export default async function OrderItemEditPage({
             <label className="text-sm font-medium">
               Net kg
               <input
+                type="number"
+                step="any"
                 name="net_weight_kg"
                 defaultValue={item.net_weight_kg ?? ""}
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
@@ -128,6 +163,8 @@ export default async function OrderItemEditPage({
             <label className="text-sm font-medium">
               Brut kg
               <input
+                type="number"
+                step="any"
                 name="gross_weight_kg"
                 defaultValue={item.gross_weight_kg ?? ""}
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
