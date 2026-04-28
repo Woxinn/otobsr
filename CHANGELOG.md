@@ -2,6 +2,65 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.590 - 2026-04-28
+
+- Tedarikci detay sayfasina `Bagli RFQ'lar` bolumu eklendi (`rfq_suppliers` uzerinden)
+- Urun detay sayfasina `Bagli RFQ'lar` bolumu eklendi (`rfq_items` uzerinden)
+- Urun detayinda her RFQ icin ilgili urunun toplam RFQ adedi gosterilir ve RFQ detaya tek tikla gidilebilir
+
+## v0.3.589 - 2026-04-28
+
+- MSSQL bridge agent tarafindaki `sales.aggregate` penceresi 120 gunden 310 gune guncellendi
+- Boylece `MSSQL_BRIDGE_MODE=agent` kullaniminda da siparis plani 10 aylik satis 2025 verisini kapsar
+- Agent icin opsiyonel `MSSQL_SALES_RECENT_DAYS` env destegi eklendi (varsayilan: 310)
+
+## v0.3.588 - 2026-04-28
+
+- Siparis plani canli metrik fetch akisi buyuk listelerde eksik satir riskini azaltacak sekilde sertlestirildi
+- Chunk boyutu ve paralellik dusuruldu (`180` kod, `2` worker) ve her chunk icin otomatik tekrar deneme eklendi
+- Tek chunk hatasinda tum metrik haritasi sifirlanmaz; gelen parcali veriler korunur
+
+## v0.3.587 - 2026-04-28
+
+- Siparis plani canli satis penceresi 300 gunden 310 gune cikarildi
+- Tarih araligi gostergesi bu yeni pencereye gore otomatik guncellenir
+
+## v0.3.586 - 2026-04-27
+
+- Siparis plani canli metrik API'sine tarih penceresi bilgisi eklendi (`recent`, `last60`, `prev60`)
+- Siparis plani tablosunda hangi satis tarih araliklarindan veri cekildigi gorunur bilgi satiri olarak gosterilmeye baslandi
+- Boylece 10 aylik pencereye gecis sonrasi ekranda dogrudan baslangic/bitis tarihleri teyit edilebilir
+
+## v0.3.585 - 2026-04-27
+
+- Siparis plani canli satis penceresi 4 ay (120 gun) yerine 10 ay (300 gun) olacak sekilde guncellendi
+- Bu degisiklik `sales120` alaninin dolduruldugu MSSQL sorgu penceresine uygulandi (geriye donuk alan adi korunarak)
+- Siparis plani ve export kolon etiketleri `10 aylik satis` / `10A` olarak guncellendi
+
+## v0.3.584 - 2026-04-27
+
+- Tedarikci detay `Finans ozeti` alanina `Kalan` karti eklendi
+- Kalan tutar, `Toplam - Odenen` formulune gore hesaplanip gosterilir
+
+## v0.3.583 - 2026-04-23
+
+- 10 yillik satis manuel import akisi buyuk dosyalar icin chunk tabanli hale getirildi (`/api/sales-10y-import/chunk`)
+- Import UI tarafina ilerleme cubugu eklendi (chunk bazli yuzde ve adim bilgisi)
+- `Cannot read properties of null (reading 'reset')` hatasi form referansi sabitlenerek giderildi
+- Veritabanimda olmayan stok kodlari import sirasinda atlanir; islem devam eder ve eslesmeyen sayisi raporlanir
+
+## v0.3.582 - 2026-04-23
+
+- Siparis plani 10 yillik satis alanina manuel import akisi eklendi (`POST /api/sales-10y-import`)
+- CSV/XLSX dosyasindan `stok_kodu` + `adet/total_10y` okunup `product_sales_10y_totals` tablosuna upsert edilir
+- `Sales10ySyncButton` uzerine dosya secimli tek seferlik import formu eklendi
+
+## v0.3.581 - 2026-04-23
+
+- Siparis plani export job akisinda `proforma acik` ve `yolda` toplamlari buyuk urun setleri icin chunk'landi
+- `product_id in (...)` filtreleri 6000+ kalemde limitlere takilmasin diye daha kucuk parcalarla (120) calisacak sekilde sertlestirildi
+- Proforma/yolda sorgularinda sessizce sifira dusmek yerine hata durumunda export olusturma adimi fail-fast olacak sekilde guncellendi
+
 ## v0.3.580 - 2026-04-22
 
 - Forwarder detay teklif tablosunda aktif olmayan/silinmis shipment referanslari `Shipment silindi` badge'i ile gosterilir

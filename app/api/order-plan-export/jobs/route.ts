@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const FALLBACK_LEAD_TIME_DAYS = 105;
 const FALLBACK_SAFETY_DAYS = 15;
 const DELIVERED_STATUS_TOKENS = new Set(["depoya teslim edildi", "depoya teslim", "delivered"]);
+const PRODUCT_ID_CHUNK_SIZE = 120;
 
 type ProductRow = {
   id: string;
@@ -20,6 +21,12 @@ const chunk = <T,>(arr: T[], size: number) => {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+};
+
+const chunkIds = (ids: string[], size = PRODUCT_ID_CHUNK_SIZE) => {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) chunks.push(ids.slice(i, i + size));
+  return chunks;
 };
 
 const normalizeStatusToken = (value: string | null | undefined) =>
@@ -46,25 +53,30 @@ const fetchTransitByProduct = async (supabase: any, productIds: string[]) => {
   if (!productIds.length) return totals;
 
   const pageSize = 1000;
-  for (let from = 0; ; from += pageSize) {
-    const to = from + pageSize - 1;
-    const { data, error } = await supabase
-      .from("order_items")
-      .select("product_id, quantity, orders!inner(order_status)")
-      .in("product_id", productIds)
-      .range(from, to);
+  for (const ids of chunkIds(productIds)) {
+    for (let from = 0; ; from += pageSize) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from("order_items")
+        .select("product_id, quantity, orders!inner(order_status)")
+        .in("product_id", ids)
+        .range(from, to);
 
-    if (error || !data?.length) break;
+      if (error) {
+        throw new Error(`[export-job] transit query failed: ${error.message}`);
+      }
+      if (!data?.length) break;
 
-    (data as any[]).forEach((row) => {
-      const pid = row.product_id as string | null;
-      if (!pid) return;
-      const status = normalizeStatusToken(extractOrderStatus(row.orders));
-      if (DELIVERED_STATUS_TOKENS.has(status)) return;
-      totals[pid] = (totals[pid] ?? 0) + Number(row.quantity ?? 0);
-    });
+      (data as any[]).forEach((row) => {
+        const pid = row.product_id as string | null;
+        if (!pid) return;
+        const status = normalizeStatusToken(extractOrderStatus(row.orders));
+        if (DELIVERED_STATUS_TOKENS.has(status)) return;
+        totals[pid] = (totals[pid] ?? 0) + Number(row.quantity ?? 0);
+      });
 
-    if (data.length < pageSize) break;
+      if (data.length < pageSize) break;
+    }
   }
 
   return totals;
@@ -80,41 +92,51 @@ const fetchOpenProformaByProduct = async (
   if (!productIds.length) return proformaByProduct;
 
   const pageSize = 1000;
-  for (let from = 0; ; from += pageSize) {
-    const to = from + pageSize - 1;
-    let query = supabase
-      .from("proforma_items")
-      .select("product_id, quantity, proformas!inner(status, supplier_id)")
-      .in("product_id", productIds)
-      .neq("proformas.status", "iptal")
-      .range(from, to);
-    if (supplierId) query = query.eq("proformas.supplier_id", supplierId);
-    const { data, error } = await query;
-    if (error || !data?.length) break;
-    (data as any[]).forEach((row) => {
-      const pid = row.product_id ? String(row.product_id) : "";
-      if (!pid) return;
-      proformaByProduct.set(pid, (proformaByProduct.get(pid) ?? 0) + Number(row.quantity ?? 0));
-    });
-    if (data.length < pageSize) break;
+  for (const ids of chunkIds(productIds)) {
+    for (let from = 0; ; from += pageSize) {
+      const to = from + pageSize - 1;
+      let query = supabase
+        .from("proforma_items")
+        .select("product_id, quantity, proformas!inner(status, supplier_id)")
+        .in("product_id", ids)
+        .neq("proformas.status", "iptal")
+        .range(from, to);
+      if (supplierId) query = query.eq("proformas.supplier_id", supplierId);
+      const { data, error } = await query;
+      if (error) {
+        throw new Error(`[export-job] proforma query failed: ${error.message}`);
+      }
+      if (!data?.length) break;
+      (data as any[]).forEach((row) => {
+        const pid = row.product_id ? String(row.product_id) : "";
+        if (!pid) return;
+        proformaByProduct.set(pid, (proformaByProduct.get(pid) ?? 0) + Number(row.quantity ?? 0));
+      });
+      if (data.length < pageSize) break;
+    }
   }
 
-  for (let from = 0; ; from += pageSize) {
-    const to = from + pageSize - 1;
-    let query = supabase
-      .from("order_items")
-      .select("product_id, quantity, orders!inner(supplier_id)")
-      .in("product_id", productIds)
-      .range(from, to);
-    if (supplierId) query = query.eq("orders.supplier_id", supplierId);
-    const { data, error } = await query;
-    if (error || !data?.length) break;
-    (data as any[]).forEach((row) => {
-      const pid = row.product_id ? String(row.product_id) : "";
-      if (!pid) return;
-      invoicedByProduct.set(pid, (invoicedByProduct.get(pid) ?? 0) + Number(row.quantity ?? 0));
-    });
-    if (data.length < pageSize) break;
+  for (const ids of chunkIds(productIds)) {
+    for (let from = 0; ; from += pageSize) {
+      const to = from + pageSize - 1;
+      let query = supabase
+        .from("order_items")
+        .select("product_id, quantity, orders!inner(supplier_id)")
+        .in("product_id", ids)
+        .range(from, to);
+      if (supplierId) query = query.eq("orders.supplier_id", supplierId);
+      const { data, error } = await query;
+      if (error) {
+        throw new Error(`[export-job] invoice(order_items) query failed: ${error.message}`);
+      }
+      if (!data?.length) break;
+      (data as any[]).forEach((row) => {
+        const pid = row.product_id ? String(row.product_id) : "";
+        if (!pid) return;
+        invoicedByProduct.set(pid, (invoicedByProduct.get(pid) ?? 0) + Number(row.quantity ?? 0));
+      });
+      if (data.length < pageSize) break;
+    }
   }
 
   const openByProduct = new Map<string, number>();
@@ -270,15 +292,39 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const [inTransitByProduct, openProformaByProduct, rfqItems, planEntries] = await Promise.all([
-    fetchTransitByProduct(supabase, productIds),
-    fetchOpenProformaByProduct(supabase, productIds, filters.supplier || undefined),
-    supabase
-      .from("rfq_items")
-      .select("product_id, quantity, rfqs!inner(status)")
-      .not("rfqs.status", "in", "(kapatildi,closed)"),
-    supabase.from("order_plan_entries").select("product_id, value"),
-  ]);
+  let inTransitByProduct: Record<string, number>;
+  let openProformaByProduct: Map<string, number>;
+  let rfqItems: { data: any[] | null; error: { message: string } | null };
+  let planEntries: { data: any[] | null; error: { message: string } | null };
+  try {
+    [inTransitByProduct, openProformaByProduct, rfqItems, planEntries] = await Promise.all([
+      fetchTransitByProduct(supabase, productIds),
+      fetchOpenProformaByProduct(supabase, productIds, filters.supplier || undefined),
+      supabase
+        .from("rfq_items")
+        .select("product_id, quantity, rfqs!inner(status)")
+        .not("rfqs.status", "in", "(kapatildi,closed)"),
+      supabase.from("order_plan_entries").select("product_id, value"),
+    ]);
+  } catch (error: any) {
+    return NextResponse.json(
+      { ok: false, message: `Export altyapisi verileri alinamadi: ${String(error?.message ?? error)}` },
+      { status: 500 }
+    );
+  }
+
+  if (rfqItems.error) {
+    return NextResponse.json(
+      { ok: false, message: `RFQ verisi alinamadi: ${rfqItems.error.message}` },
+      { status: 500 }
+    );
+  }
+  if (planEntries.error) {
+    return NextResponse.json(
+      { ok: false, message: `Plan verisi alinamadi: ${planEntries.error.message}` },
+      { status: 500 }
+    );
+  }
 
   const rfqByProduct = new Map<string, number>();
   (rfqItems.data ?? []).forEach((row) => {

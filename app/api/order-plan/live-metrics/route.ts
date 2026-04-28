@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchLiveSalesAgg, fetchLiveStockMap } from "@/lib/live-mssql";
+import { fetchLiveSalesAgg, fetchLiveStockMap, getSalesDateWindows } from "@/lib/live-mssql";
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     ).slice(0, 2000);
 
     if (!codes.length) {
-      return NextResponse.json({ ok: true, metrics: {} });
+      return NextResponse.json({ ok: true, metrics: {}, windows: getSalesDateWindows() });
     }
 
     const [stockMap, salesMap] = await Promise.all([
@@ -37,10 +37,9 @@ export async function POST(request: Request) {
       })
     );
 
-    return NextResponse.json({ ok: true, metrics });
+    return NextResponse.json({ ok: true, metrics, windows: getSalesDateWindows() });
   } catch (error) {
     console.error("[order-plan-live-metrics] failed", error);
-    return NextResponse.json({ ok: false, metrics: {} }, { status: 200 });
+    return NextResponse.json({ ok: false, metrics: {}, windows: getSalesDateWindows() }, { status: 200 });
   }
 }
-

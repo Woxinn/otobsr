@@ -63,6 +63,7 @@ const getStockSource = (value) =>
   String(value || process.env.MSSQL_STOCK_SOURCE || "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar";
 const getSalesSource = () =>
   String(process.env.MSSQL_SALES_SOURCE || "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar";
+const SALES_RECENT_DAYS = Math.max(1, Number(process.env.MSSQL_SALES_RECENT_DAYS || "310"));
 
 async function fetchStockMapChunk(pool, codes, matchMode, stockSource) {
   const request = pool.request();
@@ -364,7 +365,7 @@ class AgentCore extends EventEmitter {
     const today = new Date();
     const start120 = new Date(today);
     start120.setHours(0, 0, 0, 0);
-    start120.setDate(start120.getDate() - 120);
+    start120.setDate(start120.getDate() - SALES_RECENT_DAYS);
     const start60 = new Date(today);
     start60.setHours(0, 0, 0, 0);
     start60.setDate(start60.getDate() - 60);

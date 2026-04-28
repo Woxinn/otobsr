@@ -12,6 +12,12 @@ type LiveMetric = {
   sales10y: number;
 };
 
+type SalesWindows = {
+  recent?: { start?: string; end?: string };
+  last60?: { start?: string; end?: string };
+  prev60?: { start?: string; end?: string };
+};
+
 type PlanRow = {
   id: string;
   code: string;
@@ -46,6 +52,13 @@ type PreparedRow = {
 
 const fmt = (value: number | null | undefined) =>
   Number(value ?? 0).toLocaleString("tr-TR");
+
+const fmtDate = (value?: string) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("tr-TR");
+};
 
 const rowColorsFromId = (id: string) => {
   let hash = 0;
@@ -112,6 +125,7 @@ const computePlan = ({
 
 export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
   const [metrics, setMetrics] = useState<Map<string, LiveMetric>>(new Map());
+  const [salesWindows, setSalesWindows] = useState<SalesWindows | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [draftValues, setDraftValues] = useState<Map<string, number | null>>(new Map());
@@ -127,6 +141,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
     setLoading(true);
     if (!codes.length) {
       setMetrics(new Map());
+      setSalesWindows(null);
       setLoading(false);
       return;
     }
@@ -138,34 +153,49 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
     };
 
     const fetchMetricsChunk = async (chunkCodes: string[]) => {
-      const response = await fetch("/api/order-plan/live-metrics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codes: chunkCodes }),
-        cache: "no-store",
-      });
-      const json = (await response.json()) as {
-        ok?: boolean;
-        metrics?: Record<string, LiveMetric>;
-      };
-      const partial = new Map<string, LiveMetric>();
-      Object.entries(json.metrics ?? {}).forEach(([code, metric]) => {
-        partial.set(code, {
-          stock: Number(metric?.stock ?? 0),
-          sales120: Number(metric?.sales120 ?? 0),
-          sales60: Number(metric?.sales60 ?? 0),
-          salesPrev60: Number(metric?.salesPrev60 ?? 0),
-          sales10y: Number(metric?.sales10y ?? 0),
-        });
-      });
-      return partial;
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const response = await fetch("/api/order-plan/live-metrics", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codes: chunkCodes }),
+            cache: "no-store",
+          });
+          const json = (await response.json()) as {
+            ok?: boolean;
+            metrics?: Record<string, LiveMetric>;
+            windows?: SalesWindows;
+          };
+          if (!response.ok || !json.ok) {
+            throw new Error("live-metrics not ok");
+          }
+          const partial = new Map<string, LiveMetric>();
+          Object.entries(json.metrics ?? {}).forEach(([code, metric]) => {
+            partial.set(code, {
+              stock: Number(metric?.stock ?? 0),
+              sales120: Number(metric?.sales120 ?? 0),
+              sales60: Number(metric?.sales60 ?? 0),
+              salesPrev60: Number(metric?.salesPrev60 ?? 0),
+              sales10y: Number(metric?.sales10y ?? 0),
+            });
+          });
+          return { partial, windows: json.windows ?? null };
+        } catch (error) {
+          lastError = error;
+          if (attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+          }
+        }
+      }
+      throw lastError instanceof Error ? lastError : new Error("live-metrics failed");
     };
 
     const run = async () => {
       try {
         const next = new Map<string, LiveMetric>();
-        const chunks = chunk(codes, 400);
-        const concurrency = 3;
+        const chunks = chunk(codes, 180);
+        const concurrency = 2;
         let cursor = 0;
 
         const worker = async () => {
@@ -173,10 +203,15 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
             const idx = cursor;
             cursor += 1;
             if (idx >= chunks.length) return;
-            const partial = await fetchMetricsChunk(chunks[idx]);
-            if (!active) return;
-            partial.forEach((value, key) => next.set(key, value));
-            setMetrics(new Map(next));
+            try {
+              const { partial, windows } = await fetchMetricsChunk(chunks[idx]);
+              if (!active) return;
+              partial.forEach((value, key) => next.set(key, value));
+              if (windows) setSalesWindows(windows);
+              setMetrics(new Map(next));
+            } catch {
+              // tek chunk fail olursa tum tabloyu sifirlamayalim
+            }
           }
         };
 
@@ -185,7 +220,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
         setMetrics(next);
       } catch {
         if (!active) return;
-        setMetrics(new Map());
+        // genel hata durumunda eldeki partial metrikleri koru
       } finally {
         if (active) setLoading(false);
       }
@@ -402,6 +437,13 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
         </div>
       </div>
 
+      <div className="mb-3 rounded-2xl border border-black/10 bg-white px-3 py-2 text-xs text-black/65">
+        <span className="font-semibold text-black/75">Satis tarih araligi:</span>{" "}
+        10 aylik {fmtDate(salesWindows?.recent?.start)} - {fmtDate(salesWindows?.recent?.end)}
+        {"  |  "}Son 60: {fmtDate(salesWindows?.last60?.start)} - {fmtDate(salesWindows?.last60?.end)}
+        {"  |  "}Onceki 60: {fmtDate(salesWindows?.prev60?.start)} - {fmtDate(salesWindows?.prev60?.end)}
+      </div>
+
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-black/10 bg-white p-3 text-xs">
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -502,7 +544,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
             <th className="px-4 text-right">Stok</th>
             <th className="px-4 text-right">Onceki 2 aylik satis</th>
             <th className="px-4 text-right">Son 2 aylik satis</th>
-            <th className="px-4 text-right">4 aylik satis</th>
+            <th className="px-4 text-right">10 aylik satis</th>
             <th className="px-4 text-right">10 yillik satis</th>
             <th className="px-4 text-left">Miktarlar</th>
           </tr>

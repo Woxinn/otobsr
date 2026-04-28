@@ -45,6 +45,12 @@ export default async function SupplierDetailPage({
     .eq("supplier_id", supplier.id)
     .order("created_at", { ascending: false });
 
+  const { data: supplierRfqLinks } = await supabase
+    .from("rfq_suppliers")
+    .select("rfq_id, rfqs(id, code, title, status, response_due_date, created_at, currency)")
+    .eq("supplier_id", supplier.id)
+    .order("created_at", { ascending: false });
+
   const orderIds = (orders ?? []).map((o) => o.id);
 
   const pageSize = 1000;
@@ -167,6 +173,7 @@ export default async function SupplierDetailPage({
     (sum, p) => (p.status === "Bekleniyor" ? sum + Number(p.amount ?? 0) : sum),
     0
   );
+  const remainingAmount = Math.max(0, totalAmount - paidAmount);
   const orderQtyTotal = orderItems.reduce(
     (sum, row) => sum + Number((row as any).quantity ?? 0),
     0
@@ -231,6 +238,15 @@ export default async function SupplierDetailPage({
     if (!delays.length) return 0;
     return Math.round(delays.reduce((a, b) => a + b, 0) / delays.length);
   })();
+
+  const linkedRfqs = Array.from(
+    new Map(
+      (supplierRfqLinks ?? [])
+        .map((row: any) => row?.rfqs)
+        .filter(Boolean)
+        .map((rfq: any) => [String(rfq.id), rfq])
+    ).values()
+  );
 
   return (
     <section className="space-y-6">
@@ -454,7 +470,7 @@ export default async function SupplierDetailPage({
       {isPriv && canSeeFinance ? (
         <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
           <h3 className="text-lg font-semibold">Finans özeti</h3>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3 text-sm">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
             <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-3">
               <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Toplam</p>
               <p className="mt-1 text-xl font-semibold">
@@ -471,6 +487,12 @@ export default async function SupplierDetailPage({
               <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Bekleyen</p>
               <p className="mt-1 text-xl font-semibold">
                 {pendingAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
+              </p>
+            </div>
+            <div className="rounded-2xl border border-black/10 bg-rose-50 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Kalan</p>
+              <p className="mt-1 text-xl font-semibold">
+                {remainingAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
               </p>
             </div>
           </div>
@@ -516,6 +538,50 @@ export default async function SupplierDetailPage({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Bağlı RFQ'lar</h3>
+          <span className="text-xs text-black/60">Toplam: {linkedRfqs.length}</span>
+        </div>
+        {linkedRfqs.length ? (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-black/10">
+            <div className="grid grid-cols-[1.2fr_2fr_1fr_1fr_1fr] bg-gradient-to-r from-slate-50 to-white px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-black/45">
+              <span>Kod</span>
+              <span>Başlık</span>
+              <span>Durum</span>
+              <span>Son yanıt</span>
+              <span>İşlem</span>
+            </div>
+            <div className="divide-y divide-black/5">
+              {linkedRfqs.map((rfq: any, index: number) => (
+                <div
+                  key={rfq.id}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                  className="grid grid-cols-[1.2fr_2fr_1fr_1fr_1fr] items-center px-4 py-3 text-sm animate-[fade-up_0.35s_ease] bg-white hover:bg-[var(--mint)]/40 transition"
+                >
+                  <span className="font-semibold text-[var(--ocean)]">{rfq.code ?? "-"}</span>
+                  <span className="truncate text-black/75">{rfq.title ?? "-"}</span>
+                  <span className="capitalize text-black/70">{rfq.status ?? "-"}</span>
+                  <span className="text-black/60">{formatDate(rfq.response_due_date)}</span>
+                  <div>
+                    <Link
+                      href={`/rfqs/${rfq.id}`}
+                      className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 hover:bg-black/5"
+                    >
+                      Detay
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+            Bu tedarikçiye bağlı RFQ bulunamadı.
+          </div>
+        )}
       </div>
 
       {isPriv ? (

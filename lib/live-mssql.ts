@@ -17,6 +17,29 @@ export type Sales10yDebugRow = {
   fisnos: string | null;
 };
 
+export const SALES_RECENT_DAYS = 310;
+
+export const getSalesDateWindows = () => {
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+
+  const salesRecentStart = new Date(end);
+  salesRecentStart.setDate(salesRecentStart.getDate() - SALES_RECENT_DAYS);
+
+  const sales60Start = new Date(end);
+  sales60Start.setDate(sales60Start.getDate() - 60);
+
+  const salesPrev60Start = new Date(end);
+  salesPrev60Start.setDate(salesPrev60Start.getDate() - 120);
+
+  const fmt = (value: Date) => value.toISOString().slice(0, 10);
+  return {
+    recent: { days: SALES_RECENT_DAYS, start: fmt(salesRecentStart), end: fmt(end) },
+    last60: { days: 60, start: fmt(sales60Start), end: fmt(end) },
+    prev60: { days: 60, start: fmt(salesPrev60Start), end: fmt(sales60Start) },
+  };
+};
+
 const BRIDGE_TIMEOUT_MS = Math.max(5000, Number(process.env.MSSQL_BRIDGE_TIMEOUT_MS ?? "30000"));
 const BRIDGE_POLL_MS = Math.max(250, Number(process.env.MSSQL_BRIDGE_POLL_MS ?? "500"));
 const STOCK_CACHE_TTL_MS = Math.max(0, Number(process.env.MSSQL_STOCK_CACHE_TTL_MS ?? "15000"));
@@ -287,9 +310,9 @@ async function fetchDirectSalesAgg(codes: string[]) {
   if (!pools.length) return result;
 
   const today = new Date();
-  const start120 = new Date(today);
-  start120.setHours(0, 0, 0, 0);
-  start120.setDate(start120.getDate() - 120);
+  const start300 = new Date(today);
+  start300.setHours(0, 0, 0, 0);
+  start300.setDate(start300.getDate() - SALES_RECENT_DAYS);
   const start60 = new Date(today);
   start60.setHours(0, 0, 0, 0);
   start60.setDate(start60.getDate() - 60);
@@ -314,7 +337,7 @@ async function fetchDirectSalesAgg(codes: string[]) {
 
           const request = pool
             .request()
-            .input("start120", sql.DateTime, start120)
+            .input("start300", sql.DateTime, start300)
             .input("start60", sql.DateTime, start60)
             .input("startPrev60", sql.DateTime, startPrev60);
 
@@ -328,7 +351,7 @@ async function fetchDirectSalesAgg(codes: string[]) {
             request.input(param, sql.VarChar, `${code}%`);
             const match = `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
             selectSales120.push(
-              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start120 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start300 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
             );
             selectSales60.push(
               `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
@@ -377,7 +400,7 @@ async function fetchDirectSalesAgg(codes: string[]) {
             (
               await pool
                 .request()
-                .input("start120", sql.DateTime, start120)
+                .input("start120", sql.DateTime, start300)
                 .input("start60", sql.DateTime, start60)
                 .input("startPrev60", sql.DateTime, startPrev60)
                 .input("start10y", sql.DateTime, start10y)

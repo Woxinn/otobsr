@@ -95,6 +95,7 @@ export default async function ProductDetailPage({
     { data: values },
     { data: extraAttributes },
     { data: orderItems },
+    { data: rfqItems },
   ] = await Promise.all([
     product.group_id
       ? supabase
@@ -135,6 +136,10 @@ export default async function ProductDetailPage({
       .select(
         "order_id, product_id, unit_price, quantity, orders(id, name, created_at, extra_cost_percent, suppliers:orders_supplier_id_fkey(name, country))"
       )
+      .eq("product_id", product.id),
+    supabase
+      .from("rfq_items")
+      .select("rfq_id, quantity, rfqs!inner(id, code, title, status, response_due_date, created_at, currency)")
       .eq("product_id", product.id),
   ]);
 
@@ -365,6 +370,24 @@ export default async function ProductDetailPage({
   if (!product.gtip_id) warnings.push("GTİP bağlı değil");
   if (weightKg === null) warnings.push("Ağırlık bulunamadı (niteliklerden)");
 
+  const linkedRfqs = Array.from(
+    (rfqItems ?? []).reduce((acc: Map<string, any>, item: any) => {
+      const rfq = Array.isArray(item.rfqs) ? item.rfqs[0] : item.rfqs;
+      if (!rfq?.id) return acc;
+      const key = String(rfq.id);
+      const qty = Number(item.quantity ?? 0);
+      const current = acc.get(key);
+      if (current) {
+        current.totalQty += qty;
+      } else {
+        acc.set(key, { ...rfq, totalQty: qty });
+      }
+      return acc;
+    }, new Map<string, any>()).values()
+  ).sort((a: any, b: any) =>
+    String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
+  );
+
   return (
     <section className="space-y-8">
       {/* Hero */}
@@ -572,6 +595,57 @@ export default async function ProductDetailPage({
         ) : (
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
             Henüz bu ürüne bağlı sipariş yok.
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-[30px] border border-black/10 bg-white/95 p-6 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold">Bağlı RFQ'lar</p>
+          <span className="text-xs text-black/50">{linkedRfqs.length} RFQ</span>
+        </div>
+        {linkedRfqs.length ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
+                <tr>
+                  <th className="px-3 py-2">RFQ</th>
+                  <th className="px-3 py-2">Başlık</th>
+                  <th className="px-3 py-2">Durum</th>
+                  <th className="px-3 py-2 text-right">Toplam adet</th>
+                  <th className="px-3 py-2">Son yanıt</th>
+                  <th className="px-3 py-2 text-right">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="text-black/70">
+                {linkedRfqs.map((rfq: any, idx: number) => (
+                  <tr
+                    key={rfq.id}
+                    className={`border-t border-black/5 transition hover:bg-slate-50 ${
+                      idx % 2 === 0 ? "bg-slate-50/40" : "bg-white"
+                    }`}
+                  >
+                    <td className="px-3 py-3 font-semibold text-[var(--ocean)]">{rfq.code ?? "-"}</td>
+                    <td className="px-3 py-3">{rfq.title ?? "-"}</td>
+                    <td className="px-3 py-3 capitalize">{rfq.status ?? "-"}</td>
+                    <td className="px-3 py-3 text-right">{fmt(rfq.totalQty)}</td>
+                    <td className="px-3 py-3">{fmtDate(rfq.response_due_date)}</td>
+                    <td className="px-3 py-3 text-right">
+                      <Link
+                        href={`/rfqs/${rfq.id}`}
+                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 transition hover:border-black/30"
+                      >
+                        Detay
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
+            Henüz bu ürüne bağlı RFQ yok.
           </div>
         )}
       </div>
