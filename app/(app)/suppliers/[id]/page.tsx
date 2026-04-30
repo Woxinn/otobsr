@@ -173,7 +173,10 @@ export default async function SupplierDetailPage({
     (sum, p) => (p.status === "Bekleniyor" ? sum + Number(p.amount ?? 0) : sum),
     0
   );
-  const remainingAmount = Math.max(0, totalAmount - paidAmount);
+  const balanceAmount = totalAmount - paidAmount;
+  const balanceAbs = Math.abs(balanceAmount);
+  const balanceLabel =
+    balanceAmount > 0 ? "Kalan odeme" : balanceAmount < 0 ? "Fazla odeme" : "Bakiye";
   const orderQtyTotal = orderItems.reduce(
     (sum, row) => sum + Number((row as any).quantity ?? 0),
     0
@@ -489,10 +492,18 @@ export default async function SupplierDetailPage({
                 {pendingAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
               </p>
             </div>
-            <div className="rounded-2xl border border-black/10 bg-rose-50 p-3">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Kalan</p>
+            <div
+              className={`rounded-2xl border border-black/10 p-3 ${
+                balanceAmount > 0
+                  ? "bg-rose-50"
+                  : balanceAmount < 0
+                  ? "bg-violet-50"
+                  : "bg-slate-50"
+              }`}
+            >
+              <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">{balanceLabel}</p>
               <p className="mt-1 text-xl font-semibold">
-                {remainingAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
+                {balanceAbs.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} USD
               </p>
             </div>
           </div>

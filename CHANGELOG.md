@@ -2,6 +2,28 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.594 - 2026-04-30
+
+- Tedarikciler listesi tablosuna `Bakiye` sutunu eklendi
+- Bakiye, siparis toplam tutari ile `Odendi` durumundaki odemeler farkindan hesaplanir
+- `Kalan odeme` kirmizi, `Fazla odeme` yesil renk badge ile gosterilir
+
+## v0.3.593 - 2026-04-30
+
+- Tedarikci detay finans ozetinde `Kalan` ve `Fazla odeme` ayri kartlari tek bir `Bakiye` gostergesinde birlestirildi
+- Bakiye karti, `Toplam - Odenen` isaretine gore otomatik olarak `Kalan odeme` veya `Fazla odeme` olarak etiketlenir
+
+## v0.3.592 - 2026-04-30
+
+- Tedarikci detay `Finans ozeti` bolumune `Fazla odeme` gostergesi eklendi
+- `Toplam odenen > Toplam fatura` durumunda fark tutari artik ayri kartta gorunur
+
+## v0.3.591 - 2026-04-30
+
+- Gosterge paneli finans alanina `Kalan Odemesi Olan Siparisler` bolumu eklendi
+- Her siparis icin kalan odeme tutari, para birimi ve siparis detaya hizli gecis linki gosterilir
+- Liste kalan tutara gore buyukten kucuge siralanir
+
 ## v0.3.590 - 2026-04-28
 
 - Tedarikci detay sayfasina `Bagli RFQ'lar` bolumu eklendi (`rfq_suppliers` uzerinden)

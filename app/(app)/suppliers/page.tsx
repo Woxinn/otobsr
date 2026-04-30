@@ -13,6 +13,40 @@ export default async function SuppliersPage() {
     .from("suppliers")
     .select("*")
     .order("name");
+  const supplierIds = (suppliers ?? []).map((s) => s.id);
+  const { data: orders } = supplierIds.length
+    ? await supabase
+        .from("orders")
+        .select("id, supplier_id, total_amount")
+        .in("supplier_id", supplierIds)
+    : { data: [] as any[] };
+  const orderIds = (orders ?? []).map((o) => o.id);
+  const { data: orderPayments } = orderIds.length
+    ? await supabase
+        .from("order_payments")
+        .select("order_id, amount, status")
+        .in("order_id", orderIds)
+    : { data: [] as any[] };
+
+  const paidByOrder = new Map<string, number>();
+  (orderPayments ?? []).forEach((payment) => {
+    if (payment.status !== "Odendi") return;
+    const current = paidByOrder.get(payment.order_id) ?? 0;
+    paidByOrder.set(payment.order_id, current + Number(payment.amount ?? 0));
+  });
+
+  const balanceBySupplier = new Map<string, number>();
+  (orders ?? []).forEach((order) => {
+    const total = Number(order.total_amount ?? 0) || 0;
+    const paid = paidByOrder.get(order.id) ?? 0;
+    const balance = total - paid; // >0 kalan odeme, <0 fazla odeme
+    const supplierId = String(order.supplier_id ?? "");
+    if (!supplierId) return;
+    balanceBySupplier.set(supplierId, (balanceBySupplier.get(supplierId) ?? 0) + balance);
+  });
+
+  const formatMoney = (value: number) =>
+    value.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const rowColorsFromId = (id: string) => {
     let hash = 0;
@@ -65,7 +99,7 @@ export default async function SuppliersPage() {
         <div className="mt-4 space-y-3 text-sm">
           {suppliers?.length ? (
             <div className="overflow-x-auto">
-              <div className="min-w-[1120px] rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
+              <div className="min-w-[1240px] rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
                 <table className="w-full border-separate border-spacing-y-4">
                   <thead>
                     <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
@@ -75,13 +109,23 @@ export default async function SuppliersPage() {
                       <th className="px-4 pt-2">Telefon</th>
                       <th className="px-4 pt-2">Şehir</th>
                       <th className="px-4 pt-2">Ülke</th>
-                      <th className="px-4 pt-2">Not</th>
+                      <th className="px-4 pt-2 text-right">Bakiye</th>
                       <th className="px-4 pt-2 text-right">İşlem</th>
                     </tr>
                   </thead>
                   <tbody>
                     {suppliers.map((supplier, index) => {
                       const rowColors = rowColorsFromId(supplier.id);
+                      const balance = balanceBySupplier.get(supplier.id) ?? 0;
+                      const balanceAbs = Math.abs(balance);
+                      const balanceLabel =
+                        balance > 0 ? "Kalan" : balance < 0 ? "Fazla" : "Bakiye";
+                      const balanceClass =
+                        balance > 0
+                          ? "text-red-700 bg-red-50 border-red-200"
+                          : balance < 0
+                          ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                          : "text-black/60 bg-slate-50 border-black/15";
                       return (
                         <tr
                           key={supplier.id}
@@ -110,7 +154,13 @@ export default async function SuppliersPage() {
                           <td className="px-4 py-4">{supplier.phone ?? "-"}</td>
                           <td className="px-4 py-4">{supplier.city ?? "-"}</td>
                           <td className="px-4 py-4">{supplier.country ?? "-"}</td>
-                          <td className="px-4 py-4">{supplier.notes ?? "-"}</td>
+                          <td className="px-4 py-4 text-right">
+                            <span
+                              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${balanceClass}`}
+                            >
+                              {balanceLabel}: {formatMoney(balanceAbs)} USD
+                            </span>
+                          </td>
                           <td className="px-4 py-4 text-right">
                             <Link
                               href={`/suppliers/${supplier.id}`}

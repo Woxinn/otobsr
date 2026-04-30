@@ -353,6 +353,23 @@ export default async function DashboardPage() {
     const paid = paidByOrder.get(order.id) ?? 0;
     return acc + Math.max(0, total - paid);
   }, 0);
+  const ordersWithRemainingPayment = canSeeFinance
+    ? (orders ?? [])
+        .map((order) => {
+          const total = Number(order.total_amount ?? 0) || 0;
+          const paid = paidByOrder.get(order.id) ?? 0;
+          const remaining = Math.max(0, total - paid);
+          return {
+            id: order.id,
+            name: order.name ?? "Siparis",
+            currency: order.currency ?? "USD",
+            remaining,
+            expected_ready_date: order.expected_ready_date,
+          };
+        })
+        .filter((row) => row.remaining > 0)
+        .sort((a, b) => b.remaining - a.remaining)
+    : [];
 
   const paymentMonthlyData = (() => {
     if (!canSeeFinance) return [] as { month: string; count: number }[];
@@ -606,7 +623,8 @@ export default async function DashboardPage() {
 
       {canSeeFinance ? (
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+          <div className="space-y-4">
+            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.28em] text-black/45">Finans Ozet</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               {[
@@ -636,6 +654,44 @@ export default async function DashboardPage() {
                   <p className="mt-3 text-xl font-semibold">{item.value}</p>
                 </div>
               ))}
+            </div>
+            </div>
+            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs uppercase tracking-[0.28em] text-black/45">Kalan Odemesi Olan Siparisler</p>
+                <span className="rounded-full border border-black/15 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
+                  {ordersWithRemainingPayment.length} siparis
+                </span>
+              </div>
+              <div className="mt-4 max-h-[380px] space-y-2 overflow-y-auto pr-1">
+                {ordersWithRemainingPayment.length ? (
+                  ordersWithRemainingPayment.map((row) => (
+                    <div
+                      key={row.id}
+                      className="flex items-center justify-between rounded-2xl border border-black/10 bg-slate-50 px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <Link href={`/orders/${row.id}`} className="truncate font-semibold text-[var(--ocean)] hover:underline">
+                          {row.name}
+                        </Link>
+                        <p className="text-[11px] text-black/55">
+                          Hazir tarih: {row.expected_ready_date ? new Date(row.expected_ready_date).toLocaleDateString("tr-TR") : "-"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[11px] uppercase tracking-wider text-black/45">Kalan</p>
+                        <p className="font-semibold text-rose-700">
+                          {formatMoney(row.remaining)} {row.currency}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/40 px-3 py-2 text-sm text-black/70">
+                    Kalan odemesi olan siparis yok.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
