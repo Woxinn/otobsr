@@ -5,6 +5,8 @@ import {
   deleteProductType,
   createCompliance,
   deleteCompliance,
+  updateCompliance,
+  extendComplianceValidTo,
   syncTypesFromAttributes,
   upsertTypeFromTipValue,
 } from "@/app/actions/product-types";
@@ -12,7 +14,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ProductTypesImportForm from "@/components/ProductTypesImportForm";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 
-export default async function ProductTypesPage() {
+export default async function ProductTypesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; q?: string }>;
+}) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await createSupabaseServerClient();
 
   const fetchAll = async (table: string, selectStr: string) => {
@@ -116,6 +123,83 @@ export default async function ProductTypesPage() {
     a.localeCompare(b, "tr")
   );
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const addDays = (d: Date, n: number) => {
+    const x = new Date(d);
+    x.setDate(x.getDate() + n);
+    return x;
+  };
+  const soonLimit = addDays(today, 30);
+
+  const getComplianceStatus = (c: any): "active" | "expiring" | "expired" | "undated" => {
+    const from = c?.valid_from ? new Date(c.valid_from) : null;
+    const to = c?.valid_to ? new Date(c.valid_to) : null;
+    if (from) from.setHours(0, 0, 0, 0);
+    if (to) to.setHours(0, 0, 0, 0);
+    if (!from && !to) return "undated";
+    if (from && from > today) return "expired";
+    if (to && to < today) return "expired";
+    if (to && to >= today && to <= soonLimit) return "expiring";
+    return "active";
+  };
+
+  const allComplianceRows = (types ?? []).flatMap(
+    (t: any) => (t.product_type_compliance ?? []).map((c: any) => ({ ...c, _typeName: t.name }))
+  );
+  const totalCompliance = allComplianceRows.length;
+  const activeCompliance = allComplianceRows.filter((c: any) => getComplianceStatus(c) === "active").length;
+  const expiringCompliance = allComplianceRows.filter((c: any) => getComplianceStatus(c) === "expiring").length;
+  const expiredCompliance = allComplianceRows.filter((c: any) => getComplianceStatus(c) === "expired").length;
+  const undatedCompliance = allComplianceRows.filter((c: any) => getComplianceStatus(c) === "undated").length;
+
+  const allCountries = new Set(
+    allComplianceRows
+      .map((c: any) => String(c.country ?? "").trim())
+      .filter(Boolean)
+      .map((v) => v.toLowerCase())
+  );
+  const typesWithNoCompliance = (types ?? []).filter(
+    (t: any) => !(t.product_type_compliance ?? []).length
+  ).length;
+
+  const selectedStatus = String(resolvedSearchParams.status ?? "all");
+  const searchQ = String(resolvedSearchParams.q ?? "").trim().toLowerCase();
+  const statusFilters = [
+    { key: "all", label: "Tum kayitlar" },
+    { key: "active", label: "Sadece aktif" },
+    { key: "expiring", label: "30 gunde bitecek" },
+    { key: "expired", label: "Suresi gecmis" },
+    { key: "undated", label: "Tarihsiz" },
+    { key: "no-compliance", label: "Kayitsiz tipler" },
+  ];
+
+  const filteredTypes = (types ?? []).filter((type: any) => {
+    const rows = type.product_type_compliance ?? [];
+    const byStatus =
+      selectedStatus === "all"
+        ? true
+        : selectedStatus === "no-compliance"
+        ? rows.length === 0
+        : rows.some((c: any) => getComplianceStatus(c) === selectedStatus);
+    if (!byStatus) return false;
+    if (!searchQ) return true;
+    const inType = String(type.name ?? "").toLowerCase().includes(searchQ);
+    const inRows = rows.some((c: any) => {
+      const text = [
+        c.country,
+        c.tse_status,
+        c.analiz_gecerlilik,
+        c.tareks_no,
+        c.rapor_no,
+      ]
+        .map((v: any) => String(v ?? "").toLowerCase())
+        .join(" ");
+      return text.includes(searchQ);
+    });
+    return inType || inRows;
+  });
+
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between">
@@ -136,6 +220,65 @@ export default async function ProductTypesPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-3 rounded-2xl border border-black/10 bg-white p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {statusFilters.map((f) => (
+              <Link
+                key={f.key}
+                href={f.key === "all" ? "/product-types" : `/product-types?status=${f.key}`}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  selectedStatus === f.key
+                    ? "border-[var(--ocean)] bg-[var(--ocean)]/10 text-[var(--ocean)]"
+                    : "border-black/20 text-black/65"
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
+          <form className="mt-3" method="get">
+            {selectedStatus !== "all" ? (
+              <input type="hidden" name="status" value={selectedStatus} />
+            ) : null}
+            <input
+              name="q"
+              defaultValue={resolvedSearchParams.q ?? ""}
+              placeholder="Tip / ulke / TSE / TAREKS ara..."
+              className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
+            />
+          </form>
+        </div>
+
+        <div className="lg:col-span-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="rounded-2xl border border-black/10 bg-white p-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Toplam tip</p>
+            <p className="mt-1 text-xl font-semibold">{types?.length ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-emerald-50 p-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Aktif kayit</p>
+            <p className="mt-1 text-xl font-semibold text-emerald-700">{activeCompliance}</p>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-amber-50 p-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">30 gunde bitecek</p>
+            <p className="mt-1 text-xl font-semibold text-amber-700">{expiringCompliance}</p>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-rose-50 p-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Suresi gecmis</p>
+            <p className="mt-1 text-xl font-semibold text-rose-700">{expiredCompliance}</p>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-slate-50 p-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Tarihsiz kayit</p>
+            <p className="mt-1 text-xl font-semibold text-slate-700">{undatedCompliance}</p>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-white p-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Ulke kapsami</p>
+            <p className="mt-1 text-xl font-semibold">{allCountries.size}</p>
+            <p className="text-[11px] text-black/55 mt-1">
+              Kayitsiz tip: {typesWithNoCompliance} | Toplam kayit: {totalCompliance}
+            </p>
+          </div>
+        </div>
+
         <div className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
           <p className="text-sm font-semibold">Yeni tip ekle</p>
           <form action={createProductType} className="mt-3 space-y-3">
@@ -208,7 +351,7 @@ export default async function ProductTypesPage() {
         <div className="lg:col-span-2 rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
           <p className="text-sm font-semibold mb-3">Tip listesi</p>
           <div className="space-y-4">
-            {(types ?? []).map((type) => (
+            {filteredTypes.map((type) => (
               <div
                 key={type.id}
                 className="rounded-2xl border border-black/10 bg-[var(--sand)]/60 p-3 space-y-3"
@@ -242,21 +385,121 @@ export default async function ProductTypesPage() {
                           <th className="px-2 py-1">TAREKS</th>
                           <th className="px-2 py-1">Rapor</th>
                           <th className="px-2 py-1">Geçerlilik</th>
-                          <th className="px-2 py-1 text-right">İşlem</th>
+                          <th className="px-2 py-1 text-right">Hizli islemler</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(type.product_type_compliance ?? []).map((c: any) => (
-                          <tr key={c.id} className="border-b border-black/5">
+                        {(type.product_type_compliance ?? [])
+                          .slice()
+                          .sort((a: any, b: any) => {
+                            const rank = (x: any) => {
+                              const s = getComplianceStatus(x);
+                              if (s === "expired") return 0;
+                              if (s === "expiring") return 1;
+                              if (s === "active") return 2;
+                              return 3;
+                            };
+                            return rank(a) - rank(b);
+                          })
+                          .map((c: any) => {
+                            const status = getComplianceStatus(c);
+                            const statusLabel =
+                              status === "active"
+                                ? "Aktif"
+                                : status === "expiring"
+                                ? "Yakinda bitecek"
+                                : status === "expired"
+                                ? "Suresi gecmis"
+                                : "Tarihsiz";
+                            const statusClass =
+                              status === "active"
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                : status === "expiring"
+                                ? "bg-amber-50 border-amber-200 text-amber-700"
+                                : status === "expired"
+                                ? "bg-rose-50 border-rose-200 text-rose-700"
+                                : "bg-slate-50 border-black/15 text-black/60";
+                            return (
+                          <tr key={c.id} className="border-b border-black/5 align-top">
                             <td className="px-2 py-1">{c.country ?? "Genel"}</td>
                             <td className="px-2 py-1">{c.tse_status ?? ""}</td>
                             <td className="px-2 py-1">{c.analiz_gecerlilik ?? ""}</td>
                             <td className="px-2 py-1">{c.tareks_no ?? ""}</td>
                             <td className="px-2 py-1">{c.rapor_no ?? ""}</td>
                             <td className="px-2 py-1">
-                              {[c.valid_from, c.valid_to].filter(Boolean).join(" — ")}
+                              <div className="flex items-center gap-2">
+                                <span>{[c.valid_from, c.valid_to].filter(Boolean).join(" — ") || "-"}</span>
+                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+                              <form action={updateCompliance} className="mt-2 grid gap-1 sm:grid-cols-2">
+                                <input type="hidden" name="id" value={c.id} />
+                                <input
+                                  name="country"
+                                  defaultValue={c.country ?? ""}
+                                  placeholder="Ulke"
+                                  className="rounded border border-black/15 px-1.5 py-1 text-[11px]"
+                                />
+                                <input
+                                  name="tse_status"
+                                  defaultValue={c.tse_status ?? ""}
+                                  placeholder="TSE"
+                                  className="rounded border border-black/15 px-1.5 py-1 text-[11px]"
+                                />
+                                <input
+                                  type="date"
+                                  name="analiz_gecerlilik"
+                                  defaultValue={c.analiz_gecerlilik ?? ""}
+                                  className="rounded border border-black/15 px-1.5 py-1 text-[11px]"
+                                />
+                                <input
+                                  name="tareks_no"
+                                  defaultValue={c.tareks_no ?? ""}
+                                  placeholder="TAREKS"
+                                  className="rounded border border-black/15 px-1.5 py-1 text-[11px]"
+                                />
+                                <input
+                                  name="rapor_no"
+                                  defaultValue={c.rapor_no ?? ""}
+                                  placeholder="Rapor"
+                                  className="rounded border border-black/15 px-1.5 py-1 text-[11px]"
+                                />
+                                <div className="grid grid-cols-2 gap-1">
+                                  <input
+                                    type="date"
+                                    name="valid_from"
+                                    defaultValue={c.valid_from ?? ""}
+                                    className="rounded border border-black/15 px-1.5 py-1 text-[11px]"
+                                  />
+                                  <input
+                                    type="date"
+                                    name="valid_to"
+                                    defaultValue={c.valid_to ?? ""}
+                                    className="rounded border border-black/15 px-1.5 py-1 text-[11px]"
+                                  />
+                                </div>
+                                <button className="rounded-full border border-[var(--ocean)] px-2 py-1 text-[11px] font-semibold text-[var(--ocean)] sm:col-span-2">
+                                  Satiri kaydet
+                                </button>
+                              </form>
                             </td>
                             <td className="px-2 py-1 text-right">
+                              <div className="flex flex-col items-end gap-1">
+                                <form action={extendComplianceValidTo}>
+                                  <input type="hidden" name="id" value={c.id} />
+                                  <input type="hidden" name="days" value="30" />
+                                  <button className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+                                    +30 gun
+                                  </button>
+                                </form>
+                                <form action={extendComplianceValidTo}>
+                                  <input type="hidden" name="id" value={c.id} />
+                                  <input type="hidden" name="days" value="90" />
+                                  <button className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
+                                    +90 gun
+                                  </button>
+                                </form>
                                 <ConfirmActionForm
                                   action={deleteCompliance}
                                   confirmText="Uyumluluk kaydı silinsin mi?"
@@ -265,9 +508,10 @@ export default async function ProductTypesPage() {
                                 >
                                   <input type="hidden" name="id" value={c.id} />
                                 </ConfirmActionForm>
+                              </div>
                             </td>
                           </tr>
-                        ))}
+                        )})}
                         {!(type.product_type_compliance ?? []).length ? (
                           <tr>
                             <td
@@ -328,6 +572,11 @@ export default async function ProductTypesPage() {
                 </div>
               </div>
             ))}
+            {!filteredTypes.length ? (
+              <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+                Filtreye uygun tip/uyumluluk kaydi bulunamadi.
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

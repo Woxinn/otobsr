@@ -2,6 +2,29 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.600 - 2026-05-04
+
+- `Tip & Uyumluluk` ekraninda P3 kapsaminda satir-ici hizli duzenleme eklendi
+- Uyumluluk kayitlarinda ulke/TSE/analiz/TAREKS/rapor/valid_from/valid_to alanlari satirdan kaydedilebilir hale getirildi
+- `valid_to` icin hizli uzatma aksiyonlari eklendi (`+30 gun`, `+90 gun`)
+
+## v0.3.599 - 2026-05-04
+
+- RFQ importta `Varolanla eslestir / Yeni olustur` secim listesinin uzun kayitlarda tasmasi engellendi
+- Eksik urun secim alani ve arama sonuc listesi scrollable hale getirildi
+
+## v0.3.598 - 2026-05-04
+
+- `Tip & Uyumluluk` ekranina P2 iyilestirmesi olarak hizli filtre chipleri eklendi
+- Durum bazli filtreler: tum, aktif, 30 gunde bitecek, suresi gecmis, tarihsiz, kayitsiz tipler
+- Tip/ulke/TSE/TAREKS alanlarini kapsayan serbest arama kutusu eklendi
+
+## v0.3.597 - 2026-05-04
+
+- `Tip & Uyumluluk` ekrani bilgi mimarisi iyilestirildi (ust ozet kartlari eklendi)
+- Uyumluluk kayitlarina durum etiketi eklendi: `Aktif`, `Yakinda bitecek`, `Suresi gecmis`, `Tarihsiz`
+- Tip icindeki uyumluluk satirlari risk onceligine gore siralanir (suresi gecmis/en yakin bitecek once)
+
 ## v0.3.596 - 2026-05-04
 
 - Gumrukcu Excel olusturma akisinda (`/api/export-gumruk`) TSE/uyumluluk secimi guncellendi

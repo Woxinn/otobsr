@@ -55,6 +55,62 @@ export async function deleteCompliance(formData: FormData) {
   revalidatePath("/product-types");
 }
 
+export async function updateCompliance(formData: FormData) {
+  "use server";
+  const supabase = await createSupabaseServerClient();
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+
+  const country = (formData.get("country") as string | null)?.trim() || null;
+  const tse_status = (formData.get("tse_status") as string | null)?.trim() || null;
+  const analiz_gecerlilik = (formData.get("analiz_gecerlilik") as string | null) || null;
+  const tareks_no = (formData.get("tareks_no") as string | null)?.trim() || null;
+  const rapor_no = (formData.get("rapor_no") as string | null)?.trim() || null;
+  const valid_from = (formData.get("valid_from") as string | null) || null;
+  const valid_to = (formData.get("valid_to") as string | null) || null;
+
+  await supabase
+    .from("product_type_compliance")
+    .update({
+      country,
+      tse_status,
+      analiz_gecerlilik,
+      tareks_no,
+      rapor_no,
+      valid_from,
+      valid_to,
+    })
+    .eq("id", id);
+
+  revalidatePath("/product-types");
+}
+
+export async function extendComplianceValidTo(formData: FormData) {
+  "use server";
+  const supabase = await createSupabaseServerClient();
+  const id = String(formData.get("id") ?? "").trim();
+  const days = Number(formData.get("days") ?? 0);
+  if (!id || !Number.isFinite(days) || days <= 0) return;
+
+  const { data } = await supabase
+    .from("product_type_compliance")
+    .select("valid_to")
+    .eq("id", id)
+    .maybeSingle();
+
+  const base = data?.valid_to ? new Date(data.valid_to) : new Date();
+  base.setHours(0, 0, 0, 0);
+  base.setDate(base.getDate() + days);
+  const next = base.toISOString().slice(0, 10);
+
+  await supabase
+    .from("product_type_compliance")
+    .update({ valid_to: next })
+    .eq("id", id);
+
+  revalidatePath("/product-types");
+}
+
 /**
  * Tek bir tip deÄŸeri (nitelikten okunan) iÃ§in product_type oluÅŸturur
  * ve bu deÄŸere sahip Ã¼rÃ¼nlerin product_type_id alanÄ±nÄ± doldurur.

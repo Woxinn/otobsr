@@ -328,7 +328,7 @@ export default function RfqImportModal({ rfqId }: Props) {
                 <div className="mt-3 rounded-xl border border-black/10 bg-white px-3 py-2 font-mono text-xs text-black/75">
                   {missingCatalogProducts.join(", ")}
                 </div>
-                <div className="mt-3 space-y-3">
+                <div className="mt-3 max-h-[420px] space-y-3 overflow-y-auto pr-1">
                   {catalogChoices.map((choice) => (
                     <div key={choice.code} className="rounded-xl border border-black/10 bg-white p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -390,7 +390,8 @@ export default function RfqImportModal({ rfqId }: Props) {
                             </button>
                           </div>
                           {choice.searching ? <div className="mt-1 text-[11px] text-black/50">Araniyor...</div> : null}
-                          <div className="mt-2 flex flex-wrap gap-2">
+                          <div className="mt-2 max-h-28 overflow-y-auto pr-1">
+                            <div className="flex flex-wrap gap-2">
                             {choice.results.map((item) => (
                               <button
                                 key={item.id}
@@ -411,6 +412,7 @@ export default function RfqImportModal({ rfqId }: Props) {
                                 {item.code} - {item.name ?? "-"}
                               </button>
                             ))}
+                            </div>
                           </div>
                           <div className="mt-1 text-[11px] text-black/55">
                             {choice.selected
