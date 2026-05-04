@@ -5,6 +5,7 @@ import { getCurrentUserRole, canEdit, canViewFinance } from "@/lib/roles";
 import OrderItemsToast from "@/components/OrderItemsToast";
 import {
   createOrderItem,
+  bulkUpdateOrderItems,
   deleteOrderItem,
   importOrderItems,
   deleteAllOrderItems,
@@ -40,6 +41,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import MissingProductRow from "@/components/MissingProductRow";
 import OrderItemCreateForm from "@/components/OrderItemCreateForm";
+import OrderItemsQuickEdit from "@/components/OrderItemsQuickEdit";
 import DocumentInlineViewer from "@/components/DocumentInlineViewer";
 
 type PackingSummaryInput = {
@@ -1123,6 +1125,29 @@ export default async function OrderDetailPage({
               ) : null}
             </div>
             {orderItems?.length ? (
+              <div className="space-y-4">
+                {canEditPage && !isSales ? (
+                  <details className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
+                    <summary className="cursor-pointer select-none text-sm font-semibold text-[var(--ocean)]">
+                      Hizli duzenlemeyi ac
+                    </summary>
+                    <div className="mt-3">
+                      <OrderItemsQuickEdit
+                        orderId={order.id}
+                        action={bulkUpdateOrderItems}
+                        items={(orderItems ?? []).map((item) => ({
+                          id: String(item.id),
+                          code: item.products?.code ?? null,
+                          name: item.name ?? item.products?.name ?? null,
+                          quantity: item.quantity ?? null,
+                          unit_price: item.unit_price ?? null,
+                          net_weight_kg: item.net_weight_kg ?? null,
+                          gross_weight_kg: item.gross_weight_kg ?? null,
+                        }))}
+                      />
+                    </div>
+                  </details>
+                ) : null}
               <div className="overflow-x-auto rounded-3xl border border-black/10 bg-white p-6 shadow-[0_24px_50px_-34px_rgba(15,61,62,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dashed border-black/10 pb-4">
                   <div>
@@ -1296,6 +1321,7 @@ export default async function OrderDetailPage({
                     </span>
                   ) : null}
                 </div>
+              </div>
               </div>
             ) : (
               <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">

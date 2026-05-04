@@ -2,6 +2,18 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.596 - 2026-05-04
+
+- Gumrukcu Excel olusturma akisinda (`/api/export-gumruk`) TSE/uyumluluk secimi guncellendi
+- `valid_to` tarihi gecmis uyumluluk kayitlari artik secime dahil edilmez
+- Uygun kayit seciminde sadece tarih araliginda aktif (`valid_from <= bugun <= valid_to`) satirlar kullanilir
+
+## v0.3.595 - 2026-04-30
+
+- Siparis detayina urun kalemleri icin `Hizli duzenleme` alani eklendi
+- Kalem bazinda adet, birim fiyat, toplam net kg ve toplam brut kg alanlari toplu ve tek seferde guncellenebilir hale getirildi
+- Yeni server action: `bulkUpdateOrderItems` (toplu kayit + order toplamlarini yeniden hesaplama)
+
 ## v0.3.594 - 2026-04-30
 
 - Tedarikciler listesi tablosuna `Bakiye` sutunu eklendi

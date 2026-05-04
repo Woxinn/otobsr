@@ -549,6 +549,72 @@ export async function updateOrderItem(formData: FormData) {
   redirect(`/orders/${orderId}?toast=item-updated`);
 }
 
+export async function bulkUpdateOrderItems(formData: FormData) {
+  await requireAdminRole();
+  const supabase = await createSupabaseServerClient();
+  const orderId = String(formData.get("order_id") ?? "");
+  const rawRows = String(formData.get("rows_json") ?? "");
+  if (!orderId || !rawRows) return;
+
+  let parsedRows: Array<{
+    id: string;
+    quantity?: string | null;
+    unit_price?: string | null;
+    net_weight_kg?: string | null;
+    gross_weight_kg?: string | null;
+  }> = [];
+  try {
+    const json = JSON.parse(rawRows);
+    if (Array.isArray(json)) {
+      parsedRows = json
+        .map((row) => ({
+          id: String((row as any)?.id ?? ""),
+          quantity: (row as any)?.quantity ?? null,
+          unit_price: (row as any)?.unit_price ?? null,
+          net_weight_kg: (row as any)?.net_weight_kg ?? null,
+          gross_weight_kg: (row as any)?.gross_weight_kg ?? null,
+        }))
+        .filter((row) => row.id);
+    }
+  } catch {
+    redirect(`/orders/${orderId}?toast=item-bulk-update-failed`);
+  }
+
+  if (!parsedRows.length) return;
+
+  for (const row of parsedRows) {
+    const quantity = toIntegerFromText(String(row.quantity ?? ""));
+    const unitPrice = normalizeUnitPrice(toNumberFromText(String(row.unit_price ?? "")));
+    const netWeight = toNumberFromText(String(row.net_weight_kg ?? ""));
+    const grossWeight = toNumberFromText(String(row.gross_weight_kg ?? ""));
+    const totalAmount =
+      unitPrice !== null && quantity !== null
+        ? normalizeLineAmount(unitPrice * quantity)
+        : null;
+
+    const { error } = await supabase
+      .from("order_items")
+      .update({
+        quantity,
+        unit_price: unitPrice,
+        total_amount: totalAmount,
+        net_weight_kg: netWeight,
+        gross_weight_kg: grossWeight,
+      })
+      .eq("id", row.id)
+      .eq("order_id", orderId);
+
+    if (error) {
+      console.error("Order item bulk update failed", { rowId: row.id, error });
+      redirect(`/orders/${orderId}?toast=item-bulk-update-failed`);
+    }
+  }
+
+  await updateOrderTotals(supabase, orderId);
+  revalidatePath(`/orders/${orderId}`);
+  redirect(`/orders/${orderId}?toast=item-bulk-updated`);
+}
+
 export async function deleteOrderItem(formData: FormData) {
   await requireAdminRole();
   const supabase = await createSupabaseServerClient();

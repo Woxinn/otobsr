@@ -341,22 +341,19 @@ export async function GET(req: NextRequest) {
 
     const pickFrom = (rows: ComplianceRow[]) => {
       if (!rows.length) return null;
-      const countryMatchDated = rows.find(
+      const datedRows = rows.filter((r) => fitsDate(r));
+      if (!datedRows.length) return null;
+
+      const countryMatchDated = datedRows.find(
         (r) =>
           supplierCountry &&
           r.country?.toLowerCase() === supplierCountry.toLowerCase() &&
           fitsDate(r)
       );
       if (countryMatchDated) return countryMatchDated;
-      const genericDated = rows.find((r) => !r.country && fitsDate(r));
+      const genericDated = datedRows.find((r) => !r.country && fitsDate(r));
       if (genericDated) return genericDated;
-      const countryAnyDate = rows.find(
-        (r) =>
-          supplierCountry &&
-          r.country?.toLowerCase() === supplierCountry.toLowerCase()
-      );
-      if (countryAnyDate) return countryAnyDate;
-      return rows[0];
+      return datedRows[0];
     };
 
     if (typeId) {
