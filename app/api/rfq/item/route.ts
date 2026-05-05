@@ -12,25 +12,67 @@ export async function PATCH(req: Request) {
   const body = await req.json().catch(() => null);
   const rfqId = String(body?.rfq_id ?? "").trim();
   const rfqItemId = String(body?.rfq_item_id ?? "").trim();
-  const targetPriceRaw = body?.target_unit_price;
-  const targetUnitPrice =
-    targetPriceRaw === null || targetPriceRaw === "" || targetPriceRaw === undefined ? null : Number(targetPriceRaw);
+  const hasTargetPrice = Object.prototype.hasOwnProperty.call(body ?? {}, "target_unit_price");
+  const hasQuantity = Object.prototype.hasOwnProperty.call(body ?? {}, "quantity");
+  const hasProductCode = Object.prototype.hasOwnProperty.call(body ?? {}, "product_code");
+  const hasProductName = Object.prototype.hasOwnProperty.call(body ?? {}, "product_name");
 
-  if (!rfqId || !rfqItemId || Number.isNaN(targetUnitPrice ?? 0)) {
-    return NextResponse.json({ error: "rfq_id, rfq_item_id ve gecerli hedef fiyat gerekli" }, { status: 400 });
+  if (!rfqId || !rfqItemId || (!hasTargetPrice && !hasQuantity && !hasProductCode && !hasProductName)) {
+    return NextResponse.json(
+      { error: "rfq_id, rfq_item_id ve en az bir guncellenecek alan gerekli" },
+      { status: 400 }
+    );
+  }
+
+  const patch: Record<string, unknown> = {};
+
+  if (hasTargetPrice) {
+    const targetPriceRaw = body?.target_unit_price;
+    const targetUnitPrice =
+      targetPriceRaw === null || targetPriceRaw === "" || targetPriceRaw === undefined
+        ? null
+        : Number(targetPriceRaw);
+    if (Number.isNaN(targetUnitPrice ?? 0)) {
+      return NextResponse.json({ error: "Gecerli hedef fiyat gerekli" }, { status: 400 });
+    }
+    patch.target_unit_price = targetUnitPrice;
+  }
+
+  if (hasQuantity) {
+    const quantityRaw = body?.quantity;
+    const quantity = quantityRaw === null || quantityRaw === "" || quantityRaw === undefined ? null : Number(quantityRaw);
+    if (quantity !== null && (!Number.isFinite(quantity) || quantity < 0)) {
+      return NextResponse.json({ error: "Gecerli miktar gerekli" }, { status: 400 });
+    }
+    patch.quantity = quantity;
+  }
+
+  if (hasProductCode) {
+    patch.product_code = String(body?.product_code ?? "").trim() || null;
+  }
+
+  if (hasProductName) {
+    patch.product_name = String(body?.product_name ?? "").trim() || null;
   }
 
   const { data, error } = await supabase
     .from("rfq_items")
-    .update({ target_unit_price: targetUnitPrice })
+    .update(patch)
     .eq("id", rfqItemId)
     .eq("rfq_id", rfqId)
-    .select("id, rfq_id, target_unit_price")
+    .select("id, rfq_id, target_unit_price, quantity, product_code, product_name")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "RFQ urunu bulunamadi" }, { status: 404 });
 
-  return NextResponse.json({ ok: true, rfq_item_id: data.id, target_unit_price: data.target_unit_price });
+  return NextResponse.json({
+    ok: true,
+    rfq_item_id: data.id,
+    target_unit_price: data.target_unit_price,
+    quantity: data.quantity,
+    product_code: data.product_code,
+    product_name: data.product_name,
+  });
 }
 
 export async function DELETE(req: Request) {

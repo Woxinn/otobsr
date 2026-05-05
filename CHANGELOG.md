@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.601 - 2026-05-05
+
+- RFQ detay urun satirlarinda miktar (`quantity`) alanina inline duzenleme eklendi
+- `/api/rfq/item` PATCH endpoint'i genisletildi; artik hedef fiyat disinda miktar/kod/ad guncellemesini de destekler
+- Boylece RFQ'ya eklenen urun kalemleri ekrandan hizli duzenlenebilir hale geldi
+
 ## v0.3.600 - 2026-05-04
 
 - `Tip & Uyumluluk` ekraninda P3 kapsaminda satir-ici hizli duzenleme eklendi

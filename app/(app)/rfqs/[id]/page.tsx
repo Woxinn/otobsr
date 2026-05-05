@@ -28,6 +28,7 @@ import RfqConvertModal from "@/components/RfqConvertModal";
 import RfqItemDeleteButton from "@/components/RfqItemDeleteButton";
 import RfqSupplierAdder from "@/components/RfqSupplierAdder";
 import RfqTargetPriceField from "@/components/RfqTargetPriceField";
+import RfqItemQuantityField from "@/components/RfqItemQuantityField";
 import { pickWeightKg } from "@/lib/gtipCost";
 
 export default async function RfqDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -371,7 +372,17 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                   <tr key={item.id} className="border-b border-black/5 last:border-none">
                     <td className="px-3 py-3 font-semibold">{item.product_code ?? "-"}</td>
                     <td className="px-3 py-3">{item.product_name ?? "-"}</td>
-                    <td className="px-3 py-3 text-right">{fmtNum(item.quantity, 2)}</td>
+                    <td className="px-3 py-3 text-right">
+                      {canEditPage ? (
+                        <RfqItemQuantityField
+                          rfqId={rfq.id}
+                          rfqItemId={item.id}
+                          value={item.quantity ?? null}
+                        />
+                      ) : (
+                        fmtNum(item.quantity, 2)
+                      )}
+                    </td>
                     <td className="px-3 py-3 text-right">
                       {canEditPage ? (
                         <RfqTargetPriceField
