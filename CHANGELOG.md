@@ -2,6 +2,25 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.604 - 2026-05-05
+
+- Siparis plani satis metriklerinde stok kodu eslesme modu varsayilan olarak `exact` yapildi
+- Boylece `LIKE prefix` kaynakli fazla satis toplami riski azaltildi
+- Web (`lib/live-mssql.ts`) ve agent (`mssql-agent/agent-core.js`) tarafina `MSSQL_SALES_MATCH_MODE` env destegi eklendi (`exact|prefix`)
+
+## v0.3.603 - 2026-05-05
+
+- Siparis plani `2026 YTD` satis sorgularinda ust tarih siniri bugune sabitlendi (`< endDate`)
+- Boylece ileri tarihli hareketlerin YTD toplamina yanlislikla dahil olmasi engellendi
+- Duzeltme hem web MSSQL katmanina (`lib/live-mssql.ts`) hem agent katmanina (`mssql-agent/agent-core.js`) uygulandi
+
+## v0.3.602 - 2026-05-05
+
+- Siparis plani satis referansi rolling pencere yerine sadece `2026 YTD` olacak sekilde guncellendi (2025 ve onceki veriler dislandi)
+- Web (`lib/live-mssql.ts`) ve MSSQL agent (`mssql-agent/agent-core.js`) satis sorgulari yil basi (`01.01.2026`) baslangicina hizalandi
+- Siparis plani tablo ve export kolon etiketleri `2026 YTD` olacak sekilde guncellendi
+- Plan hesap ciktilarina `multiplier`, `use_core_quantity`, `final_order_quantity` alanlari eklendi; varsayilan final miktar trend bazli oneridir
+
 ## v0.3.601 - 2026-05-05
 
 - RFQ detay urun satirlarinda miktar (`quantity`) alanina inline duzenleme eklendi

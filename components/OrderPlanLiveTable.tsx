@@ -46,7 +46,10 @@ type PreparedRow = {
   plan: {
     base_order_quantity: number;
     trend_direction: "increasing" | "decreasing" | "stable";
+    multiplier: number;
     trend_based_suggestion: number;
+    use_core_quantity: boolean;
+    final_order_quantity: number;
   };
 };
 
@@ -88,24 +91,26 @@ const computeTrend = (
 
 const computePlan = ({
   available_stock,
-  sales_last_4_months,
+  sales_2026_ytd,
   sales_last_60_days,
   sales_previous_60_days,
   lead_time_days,
   safety_days,
 }: {
   available_stock: number;
-  sales_last_4_months: number;
+  sales_2026_ytd: number;
   sales_last_60_days: number;
   sales_previous_60_days: number;
   lead_time_days: number;
   safety_days: number;
+  use_core_quantity?: boolean;
 }): PreparedRow["plan"] => {
+  const use_core_quantity = false;
   let base_order_quantity = 0;
-  if (available_stock < sales_last_4_months) {
-    base_order_quantity = sales_last_4_months;
-  } else if (available_stock >= sales_last_4_months && lead_time_days + safety_days >= 120) {
-    const target_stock = sales_last_4_months * 2;
+  if (available_stock < sales_2026_ytd) {
+    base_order_quantity = sales_2026_ytd;
+  } else if (available_stock >= sales_2026_ytd && lead_time_days + safety_days >= 120) {
+    const target_stock = sales_2026_ytd * 2;
     base_order_quantity = target_stock - available_stock;
   } else {
     base_order_quantity = 0;
@@ -114,12 +119,17 @@ const computePlan = ({
   base_order_quantity = ceil(base_order_quantity);
 
   const trend = computeTrend(sales_last_60_days, sales_previous_60_days);
-  const trend_based_suggestion = ceil(base_order_quantity * trend.multiplier);
+  const multiplier = trend.multiplier;
+  const trend_based_suggestion = ceil(base_order_quantity * multiplier);
+  const final_order_quantity = use_core_quantity ? base_order_quantity : trend_based_suggestion;
 
   return {
     base_order_quantity,
     trend_direction: trend.trend_direction,
+    multiplier,
     trend_based_suggestion,
+    use_core_quantity,
+    final_order_quantity,
   };
 };
 
@@ -241,7 +251,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
         const available_stock = metric.stock + row.inTransit + row.proformaOpen;
         const plan = computePlan({
           available_stock,
-          sales_last_4_months: metric.sales120,
+          sales_2026_ytd: metric.sales120,
           sales_last_60_days: metric.sales60,
           sales_previous_60_days: metric.salesPrev60,
           lead_time_days: row.lead,
@@ -303,7 +313,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
     return displayRows.reduce(
       (acc, entry) => {
         acc.totalNeed += entry.plan.base_order_quantity;
-        acc.totalSuggest += entry.plan.trend_based_suggestion;
+        acc.totalSuggest += entry.plan.final_order_quantity;
         if (entry.plan.base_order_quantity > 0) acc.needCount += 1;
         if (entry.metric.stock === 0) acc.zeroStock += 1;
         return acc;
@@ -347,12 +357,12 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
     setBulkPending(true);
     try {
       const updates = selectedRows.map((entry) => {
-        const targetValue = mode === "clear" ? 0 : entry.plan.trend_based_suggestion;
+        const targetValue = mode === "clear" ? 0 : entry.plan.final_order_quantity;
         return {
           product_id: entry.row.id,
           value: targetValue,
           need_qty: entry.plan.base_order_quantity,
-          suggest_qty: entry.plan.trend_based_suggestion,
+          suggest_qty: entry.plan.final_order_quantity,
         };
       });
       const response = await fetch("/api/order-plan/bulk", {
@@ -364,7 +374,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
       setDraftValues((prev) => {
         const next = new Map(prev);
         selectedRows.forEach((entry) => {
-          next.set(entry.row.id, mode === "clear" ? 0 : entry.plan.trend_based_suggestion);
+          next.set(entry.row.id, mode === "clear" ? 0 : entry.plan.final_order_quantity);
         });
         return next;
       });
@@ -400,7 +410,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
       metric.sales60,
       metric.sales120,
       plan.base_order_quantity,
-      plan.trend_based_suggestion,
+      plan.final_order_quantity,
     ]);
     const escape = (value: string | number) => `"${String(value).replaceAll("\"", "\"\"")}"`;
     const csv = [headers.map(escape).join(","), ...rowsCsv.map((line) => line.map(escape).join(","))].join("\n");
@@ -439,7 +449,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
 
       <div className="mb-3 rounded-2xl border border-black/10 bg-white px-3 py-2 text-xs text-black/65">
         <span className="font-semibold text-black/75">Satis tarih araligi:</span>{" "}
-        10 aylik {fmtDate(salesWindows?.recent?.start)} - {fmtDate(salesWindows?.recent?.end)}
+        2026 YTD {fmtDate(salesWindows?.recent?.start)} - {fmtDate(salesWindows?.recent?.end)}
         {"  |  "}Son 60: {fmtDate(salesWindows?.last60?.start)} - {fmtDate(salesWindows?.last60?.end)}
         {"  |  "}Onceki 60: {fmtDate(salesWindows?.prev60?.start)} - {fmtDate(salesWindows?.prev60?.end)}
       </div>
@@ -544,7 +554,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
             <th className="px-4 text-right">Stok</th>
             <th className="px-4 text-right">Onceki 2 aylik satis</th>
             <th className="px-4 text-right">Son 2 aylik satis</th>
-            <th className="px-4 text-right">10 aylik satis</th>
+            <th className="px-4 text-right">2026 YTD satis</th>
             <th className="px-4 text-right">10 yillik satis</th>
             <th className="px-4 text-left">Miktarlar</th>
           </tr>
@@ -611,7 +621,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
                 <td className="px-3 py-1 text-left text-sm text-black">
                   <div className="text-[13px] font-semibold text-black">Ihtiyac: {fmt(plan.base_order_quantity)}</div>
                   <div className="text-xs text-black/70">
-                    Tavsiye: {fmt(plan.trend_based_suggestion)} (
+                    Tavsiye: {fmt(plan.final_order_quantity)} (
                     {plan.trend_direction === "increasing"
                       ? "satis artiyor"
                       : plan.trend_direction === "decreasing"
@@ -625,7 +635,7 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
                   <OrderPlanInput
                     productId={row.id}
                     need={plan.base_order_quantity}
-                    suggest={plan.trend_based_suggestion}
+                    suggest={plan.final_order_quantity}
                     defaultValue={row.defaultValue}
                     onLocalValueChange={(numeric) =>
                       setDraftValues((prev) => {

@@ -297,7 +297,7 @@ export async function GET(req: NextRequest) {
     { header: "Toplam", key: "total_stock", width: 14 },
     { header: "Önceki 2A", key: "sales_prev60", width: 14 },
     { header: "Son 2A", key: "sales_60", width: 14 },
-    { header: "10A", key: "sales_120", width: 14 },
+    { header: "2026 YTD", key: "sales_120", width: 14 },
     { header: "10Y", key: "sales_10y", width: 14 },
     { header: "Lead", key: "lead", width: 10 },
     { header: "Safety", key: "safety", width: 10 },

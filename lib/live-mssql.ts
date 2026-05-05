@@ -17,14 +17,11 @@ export type Sales10yDebugRow = {
   fisnos: string | null;
 };
 
-export const SALES_RECENT_DAYS = 310;
-
 export const getSalesDateWindows = () => {
   const end = new Date();
   end.setHours(0, 0, 0, 0);
 
-  const salesRecentStart = new Date(end);
-  salesRecentStart.setDate(salesRecentStart.getDate() - SALES_RECENT_DAYS);
+  const salesRecentStart = new Date(end.getFullYear(), 0, 1);
 
   const sales60Start = new Date(end);
   sales60Start.setDate(sales60Start.getDate() - 60);
@@ -34,7 +31,7 @@ export const getSalesDateWindows = () => {
 
   const fmt = (value: Date) => value.toISOString().slice(0, 10);
   return {
-    recent: { days: SALES_RECENT_DAYS, start: fmt(salesRecentStart), end: fmt(end) },
+    recent: { days: null, start: fmt(salesRecentStart), end: fmt(end) },
     last60: { days: 60, start: fmt(sales60Start), end: fmt(end) },
     prev60: { days: 60, start: fmt(salesPrev60Start), end: fmt(sales60Start) },
   };
@@ -45,11 +42,14 @@ const BRIDGE_POLL_MS = Math.max(250, Number(process.env.MSSQL_BRIDGE_POLL_MS ?? 
 const STOCK_CACHE_TTL_MS = Math.max(0, Number(process.env.MSSQL_STOCK_CACHE_TTL_MS ?? "15000"));
 type StockSource = "sthar" | "stokhar";
 type SalesSource = "sthar" | "stokhar";
+type SalesMatchMode = "prefix" | "exact";
 
 const getStockSource = (): StockSource =>
   (String(process.env.MSSQL_STOCK_SOURCE ?? "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar");
 const getSalesSource = (): SalesSource =>
   (String(process.env.MSSQL_SALES_SOURCE ?? "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar");
+const getSalesMatchMode = (): SalesMatchMode =>
+  (String(process.env.MSSQL_SALES_MATCH_MODE ?? "exact").trim().toLowerCase() === "prefix" ? "prefix" : "exact");
 
 const stockCache = new Map<string, { expiresAt: number; result: Map<string, number> }>();
 type DirectPool = InstanceType<typeof sql.ConnectionPool>;
@@ -301,6 +301,7 @@ async function fetchDirectSalesAgg(codes: string[]) {
   const dbs = getSalesDbs();
   const pools: any[] = [];
   const salesSource = getSalesSource();
+  const salesMatchMode = getSalesMatchMode();
 
   for (const dbName of dbs) {
     const pool = await connectDirectMssql(dbName);
@@ -310,9 +311,8 @@ async function fetchDirectSalesAgg(codes: string[]) {
   if (!pools.length) return result;
 
   const today = new Date();
-  const start300 = new Date(today);
-  start300.setHours(0, 0, 0, 0);
-  start300.setDate(start300.getDate() - SALES_RECENT_DAYS);
+  const endExclusive = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const start300 = new Date(today.getFullYear(), 0, 1);
   const start60 = new Date(today);
   start60.setHours(0, 0, 0, 0);
   start60.setDate(start60.getDate() - 60);
@@ -339,7 +339,8 @@ async function fetchDirectSalesAgg(codes: string[]) {
             .request()
             .input("start300", sql.DateTime, start300)
             .input("start60", sql.DateTime, start60)
-            .input("startPrev60", sql.DateTime, startPrev60);
+            .input("startPrev60", sql.DateTime, startPrev60)
+            .input("endDate", sql.DateTime, endExclusive);
 
           const selectSales120: string[] = [];
           const selectSales60: string[] = [];
@@ -348,13 +349,16 @@ async function fetchDirectSalesAgg(codes: string[]) {
 
           part.forEach((code, index) => {
             const param = `code${index}`;
-            request.input(param, sql.VarChar, `${code}%`);
-            const match = `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
+            request.input(param, sql.VarChar, salesMatchMode === "exact" ? code : `${code}%`);
+            const match =
+              salesMatchMode === "exact"
+                ? `LTRIM(RTRIM(T1.KOD)) = @${param}`
+                : `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
             selectSales120.push(
-              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start300 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start300 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
             );
             selectSales60.push(
-              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
             );
             selectSalesPrev60.push(
               `SUM(CASE WHEN ${match} AND T2.TARIH >= @startPrev60 AND T2.TARIH < @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS sp60_${index}`
@@ -393,7 +397,11 @@ async function fetchDirectSalesAgg(codes: string[]) {
               SUM(CASE WHEN STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS salesPrev60,
               SUM(CASE WHEN STHAR_TARIH >= @start10y THEN STHAR_GCMIK ELSE 0 END) AS sales10y
             FROM TBLSTHAR
-            WHERE LTRIM(RTRIM(STOK_KODU)) LIKE @code AND UPPER(STHAR_GCKOD) = 'C'
+            WHERE ${
+              salesMatchMode === "exact"
+                ? "LTRIM(RTRIM(STOK_KODU)) = @code"
+                : "LTRIM(RTRIM(STOK_KODU)) LIKE @code"
+            } AND UPPER(STHAR_GCKOD) = 'C' AND STHAR_TARIH < @endDate
           `;
 
           const row =
@@ -404,7 +412,8 @@ async function fetchDirectSalesAgg(codes: string[]) {
                 .input("start60", sql.DateTime, start60)
                 .input("startPrev60", sql.DateTime, startPrev60)
                 .input("start10y", sql.DateTime, start10y)
-                .input("code", sql.VarChar, `${key}%`)
+                .input("endDate", sql.DateTime, endExclusive)
+                .input("code", sql.VarChar, salesMatchMode === "exact" ? key : `${key}%`)
                 .query(query)
             ).recordset?.[0] ?? {};
 

@@ -63,7 +63,8 @@ const getStockSource = (value) =>
   String(value || process.env.MSSQL_STOCK_SOURCE || "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar";
 const getSalesSource = () =>
   String(process.env.MSSQL_SALES_SOURCE || "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar";
-const SALES_RECENT_DAYS = Math.max(1, Number(process.env.MSSQL_SALES_RECENT_DAYS || "310"));
+const getSalesMatchMode = () =>
+  String(process.env.MSSQL_SALES_MATCH_MODE || "exact").trim().toLowerCase() === "prefix" ? "prefix" : "exact";
 
 async function fetchStockMapChunk(pool, codes, matchMode, stockSource) {
   const request = pool.request();
@@ -361,11 +362,11 @@ class AgentCore extends EventEmitter {
     const codes = Array.from(new Set((payload?.codes || []).map(trimCode).filter(Boolean)));
     if (!codes.length) return {};
     const salesSource = getSalesSource();
+    const salesMatchMode = getSalesMatchMode();
 
     const today = new Date();
-    const start120 = new Date(today);
-    start120.setHours(0, 0, 0, 0);
-    start120.setDate(start120.getDate() - SALES_RECENT_DAYS);
+    const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    const start120 = new Date(today.getFullYear(), 0, 1);
     const start60 = new Date(today);
     start60.setHours(0, 0, 0, 0);
     start60.setDate(start60.getDate() - 60);
@@ -391,7 +392,8 @@ class AgentCore extends EventEmitter {
               .request()
               .input("start120", sql.DateTime, start120)
               .input("start60", sql.DateTime, start60)
-              .input("startPrev60", sql.DateTime, startPrev60);
+              .input("startPrev60", sql.DateTime, startPrev60)
+              .input("endDate", sql.DateTime, endDate);
 
             const selectSales120 = [];
             const selectSales60 = [];
@@ -400,13 +402,15 @@ class AgentCore extends EventEmitter {
 
             part.forEach((code, index) => {
               const param = `code${index}`;
-              request.input(param, sql.VarChar, `${code}%`);
-              const match = `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
+              request.input(param, sql.VarChar, salesMatchMode === "exact" ? code : `${code}%`);
+              const match = salesMatchMode === "exact"
+                ? `LTRIM(RTRIM(T1.KOD)) = @${param}`
+                : `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
               selectSales120.push(
-                `SUM(CASE WHEN ${match} AND T2.TARIH >= @start120 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
+                `SUM(CASE WHEN ${match} AND T2.TARIH >= @start120 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
               );
               selectSales60.push(
-                `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
+                `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
               );
               selectSalesPrev60.push(
                 `SUM(CASE WHEN ${match} AND T2.TARIH >= @startPrev60 AND T2.TARIH < @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS sp60_${index}`
@@ -440,7 +444,8 @@ class AgentCore extends EventEmitter {
               .input("start120", sql.DateTime, start120)
               .input("start60", sql.DateTime, start60)
               .input("startPrev60", sql.DateTime, startPrev60)
-              .input("start10y", sql.DateTime, start10y);
+              .input("start10y", sql.DateTime, start10y)
+              .input("endDate", sql.DateTime, endDate);
 
             const selectSales120 = [];
             const selectSales60 = [];
@@ -450,10 +455,12 @@ class AgentCore extends EventEmitter {
 
             part.forEach((code, index) => {
               const param = `code${index}`;
-              request.input(param, sql.VarChar, `${code}%`);
-              const match = `LTRIM(RTRIM(STOK_KODU)) LIKE @${param}`;
-              selectSales120.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start120 THEN STHAR_GCMIK ELSE 0 END) AS s120_${index}`);
-              selectSales60.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start60 THEN STHAR_GCMIK ELSE 0 END) AS s60_${index}`);
+              request.input(param, sql.VarChar, salesMatchMode === "exact" ? code : `${code}%`);
+              const match = salesMatchMode === "exact"
+                ? `LTRIM(RTRIM(STOK_KODU)) = @${param}`
+                : `LTRIM(RTRIM(STOK_KODU)) LIKE @${param}`;
+              selectSales120.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start120 AND STHAR_TARIH < @endDate THEN STHAR_GCMIK ELSE 0 END) AS s120_${index}`);
+              selectSales60.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start60 AND STHAR_TARIH < @endDate THEN STHAR_GCMIK ELSE 0 END) AS s60_${index}`);
               selectSalesPrev60.push(
                 `SUM(CASE WHEN ${match} AND STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS sp60_${index}`
               );
@@ -466,6 +473,7 @@ class AgentCore extends EventEmitter {
                 ${[...selectSales120, ...selectSales60, ...selectSalesPrev60, ...selectSales10y].join(",\n              ")}
               FROM TBLSTHAR
               WHERE UPPER(STHAR_GCKOD) = 'C'
+                AND STHAR_TARIH < @endDate
                 AND (${where.join(" OR ")})
             `);
 
