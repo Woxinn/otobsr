@@ -106,9 +106,11 @@ export default async function SupplierDetailPage({
   const { data: supplierProformas } = isPriv
     ? await supabase
         .from("proformas")
-        .select("id, currency, status")
+        .select("id, proforma_no, name, proforma_date, total_amount, currency, status, created_at")
         .eq("supplier_id", supplier.id)
         .neq("status", "iptal")
+        .order("proforma_date", { ascending: false })
+        .order("created_at", { ascending: false })
     : { data: [] };
 
   const proformaIds = (supplierProformas ?? []).map((p) => p.id);
@@ -591,6 +593,63 @@ export default async function SupplierDetailPage({
         ) : (
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
             Bu tedarikçiye bağlı RFQ bulunamadı.
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Bağlı Proformalar</h3>
+          <span className="text-xs text-black/60">Toplam: {(supplierProformas ?? []).length}</span>
+        </div>
+        {(supplierProformas ?? []).length ? (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-black/10">
+            <div
+              className={`grid ${
+                canSeeFinance ? "grid-cols-[1.4fr_2fr_1fr_1fr_1fr_1fr]" : "grid-cols-[1.6fr_2.2fr_1fr_1fr_1fr]"
+              } bg-gradient-to-r from-slate-50 to-white px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-black/45`}
+            >
+              <span>Proforma no</span>
+              <span>Başlık</span>
+              <span>Durum</span>
+              <span>Tarih</span>
+              {canSeeFinance ? <span className="text-right">Tutar</span> : null}
+              <span className="text-right">İşlem</span>
+            </div>
+            <div className="divide-y divide-black/5">
+              {(supplierProformas ?? []).map((proforma: any, index: number) => (
+                <div
+                  key={proforma.id}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                  className={`grid ${
+                    canSeeFinance ? "grid-cols-[1.4fr_2fr_1fr_1fr_1fr_1fr]" : "grid-cols-[1.6fr_2.2fr_1fr_1fr_1fr]"
+                  } items-center px-4 py-3 text-sm animate-[fade-up_0.35s_ease] bg-white hover:bg-[var(--mint)]/40 transition`}
+                >
+                  <span className="font-semibold text-[var(--ocean)]">{proforma.proforma_no ?? "-"}</span>
+                  <span className="truncate text-black/75">{proforma.name ?? "-"}</span>
+                  <span className="capitalize text-black/70">{proforma.status ?? "-"}</span>
+                  <span className="text-black/60">{formatDate(proforma.proforma_date)}</span>
+                  {canSeeFinance ? (
+                    <span className="text-right text-black/80">
+                      {Number(proforma.total_amount ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}{" "}
+                      {proforma.currency ?? "USD"}
+                    </span>
+                  ) : null}
+                  <div className="text-right">
+                    <Link
+                      href={`/proformalar/${proforma.id}`}
+                      className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 hover:bg-black/5"
+                    >
+                      Detay
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+            Bu tedarikçiye bağlı proforma bulunamadı.
           </div>
         )}
       </div>

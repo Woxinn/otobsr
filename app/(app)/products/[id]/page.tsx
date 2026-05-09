@@ -96,6 +96,7 @@ export default async function ProductDetailPage({
     { data: extraAttributes },
     { data: orderItems },
     { data: rfqItems },
+    { data: proformaItems },
   ] = await Promise.all([
     product.group_id
       ? supabase
@@ -140,6 +141,12 @@ export default async function ProductDetailPage({
     supabase
       .from("rfq_items")
       .select("rfq_id, quantity, rfqs!inner(id, code, title, status, response_due_date, created_at, currency)")
+      .eq("product_id", product.id),
+    supabase
+      .from("proforma_items")
+      .select(
+        "proforma_id, quantity, line_total, proformas!inner(id, proforma_no, proforma_date, status, created_at, currency, suppliers(name))"
+      )
       .eq("product_id", product.id),
   ]);
 
@@ -388,6 +395,55 @@ export default async function ProductDetailPage({
     String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
   );
 
+  const linkedProformas = Array.from(
+    (proformaItems ?? []).reduce((acc: Map<string, any>, item: any) => {
+      const proforma = Array.isArray(item.proformas) ? item.proformas[0] : item.proformas;
+      if (!proforma?.id) return acc;
+      const key = String(proforma.id);
+      const qty = Number(item.quantity ?? 0);
+      const amount = Number(item.line_total ?? 0);
+      const current = acc.get(key);
+      if (current) {
+        current.totalQty += qty;
+        current.totalAmount += amount;
+      } else {
+        acc.set(key, { ...proforma, totalQty: qty, totalAmount: amount });
+      }
+      return acc;
+    }, new Map<string, any>()).values()
+  ).sort((a: any, b: any) =>
+    String(b.proforma_date ?? b.created_at ?? "").localeCompare(String(a.proforma_date ?? a.created_at ?? ""))
+  );
+
+  const invoiceQtyTotal = (orderItems ?? []).reduce((sum: number, item: any) => {
+    const qtyRaw = (item as any).quantity ?? (item as any).packages ?? 0;
+    return sum + (Number(qtyRaw) || 0);
+  }, 0);
+  const proformaQtyTotal = linkedProformas.reduce(
+    (sum: number, item: any) => sum + (Number(item.totalQty ?? 0) || 0),
+    0
+  );
+  const stillInProductionTotal = Math.max(proformaQtyTotal - invoiceQtyTotal, 0);
+
+  const stillInProductionRows = (() => {
+    if (!linkedProformas.length || stillInProductionTotal <= 0) return [] as any[];
+    const fifo = [...linkedProformas].sort((a: any, b: any) =>
+      String(a.proforma_date ?? a.created_at ?? "").localeCompare(String(b.proforma_date ?? b.created_at ?? ""))
+    );
+    let remainingInvoicePool = invoiceQtyTotal;
+    const rows: any[] = [];
+    for (const item of fifo) {
+      const qty = Number(item.totalQty ?? 0) || 0;
+      const consumed = Math.min(qty, Math.max(remainingInvoicePool, 0));
+      remainingInvoicePool -= consumed;
+      const openQty = qty - consumed;
+      if (openQty > 0) rows.push({ ...item, openQty });
+    }
+    return rows.sort((a: any, b: any) =>
+      String(b.proforma_date ?? b.created_at ?? "").localeCompare(String(a.proforma_date ?? a.created_at ?? ""))
+    );
+  })();
+
   return (
     <section className="space-y-8">
       {/* Hero */}
@@ -599,6 +655,59 @@ export default async function ProductDetailPage({
         )}
       </div>
 
+      <div className="rounded-[30px] border border-amber-200 bg-amber-50/60 p-6 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold">Uretimde</p>
+          <span className="text-xs text-black/60">
+            Acik miktar: {fmt(stillInProductionTotal)} (Proforma: {fmt(proformaQtyTotal)} / Fatura: {fmt(invoiceQtyTotal)})
+          </span>
+        </div>
+        {stillInProductionRows.length ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
+                <tr>
+                  <th className="px-3 py-2">Proforma</th>
+                  <th className="px-3 py-2">Tedarikci</th>
+                  <th className="px-3 py-2">Tarih</th>
+                  <th className="px-3 py-2 text-right">Proforma adet</th>
+                  <th className="px-3 py-2 text-right">Uretimde kalan</th>
+                  <th className="px-3 py-2 text-right">Islem</th>
+                </tr>
+              </thead>
+              <tbody className="text-black/70">
+                {stillInProductionRows.map((item: any, idx: number) => (
+                  <tr
+                    key={`in-production-${item.id}`}
+                    className={`border-t border-black/5 transition hover:bg-amber-50 ${
+                      idx % 2 === 0 ? "bg-white/70" : "bg-white"
+                    }`}
+                  >
+                    <td className="px-3 py-3 font-semibold text-[var(--ocean)]">{item.proforma_no ?? "-"}</td>
+                    <td className="px-3 py-3">{item?.suppliers?.name ?? "-"}</td>
+                    <td className="px-3 py-3">{fmtDate(item.proforma_date)}</td>
+                    <td className="px-3 py-3 text-right">{fmt(item.totalQty)}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-amber-700">{fmt(item.openQty)}</td>
+                    <td className="px-3 py-3 text-right">
+                      <Link
+                        href={`/proformalar/${item.id}`}
+                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 transition hover:border-black/30"
+                      >
+                        Detay
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            Acikta kalan urun yok. Tum proforma miktarlari faturalanmis gorunuyor.
+          </div>
+        )}
+      </div>
+
       <div className="rounded-[30px] border border-black/10 bg-white/95 p-6 shadow-sm backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold">Bağlı RFQ'lar</p>
@@ -646,6 +755,63 @@ export default async function ProductDetailPage({
         ) : (
           <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
             Henüz bu ürüne bağlı RFQ yok.
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-[30px] border border-black/10 bg-white/95 p-6 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold">Bağlı Proformalar</p>
+          <span className="text-xs text-black/50">{linkedProformas.length} proforma</span>
+        </div>
+        {linkedProformas.length ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
+                <tr>
+                  <th className="px-3 py-2">Proforma</th>
+                  <th className="px-3 py-2">Tedarikçi</th>
+                  <th className="px-3 py-2">Durum</th>
+                  <th className="px-3 py-2">Tarih</th>
+                  <th className="px-3 py-2 text-right">Adet</th>
+                  {canSeeFinance ? <th className="px-3 py-2 text-right">Tutar</th> : null}
+                  <th className="px-3 py-2 text-right">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="text-black/70">
+                {linkedProformas.map((proforma: any, idx: number) => (
+                  <tr
+                    key={proforma.id}
+                    className={`border-t border-black/5 transition hover:bg-slate-50 ${
+                      idx % 2 === 0 ? "bg-slate-50/40" : "bg-white"
+                    }`}
+                  >
+                    <td className="px-3 py-3 font-semibold text-[var(--ocean)]">{proforma.proforma_no ?? "-"}</td>
+                    <td className="px-3 py-3">{proforma?.suppliers?.name ?? "-"}</td>
+                    <td className="px-3 py-3 capitalize">{proforma.status ?? "-"}</td>
+                    <td className="px-3 py-3">{fmtDate(proforma.proforma_date)}</td>
+                    <td className="px-3 py-3 text-right">{fmt(proforma.totalQty)}</td>
+                    {canSeeFinance ? (
+                      <td className="px-3 py-3 text-right">
+                        {fmt(proforma.totalAmount)} {proforma.currency ?? ""}
+                      </td>
+                    ) : null}
+                    <td className="px-3 py-3 text-right">
+                      <Link
+                        href={`/proformalar/${proforma.id}`}
+                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 transition hover:border-black/30"
+                      >
+                        Detay
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
+            Henüz bu ürüne bağlı proforma yok.
           </div>
         )}
       </div>

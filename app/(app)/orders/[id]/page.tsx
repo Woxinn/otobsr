@@ -387,6 +387,21 @@ export default async function OrderDetailPage({
     .eq("order_id", order.id)
     .order("payment_date", { ascending: false });
 
+  const { data: supplierOrders } = canSeeFinance
+    ? await supabase
+        .from("orders")
+        .select("id, total_amount, created_at")
+        .eq("supplier_id", order.supplier_id)
+    : { data: [] as any[] };
+  const supplierOrderIds = (supplierOrders ?? []).map((item: any) => item.id).filter(Boolean);
+  const { data: supplierPayments } =
+    canSeeFinance && supplierOrderIds.length
+      ? await supabase
+          .from("order_payments")
+          .select("order_id, amount, status")
+          .in("order_id", supplierOrderIds)
+      : { data: [] as any[] };
+
   const { data: orderDocuments } = await supabase
     .from("order_documents")
     .select(
@@ -496,10 +511,30 @@ export default async function OrderDetailPage({
   const paidTotal = (orderPayments ?? [])
     .filter((payment) => payment.status === "Odendi")
     .reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0);
-  const remainingTotal = Math.max(
-    0,
-    Number(order.total_amount ?? 0) - paidTotal
-  );
+  const remainingBySupplierTimeline = (() => {
+    if (!canSeeFinance) return null;
+    const sortedOrders = [...(supplierOrders ?? [])].sort((a: any, b: any) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (aTime !== bTime) return aTime - bTime;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    const totalPaid = (supplierPayments ?? []).reduce((sum: number, payment: any) => {
+      if (payment.status !== "Odendi") return sum;
+      return sum + Number(payment.amount ?? 0);
+    }, 0);
+    let supplierCredit = totalPaid;
+    const map = new Map<string, number>();
+    sortedOrders.forEach((item: any) => {
+      const total = Number(item.total_amount ?? 0) || 0;
+      const remaining = Math.max(0, total - supplierCredit);
+      map.set(String(item.id), remaining);
+      supplierCredit = Math.max(0, supplierCredit - total);
+    });
+    return map.get(String(order.id)) ?? null;
+  })();
+  const remainingTotal =
+    remainingBySupplierTimeline ?? Math.max(0, Number(order.total_amount ?? 0) - paidTotal);
 
   const totalsAll = (orderItemsAll ?? []).reduce(
     (acc, item) => {

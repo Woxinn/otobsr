@@ -185,6 +185,55 @@ export default async function OrdersPage({
     },
     {}
   );
+  const remainingByOrder = (() => {
+    const map = new Map<string, number>();
+    if (!canSeeFinance) return map;
+
+    const supplierPaidTotals = new Map<string, number>();
+    const supplierIdByOrderId = new Map<string, string>();
+    (orders ?? []).forEach((order) => {
+      const supplierId = order.supplier_id ? String(order.supplier_id) : "";
+      if (!supplierId) return;
+      supplierIdByOrderId.set(String(order.id), supplierId);
+    });
+
+    (payments ?? []).forEach((payment) => {
+      if (payment.status !== "Odendi") return;
+      const supplierId = supplierIdByOrderId.get(String(payment.order_id)) ?? "";
+      if (!supplierId) return;
+      supplierPaidTotals.set(
+        supplierId,
+        (supplierPaidTotals.get(supplierId) ?? 0) + Number(payment.amount ?? 0)
+      );
+    });
+
+    const supplierOrders = new Map<string, any[]>();
+    (orders ?? []).forEach((order) => {
+      const supplierId = order.supplier_id ? String(order.supplier_id) : "";
+      if (!supplierId) return;
+      const bucket = supplierOrders.get(supplierId) ?? [];
+      bucket.push(order);
+      supplierOrders.set(supplierId, bucket);
+    });
+
+    supplierOrders.forEach((supplierOrderList, supplierId) => {
+      const sortedOrders = [...supplierOrderList].sort((a, b) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (aTime !== bTime) return aTime - bTime;
+        return String(a.id).localeCompare(String(b.id));
+      });
+      let supplierCredit = supplierPaidTotals.get(supplierId) ?? 0;
+      sortedOrders.forEach((order) => {
+        const total = Number(order.total_amount ?? 0) || 0;
+        const remaining = Math.max(0, total - supplierCredit);
+        map.set(order.id, remaining);
+        supplierCredit = Math.max(0, supplierCredit - total);
+      });
+    });
+
+    return map;
+  })();
 
   const query = resolvedParams.q?.toLowerCase();
   const normalizeStatus = (value: string | null | undefined) =>
@@ -746,7 +795,7 @@ export default async function OrdersPage({
                         const detailHref = `/orders/${order.id}`;
                         const paid = paidTotals[order.id] ?? 0;
                         const total = Number(order.total_amount ?? 0);
-                        const remaining = Math.max(0, total - paid);
+                        const remaining = remainingByOrder.get(order.id) ?? Math.max(0, total - paid);
                         const missingDocs = canSeeFinance
                           ? missingOrderDocsByOrder.get(order.id) ?? []
                           : [];
@@ -909,7 +958,7 @@ export default async function OrdersPage({
                       const detailHref = `/orders/${order.id}`;
                       const paid = paidTotals[order.id] ?? 0;
                       const total = Number(order.total_amount ?? 0);
-                      const remaining = Math.max(0, total - paid);
+                      const remaining = remainingByOrder.get(order.id) ?? Math.max(0, total - paid);
                       const missingDocs = canSeeFinance ? missingOrderDocsByOrder.get(order.id) ?? [] : [];
                       const rowColors = rowColorsFromId(order.id);
                       const eta = (() => {

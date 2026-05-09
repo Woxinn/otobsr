@@ -43,7 +43,7 @@ export default async function DashboardPage() {
 
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, name, expected_ready_date, order_status, total_amount, currency, created_at, suppliers(name)")
+    .select("id, name, expected_ready_date, order_status, total_amount, currency, created_at, supplier_id, suppliers(name)")
     .order("created_at", { ascending: false });
 
   const { data: orderPayments } = canSeeFinance
@@ -348,7 +348,59 @@ export default async function DashboardPage() {
     }, 0)
     : 0;
 
+  const remainingByOrder = (() => {
+    const map = new Map<string, number>();
+    if (!canSeeFinance) return map;
+
+    const supplierIdByOrderId = new Map<string, string>();
+    (orders ?? []).forEach((order) => {
+      const supplierId = order.supplier_id ? String(order.supplier_id) : "";
+      if (!supplierId) return;
+      supplierIdByOrderId.set(String(order.id), supplierId);
+    });
+
+    const supplierPaidTotals = new Map<string, number>();
+    (orderPayments ?? []).forEach((payment) => {
+      if (payment.status !== "Odendi") return;
+      const supplierId = supplierIdByOrderId.get(String(payment.order_id)) ?? "";
+      if (!supplierId) return;
+      supplierPaidTotals.set(
+        supplierId,
+        (supplierPaidTotals.get(supplierId) ?? 0) + paymentAmount(payment.amount)
+      );
+    });
+
+    const supplierOrders = new Map<string, any[]>();
+    (orders ?? []).forEach((order) => {
+      const supplierId = order.supplier_id ? String(order.supplier_id) : "";
+      if (!supplierId) return;
+      const bucket = supplierOrders.get(supplierId) ?? [];
+      bucket.push(order);
+      supplierOrders.set(supplierId, bucket);
+    });
+
+    supplierOrders.forEach((supplierOrderList, supplierId) => {
+      const sortedOrders = [...supplierOrderList].sort((a, b) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (aTime !== bTime) return aTime - bTime;
+        return String(a.id).localeCompare(String(b.id));
+      });
+      let supplierCredit = supplierPaidTotals.get(supplierId) ?? 0;
+      sortedOrders.forEach((order) => {
+        const total = Number(order.total_amount ?? 0) || 0;
+        const remaining = Math.max(0, total - supplierCredit);
+        map.set(order.id, remaining);
+        supplierCredit = Math.max(0, supplierCredit - total);
+      });
+    });
+
+    return map;
+  })();
+
   const remainingPayments = (orders ?? []).reduce((acc, order) => {
+    const remaining = remainingByOrder.get(order.id);
+    if (typeof remaining === "number") return acc + remaining;
     const total = Number(order.total_amount ?? 0) || 0;
     const paid = paidByOrder.get(order.id) ?? 0;
     return acc + Math.max(0, total - paid);
@@ -356,9 +408,9 @@ export default async function DashboardPage() {
   const ordersWithRemainingPayment = canSeeFinance
     ? (orders ?? [])
         .map((order) => {
-          const total = Number(order.total_amount ?? 0) || 0;
-          const paid = paidByOrder.get(order.id) ?? 0;
-          const remaining = Math.max(0, total - paid);
+          const fallbackTotal = Number(order.total_amount ?? 0) || 0;
+          const fallbackPaid = paidByOrder.get(order.id) ?? 0;
+          const remaining = remainingByOrder.get(order.id) ?? Math.max(0, fallbackTotal - fallbackPaid);
           return {
             id: order.id,
             name: order.name ?? "Siparis",

@@ -58,15 +58,10 @@ if (typeof AbortSignal !== "undefined" && typeof AbortSignal.any !== "function")
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const nowIso = () => new Date().toISOString();
 const trimCode = (value) => String(value || "").trim();
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const getStockSource = (value) =>
-  String(value || process.env.MSSQL_STOCK_SOURCE || "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar";
-const getSalesSource = () =>
-  String(process.env.MSSQL_SALES_SOURCE || "sthar").trim().toLowerCase() === "stokhar" ? "stokhar" : "sthar";
 const getSalesMatchMode = () =>
   String(process.env.MSSQL_SALES_MATCH_MODE || "exact").trim().toLowerCase() === "prefix" ? "prefix" : "exact";
 
-async function fetchStockMapChunk(pool, codes, matchMode, stockSource) {
+async function fetchStockMapChunk(pool, codes, matchMode) {
   const request = pool.request();
   const normalizedCodes = codes.map(trimCode).filter(Boolean);
   if (!normalizedCodes.length) return {};
@@ -80,48 +75,31 @@ async function fetchStockMapChunk(pool, codes, matchMode, stockSource) {
     return { code, param };
   });
 
-  if (stockSource === "stokhar") {
-    request.input("startDate", sql.DateTime, startOfYear);
-    request.input("endDate", sql.DateTime, endExclusive);
-  }
+  request.input("startDate", sql.DateTime, startOfYear);
+  request.input("endDate", sql.DateTime, endExclusive);
 
   const matchExpression = (field, param) =>
     matchMode === "exact" ? `LTRIM(RTRIM(${field})) = @${param}` : `LTRIM(RTRIM(${field})) LIKE @${param}`;
 
-  const rs =
-    stockSource === "stokhar"
-      ? await request.query(`
-          SELECT
-            ${params
-              .map(
-                ({ param }, index) => `CONVERT(DECIMAL(22,2), ISNULL(SUM(CASE WHEN ${matchExpression(
-                  "T1.KOD",
-                  param
-                )} THEN CASE WHEN UPPER(T2.GCKOD)='G' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) * -1 ELSE 0 END ELSE 0 END),0)) AS s${index}`
-              )
-              .join(",\n              ")}
-          FROM TBLSTOKSB T1
-          LEFT JOIN TBLSTOKHAR T2
-            ON T2.STOKID = T1.ID
-           AND T2.TARIH >= @startDate
-           AND T2.TARIH < @endDate
-           AND T2.KAYITTIPI = 0
-           AND T2.ISLEMTIPI IN (0,1)
-          WHERE ${params.map(({ param }) => matchExpression("T1.KOD", param)).join(" OR ")}
-        `)
-      : await request.query(`
-          SELECT
-            ${params
-              .map(
-                ({ param }, index) => `SUM(CASE WHEN ${matchExpression(
-                  "Har.STOK_KODU",
-                  param
-                )} THEN CASE WHEN UPPER(Har.STHAR_GCKOD)='G' THEN Har.STHAR_GCMIK ELSE -Har.STHAR_GCMIK END ELSE 0 END) AS s${index}`
-              )
-              .join(",\n              ")}
-          FROM TBLSTHAR Har
-          WHERE ${params.map(({ param }) => matchExpression("Har.STOK_KODU", param)).join(" OR ")}
-        `);
+  const rs = await request.query(`
+    SELECT
+      ${params
+        .map(
+          ({ param }, index) => `CONVERT(DECIMAL(22,2), ISNULL(SUM(CASE WHEN ${matchExpression(
+            "T1.KOD",
+            param
+          )} THEN CASE WHEN UPPER(T2.GCKOD)='G' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) * -1 ELSE 0 END ELSE 0 END),0)) AS s${index}`
+        )
+        .join(",\n      ")}
+    FROM TBLSTOKSB T1
+    LEFT JOIN TBLSTOKHAR T2
+      ON T2.STOKID = T1.ID
+     AND T2.TARIH >= @startDate
+     AND T2.TARIH < @endDate
+     AND T2.KAYITTIPI = 0
+     AND T2.ISLEMTIPI IN (0,1)
+    WHERE ${params.map(({ param }) => matchExpression("T1.KOD", param)).join(" OR ")}
+  `);
 
   const row = rs.recordset?.[0] || {};
   return Object.fromEntries(params.map(({ code }, index) => [code, Number(row[`s${index}`] || 0)]));
@@ -345,13 +323,12 @@ class AgentCore extends EventEmitter {
   async handleStockLookup(payload) {
     const codes = Array.from(new Set((payload?.codes || []).map(trimCode).filter(Boolean)));
     const matchMode = payload?.matchMode === "exact" ? "exact" : "prefix";
-    const stockSource = getStockSource(payload?.stockSource);
     if (!codes.length) return {};
 
     return this.withPool(undefined, async (pool) => {
       const result = {};
       for (let i = 0; i < codes.length; i += 100) {
-        const chunkResult = await fetchStockMapChunk(pool, codes.slice(i, i + 100), matchMode, stockSource);
+        const chunkResult = await fetchStockMapChunk(pool, codes.slice(i, i + 100), matchMode);
         Object.assign(result, chunkResult);
       }
       return result;
@@ -361,7 +338,6 @@ class AgentCore extends EventEmitter {
   async handleSalesAggregate(payload) {
     const codes = Array.from(new Set((payload?.codes || []).map(trimCode).filter(Boolean)));
     if (!codes.length) return {};
-    const salesSource = getSalesSource();
     const salesMatchMode = getSalesMatchMode();
 
     const today = new Date();
@@ -373,10 +349,6 @@ class AgentCore extends EventEmitter {
     const startPrev60 = new Date(today);
     startPrev60.setHours(0, 0, 0, 0);
     startPrev60.setDate(startPrev60.getDate() - 120);
-    const start10y = new Date(today);
-    start10y.setHours(0, 0, 0, 0);
-    start10y.setDate(start10y.getDate() - 3650);
-
     const output = {};
     for (const code of codes) {
       output[code] = { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
@@ -385,106 +357,55 @@ class AgentCore extends EventEmitter {
     const chunkSize = 60;
     for (const dbName of this.salesDbs) {
       await this.withPool(dbName, async (pool) => {
-        if (salesSource === "stokhar") {
-          for (let i = 0; i < codes.length; i += chunkSize) {
-            const part = codes.slice(i, i + chunkSize);
-            const request = pool
-              .request()
-              .input("start120", sql.DateTime, start120)
-              .input("start60", sql.DateTime, start60)
-              .input("startPrev60", sql.DateTime, startPrev60)
-              .input("endDate", sql.DateTime, endDate);
+        for (let i = 0; i < codes.length; i += chunkSize) {
+          const part = codes.slice(i, i + chunkSize);
+          const request = pool
+            .request()
+            .input("start120", sql.DateTime, start120)
+            .input("start60", sql.DateTime, start60)
+            .input("startPrev60", sql.DateTime, startPrev60)
+            .input("endDate", sql.DateTime, endDate);
 
-            const selectSales120 = [];
-            const selectSales60 = [];
-            const selectSalesPrev60 = [];
-            const where = [];
+          const selectSales120 = [];
+          const selectSales60 = [];
+          const selectSalesPrev60 = [];
+          const where = [];
 
-            part.forEach((code, index) => {
-              const param = `code${index}`;
-              request.input(param, sql.VarChar, salesMatchMode === "exact" ? code : `${code}%`);
-              const match = salesMatchMode === "exact"
-                ? `LTRIM(RTRIM(T1.KOD)) = @${param}`
-                : `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
-              selectSales120.push(
-                `SUM(CASE WHEN ${match} AND T2.TARIH >= @start120 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
-              );
-              selectSales60.push(
-                `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
-              );
-              selectSalesPrev60.push(
-                `SUM(CASE WHEN ${match} AND T2.TARIH >= @startPrev60 AND T2.TARIH < @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS sp60_${index}`
-              );
-              where.push(match);
-            });
+          part.forEach((code, index) => {
+            const param = `code${index}`;
+            request.input(param, sql.VarChar, salesMatchMode === "exact" ? code : `${code}%`);
+            const match = salesMatchMode === "exact"
+              ? `LTRIM(RTRIM(T1.KOD)) = @${param}`
+              : `LTRIM(RTRIM(T1.KOD)) LIKE @${param}`;
+            selectSales120.push(
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start120 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s120_${index}`
+            );
+            selectSales60.push(
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @start60 AND T2.TARIH < @endDate THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS s60_${index}`
+            );
+            selectSalesPrev60.push(
+              `SUM(CASE WHEN ${match} AND T2.TARIH >= @startPrev60 AND T2.TARIH < @start60 THEN CASE WHEN UPPER(T2.GCKOD)='C' THEN ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1) ELSE 0 END ELSE 0 END) AS sp60_${index}`
+            );
+            where.push(match);
+          });
 
-            const rs = await request.query(`
-              SELECT
-                ${[...selectSales120, ...selectSales60, ...selectSalesPrev60].join(",\n              ")}
-              FROM TBLSTOKSB T1
-              LEFT JOIN TBLSTOKHAR T2
-                ON T2.STOKID = T1.ID
-               AND T2.KAYITTIPI = 0
-               AND T2.ISLEMTIPI IN (0,1)
-              WHERE ${where.join(" OR ")}
-            `);
+          const rs = await request.query(`
+            SELECT
+              ${[...selectSales120, ...selectSales60, ...selectSalesPrev60].join(",\n              ")}
+            FROM TBLSTOKSB T1
+            LEFT JOIN TBLSTOKHAR T2
+              ON T2.STOKID = T1.ID
+             AND T2.KAYITTIPI = 0
+             AND T2.ISLEMTIPI IN (0,1)
+            WHERE ${where.join(" OR ")}
+          `);
 
-            const row = rs.recordset?.[0] || {};
-            part.forEach((code, index) => {
-              output[code].sales120 += Number(row[`s120_${index}`] || 0);
-              output[code].sales60 += Number(row[`s60_${index}`] || 0);
-              output[code].salesPrev60 += Number(row[`sp60_${index}`] || 0);
-            });
-          }
-        } else {
-          for (let i = 0; i < codes.length; i += chunkSize) {
-            const part = codes.slice(i, i + chunkSize);
-            const request = pool
-              .request()
-              .input("start120", sql.DateTime, start120)
-              .input("start60", sql.DateTime, start60)
-              .input("startPrev60", sql.DateTime, startPrev60)
-              .input("start10y", sql.DateTime, start10y)
-              .input("endDate", sql.DateTime, endDate);
-
-            const selectSales120 = [];
-            const selectSales60 = [];
-            const selectSalesPrev60 = [];
-            const selectSales10y = [];
-            const where = [];
-
-            part.forEach((code, index) => {
-              const param = `code${index}`;
-              request.input(param, sql.VarChar, salesMatchMode === "exact" ? code : `${code}%`);
-              const match = salesMatchMode === "exact"
-                ? `LTRIM(RTRIM(STOK_KODU)) = @${param}`
-                : `LTRIM(RTRIM(STOK_KODU)) LIKE @${param}`;
-              selectSales120.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start120 AND STHAR_TARIH < @endDate THEN STHAR_GCMIK ELSE 0 END) AS s120_${index}`);
-              selectSales60.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start60 AND STHAR_TARIH < @endDate THEN STHAR_GCMIK ELSE 0 END) AS s60_${index}`);
-              selectSalesPrev60.push(
-                `SUM(CASE WHEN ${match} AND STHAR_TARIH >= @startPrev60 AND STHAR_TARIH < @start60 THEN STHAR_GCMIK ELSE 0 END) AS sp60_${index}`
-              );
-              selectSales10y.push(`SUM(CASE WHEN ${match} AND STHAR_TARIH >= @start10y THEN STHAR_GCMIK ELSE 0 END) AS s10y_${index}`);
-              where.push(match);
-            });
-
-            const rs = await request.query(`
-              SELECT
-                ${[...selectSales120, ...selectSales60, ...selectSalesPrev60, ...selectSales10y].join(",\n              ")}
-              FROM TBLSTHAR
-              WHERE UPPER(STHAR_GCKOD) = 'C'
-                AND STHAR_TARIH < @endDate
-                AND (${where.join(" OR ")})
-            `);
-
-            const row = rs.recordset?.[0] || {};
-            part.forEach((code, index) => {
-              output[code].sales120 += Number(row[`s120_${index}`] || 0);
-              output[code].sales60 += Number(row[`s60_${index}`] || 0);
-              output[code].salesPrev60 += Number(row[`sp60_${index}`] || 0);
-              output[code].sales10y += Number(row[`s10y_${index}`] || 0);
-            });
-          }
+          const row = rs.recordset?.[0] || {};
+          part.forEach((code, index) => {
+            output[code].sales120 += Number(row[`s120_${index}`] || 0);
+            output[code].sales60 += Number(row[`s60_${index}`] || 0);
+            output[code].salesPrev60 += Number(row[`sp60_${index}`] || 0);
+          });
         }
 
         // stokhar modunda 10y icin ek MSSQL sorgusu calistirmiyoruz.
@@ -509,18 +430,26 @@ class AgentCore extends EventEmitter {
       await this.withPool(dbName, async (pool) => {
         for (let i = 0; i < codes.length; i += 100) {
           const part = codes.slice(i, i + 100);
-          const request = pool.request().input("startDate", sql.DateTime, startDate);
+          const request = pool
+            .request()
+            .input("startDate", sql.DateTime, startDate)
+            .input("endDate", sql.DateTime, new Date());
           const params = part.map((code, index) => {
             request.input(`c${index}`, sql.VarChar, code);
             return `@c${index}`;
           });
           const rs = await request.query(`
-            SELECT LTRIM(RTRIM(STOK_KODU)) AS code, SUM(STHAR_GCMIK) AS qty
-            FROM TBLSTHAR
-            WHERE UPPER(STHAR_GCKOD) = 'C'
-              AND STHAR_TARIH >= @startDate
-              AND LTRIM(RTRIM(STOK_KODU)) IN (${params.join(",")})
-            GROUP BY LTRIM(RTRIM(STOK_KODU))
+            SELECT LTRIM(RTRIM(T1.KOD)) AS code, SUM(ISNULL(T2.MIKTAR,0) * ISNULL(T2.CEVRIM,1)) AS qty
+            FROM TBLSTOKSB T1
+            INNER JOIN TBLSTOKHAR T2
+              ON T2.STOKID = T1.ID
+             AND T2.KAYITTIPI = 0
+             AND T2.ISLEMTIPI IN (0,1)
+             AND UPPER(T2.GCKOD) = 'C'
+             AND T2.TARIH >= @startDate
+             AND T2.TARIH < @endDate
+            WHERE LTRIM(RTRIM(T1.KOD)) IN (${params.join(",")})
+            GROUP BY LTRIM(RTRIM(T1.KOD))
           `);
 
           for (const row of rs.recordset || []) {
@@ -537,54 +466,7 @@ class AgentCore extends EventEmitter {
   }
 
   async handleSales10yChunk(payload) {
-    const codes = Array.from(new Set((payload?.codes || []).map(trimCode).filter(Boolean)));
-    const totals = {};
-    const debug = [];
-    if (!codes.length) return { totals, debug };
-
-    const codeSet = new Set(codes.map((code) => code.toUpperCase()));
-    for (const dbName of this.salesDbs) {
-      await this.withPool(dbName, async (pool) => {
-        for (const code of codes) {
-          const wordPattern = new RegExp(`(^|[\\s-])${escapeRegex(code.toUpperCase())}([\\s-]|$)`, "i");
-          const rs = await pool
-            .request()
-            .input("codeLike", sql.VarChar, `%${code}%`)
-            .query(`
-              SELECT
-                LTRIM(RTRIM(t.STOK_KODU)) AS stok_kodu,
-                SUM(CASE WHEN UPPER(t.STHAR_GCKOD)='C' THEN ISNULL(t.STHAR_GCMIK,0) ELSE 0 END) AS total_sales,
-                STUFF((
-                  SELECT ',' + CAST(t2.FISNO AS nvarchar(100))
-                  FROM TBLSTHAR t2
-                  WHERE UPPER(LTRIM(RTRIM(t2.STOK_KODU))) LIKE UPPER(@codeLike)
-                    AND UPPER(t2.STHAR_GCKOD)='C'
-                  FOR XML PATH(''), TYPE
-                ).value('.','NVARCHAR(MAX)'),1,1,'') AS fisnos
-              FROM TBLSTHAR t
-              WHERE UPPER(LTRIM(RTRIM(t.STOK_KODU))) LIKE UPPER(@codeLike)
-              GROUP BY LTRIM(RTRIM(t.STOK_KODU))
-            `);
-
-          for (const row of rs.recordset || []) {
-            const stokKodu = trimCode(row.stok_kodu).toUpperCase();
-            if (!stokKodu) continue;
-            if (codeSet.has(stokKodu) && stokKodu !== code.toUpperCase()) continue;
-            if (!wordPattern.test(stokKodu)) continue;
-            const total = Number(row.total_sales || 0);
-            totals[code] = (totals[code] || 0) + total;
-            debug.push({
-              db: dbName,
-              code,
-              total,
-              fisnos: row.fisnos || null,
-            });
-          }
-        }
-      });
-    }
-
-    return { totals, debug };
+    return { totals: {}, debug: [] };
   }
 
   async executeRequest(requestType, payload) {

@@ -2,6 +2,12 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.605 - 2026-05-05
+
+- MSSQL canli stok/satis akisindan `TBLSTHAR` kullanimlari tamamen kaldirildi
+- Web tarafinda (`lib/live-mssql.ts`) stok ve satis sorgulari sadece `TBLSTOKSB + TBLSTOKHAR` uzerinden calisacak sekilde sadelelestirildi
+- Agent tarafinda (`mssql-agent/agent-core.js`) tum `TBLSTHAR` fallback dallari kaldirildi; bridge sorgulari tek kaynakta hizalandi
+
 ## v0.3.604 - 2026-05-05
 
 - Siparis plani satis metriklerinde stok kodu eslesme modu varsayilan olarak `exact` yapildi
