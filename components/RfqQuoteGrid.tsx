@@ -30,6 +30,14 @@ type Baseline = {
   value: number | null;
 };
 
+type SupplierTotalInfo = {
+  total: number | null;
+  pricedCount: number;
+  missingCount: number;
+  relevantCount: number;
+  complete: boolean;
+};
+
 export default function RfqQuoteGrid({
   rfqId,
   currency,
@@ -112,6 +120,9 @@ export default function RfqQuoteGrid({
     return qi?.unit_price ?? null;
   };
 
+  const isValidQuotePrice = (price: number | null | undefined): price is number =>
+    typeof price === "number" && Number.isFinite(price) && price > 0;
+
   const parsePercentInput = (raw: string): number | null => {
     const normalized = raw.trim().replace(",", ".");
     if (!normalized) return null;
@@ -138,7 +149,7 @@ export default function RfqQuoteGrid({
     const current = getCurrentPrice(sup, item);
     const gtip = Array.isArray((item as any).gtip) ? (item as any).gtip?.[0] ?? null : (item as any).gtip ?? null;
     const result =
-      current != null
+      isValidQuotePrice(current)
         ? calculateDisplayedNetCost({
             basePrice: current,
             domesticCostPercent: getEffectiveDomesticCostPercent(item),
@@ -158,7 +169,7 @@ export default function RfqQuoteGrid({
     const offerPrices = suppliers
       .filter((sup) => isComparableCurrency(sup))
       .map((sup) => getCurrentPrice(sup, item))
-      .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+      .filter((price): price is number => isValidQuotePrice(price));
 
     if (offerPrices.length >= 2) {
       return { kind: "offer", value: Math.min(...offerPrices) };
@@ -171,17 +182,33 @@ export default function RfqQuoteGrid({
     return { kind: null, value: null };
   };
 
-  const getTotalForSupplier = (sup: QuoteSupplier) => {
-    if (!isComparableCurrency(sup)) return null;
+  const getTotalInfoForSupplier = (sup: QuoteSupplier): SupplierTotalInfo => {
+    if (!isComparableCurrency(sup)) {
+      return { total: null, pricedCount: 0, missingCount: 0, relevantCount: 0, complete: false };
+    }
     let total = 0;
+    let pricedCount = 0;
+    let missingCount = 0;
+    let relevantCount = 0;
     for (const item of items) {
       const qty = Number(item.quantity ?? 0);
       const price = getCurrentPrice(sup, item);
       if (!Number.isFinite(qty) || qty <= 0) continue;
-      if (price == null || !Number.isFinite(price)) return null;
+      relevantCount += 1;
+      if (!isValidQuotePrice(price)) {
+        missingCount += 1;
+        continue;
+      }
+      pricedCount += 1;
       total += qty * price;
     }
-    return total;
+    return {
+      total: pricedCount ? total : null,
+      pricedCount,
+      missingCount,
+      relevantCount,
+      complete: relevantCount > 0 && missingCount === 0,
+    };
   };
 
   const targetTotal = useMemo(() => {
@@ -208,7 +235,9 @@ export default function RfqQuoteGrid({
 
   const totalBaseline = useMemo<Baseline>(() => {
     const totals = suppliers
-      .map((sup) => getTotalForSupplier(sup))
+      .map((sup) => getTotalInfoForSupplier(sup))
+      .filter((info) => info.complete)
+      .map((info) => info.total)
       .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
     if (totals.length >= 2) {
@@ -226,6 +255,7 @@ export default function RfqQuoteGrid({
     const current = getCurrentPrice(sup, item);
     const key = `${sup.id}-${item.id}`;
     const isEditing = editingKey === key;
+    const hasValidPrice = isValidQuotePrice(current);
     const { netCost, hasGtip } = getNetCost(sup, item);
     const marginPct = getEffectiveMarginPercent(item);
     const sellingPrice = netCost != null ? netCost * (1 + marginPct / 100) : null;
@@ -256,30 +286,32 @@ export default function RfqQuoteGrid({
         onDoubleClick={() => {
           if (!readOnly) startEdit(sup.id, item.id, current);
         }}
-        className={`w-full rounded-xl border px-2.5 py-2 text-right transition ${
-          current != null
+        className={`w-full rounded-lg border px-2 py-1.5 text-right transition ${
+          hasValidPrice
             ? "border-emerald-200 bg-emerald-50/50 hover:border-emerald-300"
-            : "border-black/10 bg-white text-black/45 hover:bg-black/[0.02]"
+            : current === 0
+              ? "border-amber-200 bg-amber-50/70 text-amber-800 hover:border-amber-300"
+              : "border-black/10 bg-white text-black/45 hover:bg-black/[0.02]"
         }`}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="rounded-full bg-black/5 px-2 py-[3px] text-[9px] font-semibold uppercase tracking-[0.14em] text-black/45">
+          <span className="rounded-md bg-black/5 px-1.5 py-[2px] text-[9px] font-semibold uppercase tracking-[0.12em] text-black/45">
             {sup.currency ?? currency ?? "-"}
           </span>
           {saving === key ? <span className="text-[9px] text-black/35">...</span> : null}
         </div>
-        <div className={`mt-2 text-base font-semibold leading-none ${current != null ? "text-black" : "text-black/35"}`}>
+        <div className={`mt-1 text-sm font-semibold leading-none ${hasValidPrice ? "text-black" : current === 0 ? "text-amber-800" : "text-black/35"}`}>
           {current != null ? current : "-"}
         </div>
-        <div className="mt-2 border-t border-black/5 pt-2 text-left">
-          <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">KDV'siz maliyet</div>
-          <div className={`mt-1 text-xs font-semibold ${netCost != null ? "text-black/75" : "text-black/35"}`}>
-            {netCost != null ? netCost.toFixed(3) : "-"}
-          </div>
-          <div className="mt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">Satış fiyatı</div>
-          <div className={`mt-1 text-xs font-semibold ${sellingPrice != null ? "text-[var(--ocean)]" : "text-black/35"}`}>
-            {sellingPrice != null ? sellingPrice.toFixed(3) : "-"}
-          </div>
+        {current === 0 ? (
+          <div className="mt-1 text-[9px] font-semibold text-amber-700">0 eksik</div>
+        ) : null}
+        <div className="mt-1 border-t border-black/5 pt-1 text-left text-[10px] font-semibold text-black/45">
+          <span className={netCost != null ? "text-black/70" : "text-black/30"}>M {netCost != null ? netCost.toFixed(3) : "-"}</span>
+          <span className="mx-1 text-black/25">·</span>
+          <span className={sellingPrice != null ? "text-[var(--ocean)]" : "text-black/30"}>
+            S {sellingPrice != null ? sellingPrice.toFixed(3) : "-"}
+          </span>
           {netCost == null && !hasGtip ? <div className="mt-1 text-[9px] text-red-500">GTIP yok</div> : null}
         </div>
       </button>
@@ -288,7 +320,15 @@ export default function RfqQuoteGrid({
 
   const renderDiffPctChip = (sup: QuoteSupplier, item: QuoteItem) => {
     const current = getCurrentPrice(sup, item);
-    if (current == null) return <span className="text-black/35">-</span>;
+    if (!isValidQuotePrice(current)) {
+      return current === 0 ? (
+        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+          0 fiyat
+        </span>
+      ) : (
+        <span className="text-black/35">-</span>
+      );
+    }
     if (!isComparableCurrency(sup)) {
       return (
         <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
@@ -320,17 +360,45 @@ export default function RfqQuoteGrid({
   };
 
   const renderTotalCell = (sup: QuoteSupplier) => {
-    const total = getTotalForSupplier(sup);
-    return total != null ? `${formatNumber(total, 2)} ${sup.currency ?? currency ?? ""}` : "-";
+    const info = getTotalInfoForSupplier(sup);
+    if (info.total == null) return "-";
+    return (
+      <div className="inline-flex flex-col items-end gap-1">
+        <span>
+          {formatNumber(info.total, 2)} {sup.currency ?? currency ?? ""}
+        </span>
+        {info.missingCount ? (
+          <div className="flex flex-col items-end gap-1">
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              Kısmi toplam
+            </span>
+            <span className="text-[10px] font-semibold text-amber-700">
+              {info.missingCount} ürünün fiyatı eksik
+            </span>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   const renderTotalDiffPctChip = (sup: QuoteSupplier) => {
-    const total = getTotalForSupplier(sup);
+    const info = getTotalInfoForSupplier(sup);
+    const total = info.total;
     if (total == null) return <span className="text-black/35">-</span>;
     if (!isComparableCurrency(sup)) {
       return (
         <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
           Kur farkli
+        </span>
+      );
+    }
+    if (!info.complete) {
+      return (
+        <span
+          title={`${info.missingCount} ürünün fiyatı eksik olduğu için toplam fark hesaplanmadı`}
+          className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700"
+        >
+          {info.missingCount} ürün eksik
         </span>
       );
     }
@@ -356,70 +424,106 @@ export default function RfqQuoteGrid({
   };
 
   const supList = suppliers;
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams({ rfq_id: rfqId });
+    const overrides = Object.fromEntries(
+      Object.entries(costOverrides)
+        .map(([itemId, raw]) => [itemId, parsePercentInput(raw)])
+        .filter(([, parsed]) => parsed != null)
+    );
+    if (Object.keys(overrides).length) {
+      params.set("cost_overrides", JSON.stringify(overrides));
+    }
+    return `/api/rfq/export?${params.toString()}`;
+  }, [costOverrides, rfqId]);
 
-  if (!supList.length) return <p className="text-sm text-black/60">Henüz teklif yok.</p>;
+  if (!supList.length) {
+    return (
+      <div className="rounded-lg border border-dashed border-black/15 bg-slate-50 px-4 py-6 text-center text-sm text-black/55">
+        Henüz teklif yok.
+      </div>
+    );
+  }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-black/10 bg-white shadow-sm">
-      <div className="border-b border-black/10 px-4 py-3 text-[11px] text-black/45">
-        Fark %: birden fazla teklifte en dusuk teklif, tek teklifte hedef fiyat baz alinir.
-        {readOnly ? " (Yonetim rolunde duzenleme kapali)" : ""}
+    <div className="overflow-x-auto rounded-lg border border-black/10 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 bg-slate-50 px-4 py-2.5 text-[11px] font-medium text-black/50">
+        <span>
+          Fark %: birden fazla teklifte en dusuk teklif, tek teklifte hedef fiyat baz alinir. Sifir fiyatlar eksik sayilir.
+          {readOnly ? " (Yonetim rolunde duzenleme kapali)" : ""}
+        </span>
+        <a
+          href={exportHref}
+          className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black/70 transition hover:-translate-y-0.5 hover:bg-slate-50"
+        >
+          Excel (girilen masrafla)
+        </a>
       </div>
       <table className="w-full table-fixed text-sm">
         <colgroup>
-          <col className="w-[18rem]" />
-          <col className="w-[7rem]" />
-          <col className="w-[10rem]" />
+          <col className="w-[14rem]" />
+          <col className="w-[5.5rem]" />
+          <col className="w-[7.5rem]" />
           {supList.map((s) => (
             <Fragment key={`cols-${s.id}`}>
-              <col className="w-[9rem]" />
-              <col className="w-[7rem]" />
+              <col className="w-[7.5rem]" />
+              <col className="w-[5.5rem]" />
             </Fragment>
           ))}
         </colgroup>
-        <thead className="bg-black/[0.02] text-[11px] uppercase tracking-[0.18em] text-black/45">
+        <thead className="bg-[#f6f7f8] text-[11px] uppercase tracking-[0.16em] text-black/45">
           <tr>
-            <th rowSpan={2} className="sticky left-0 z-30 border-r border-black/10 bg-[inherit] px-4 py-4 text-left shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)]">
+            <th rowSpan={2} className="sticky left-0 z-30 border-r border-black/10 bg-[inherit] px-3 py-3 text-left shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)]">
               Ürün
             </th>
-            <th rowSpan={2} className="border-r border-black/10 px-3 py-4 text-right">RFQ adet</th>
-            <th rowSpan={2} className="border-r border-black/10 px-3 py-4 text-right">Hedef fiyat</th>
-            {supList.map((s) => (
-              <th key={s.id} colSpan={2} className="border-l border-black/10 px-3 py-3 text-center align-top">
-                <div className="flex justify-center">
-                  <span
-                    className="inline-flex max-w-full items-center gap-2 rounded-full bg-[var(--ocean)]/10 px-3 py-1 text-[12px] font-semibold normal-case tracking-normal text-[var(--ocean)]"
-                    title={s.name}
-                  >
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--ocean)]" />
-                    <span className="max-w-[8rem] truncate">{s.name}</span>
-                  </span>
-                </div>
-                <div className="mt-1 text-[11px] normal-case tracking-normal text-black/45">{s.currency ?? "-"}</div>
-              </th>
-            ))}
+            <th rowSpan={2} className="border-r border-black/10 px-2 py-3 text-right">Adet</th>
+            <th rowSpan={2} className="border-r border-black/10 px-2 py-3 text-right">Hedef</th>
+            {supList.map((s) => {
+              const totalInfo = getTotalInfoForSupplier(s);
+              return (
+                <th key={s.id} colSpan={2} className="border-l border-black/10 px-2 py-2 text-center align-top">
+                  <div className="flex justify-center">
+                    <span
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-semibold normal-case tracking-normal text-white"
+                      title={s.name}
+                    >
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-300" />
+                      <span className="max-w-[7rem] truncate">{s.name}</span>
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] normal-case tracking-normal text-black/45">{s.currency ?? "-"}</div>
+                  {totalInfo.missingCount ? (
+                    <div className="mt-1 flex justify-center">
+                      <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-700">
+                        {totalInfo.missingCount} ürün eksik
+                      </span>
+                    </div>
+                  ) : null}
+                </th>
+              );
+            })}
           </tr>
           <tr>
             {supList.map((s) => (
               <Fragment key={`head-${s.id}`}>
-                <th className="border-l border-black/10 px-3 py-2 text-center">Teklif</th>
-                <th className="border-l border-black/10 px-3 py-2 text-center">Fark %</th>
+                <th className="border-l border-black/10 px-2 py-1.5 text-center">Teklif</th>
+                <th className="border-l border-black/10 px-2 py-1.5 text-center">Fark</th>
               </Fragment>
             ))}
           </tr>
         </thead>
         <tbody>
           {items.map((it, idx) => {
-            const rowBgClass = idx % 2 === 0 ? "bg-white" : "bg-[#f6f7f8]";
+            const rowBgClass = idx % 2 === 0 ? "bg-white" : "bg-slate-50/70";
             return (
-            <tr key={it.id} className={rowBgClass}>
-              <td className={`sticky left-0 z-20 border-t border-r border-black/10 px-4 py-4 align-top shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)] ${rowBgClass}`}>
+            <tr key={it.id} className={`${rowBgClass} transition hover:bg-emerald-50/30`}>
+              <td className={`sticky left-0 z-20 border-t border-r border-black/10 px-3 py-2.5 align-top shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)] ${rowBgClass}`}>
                 <div className="min-w-0">
                   <div className="font-semibold text-black">{it.product_code ?? "-"}</div>
                   <div className="mt-1 text-xs text-black/60">{it.product_name ?? "-"}</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     <label className="text-right">
-                      <span className="text-[9px] uppercase tracking-[0.14em] text-black/35">Masraf %</span>
+                      <span className="text-[8px] uppercase tracking-[0.12em] text-black/35">Masraf</span>
                       <input
                         type="number"
                         step="0.01"
@@ -431,11 +535,11 @@ export default function RfqQuoteGrid({
                             [it.id]: e.target.value,
                           }))
                         }
-                        className="mt-1 w-20 rounded-lg border border-black/10 bg-white px-2 py-1 text-right text-xs font-semibold text-black/75 outline-none transition focus:border-[var(--ocean)]/40 focus:ring-2 focus:ring-[var(--ocean)]/10"
+                        className="mt-0.5 w-14 rounded-md border border-black/10 bg-white px-1.5 py-0.5 text-right text-[11px] font-semibold text-black/75 outline-none transition focus:border-[var(--ocean)]/40 focus:ring-2 focus:ring-[var(--ocean)]/10"
                       />
                     </label>
                     <label className="text-right">
-                      <span className="text-[9px] uppercase tracking-[0.14em] text-black/35">Kar %</span>
+                      <span className="text-[8px] uppercase tracking-[0.12em] text-black/35">Kar</span>
                       <input
                         type="number"
                         step="0.01"
@@ -447,20 +551,20 @@ export default function RfqQuoteGrid({
                             [it.id]: e.target.value,
                           }))
                         }
-                        className="mt-1 w-20 rounded-lg border border-black/10 bg-white px-2 py-1 text-right text-xs font-semibold text-black/75 outline-none transition focus:border-[var(--ocean)]/40 focus:ring-2 focus:ring-[var(--ocean)]/10"
+                        className="mt-0.5 w-14 rounded-md border border-black/10 bg-white px-1.5 py-0.5 text-right text-[11px] font-semibold text-black/75 outline-none transition focus:border-[var(--ocean)]/40 focus:ring-2 focus:ring-[var(--ocean)]/10"
                       />
                     </label>
                   </div>
                 </div>
               </td>
-              <td className="border-t border-r border-black/10 px-3 py-4 text-right align-top">
-                <span className="inline-flex rounded-full bg-black/5 px-3 py-1 font-semibold text-black/70">
+              <td className="border-t border-r border-black/10 px-2 py-2.5 text-right align-top">
+                <span className="inline-flex rounded-md bg-black/5 px-2 py-1 font-semibold text-black/70">
                   {it.quantity ?? "-"}
                 </span>
               </td>
-              <td className="border-t border-r border-black/10 px-3 py-4 text-right align-top">
+              <td className="border-t border-r border-black/10 px-2 py-2.5 text-right align-top">
                 {it.target_unit_price != null ? (
-                  <div className="inline-flex flex-col items-end rounded-xl border border-black/10 bg-white px-3 py-2 shadow-sm">
+                  <div className="inline-flex flex-col items-end rounded-lg border border-black/10 bg-white px-2 py-1 shadow-sm">
                     <span className="text-[9px] uppercase tracking-[0.14em] text-black/35">{currency ?? "-"}</span>
                     <span className="mt-1 text-sm font-semibold text-black">{it.target_unit_price}</span>
                   </div>
@@ -470,16 +574,16 @@ export default function RfqQuoteGrid({
               </td>
               {supList.map((s) => (
                 <Fragment key={`${it.id}-${s.id}`}>
-                  <td className="border-t border-l border-black/10 px-3 py-3 align-top">{renderPriceCell(s, it)}</td>
-                  <td className="border-t border-l border-black/10 px-3 py-3 text-center align-top">{renderDiffPctChip(s, it)}</td>
+                  <td className="border-t border-l border-black/10 px-2 py-2 align-top">{renderPriceCell(s, it)}</td>
+                  <td className="border-t border-l border-black/10 px-2 py-2 text-center align-top">{renderDiffPctChip(s, it)}</td>
                 </Fragment>
               ))}
             </tr>
           )})}
         </tbody>
-        <tfoot className="bg-[#f1f3f4]">
+        <tfoot className="bg-[#eef2f1]">
           <tr>
-            <td className="sticky left-0 z-20 border-t border-r border-black/10 bg-[#f1f3f4] px-4 py-4 font-semibold text-black shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)]">
+            <td className="sticky left-0 z-20 border-t border-r border-black/10 bg-[#eef2f1] px-4 py-4 font-semibold text-black shadow-[6px_0_12px_-12px_rgba(0,0,0,0.35)]">
               Toplam
             </td>
             <td className="border-t border-r border-black/10 px-3 py-4 text-right font-semibold text-black/75">

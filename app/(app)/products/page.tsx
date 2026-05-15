@@ -9,6 +9,18 @@ import { deleteAllProducts, deleteSelectedProducts } from "@/app/actions/product
 import { computeCosts, GtipRow, pickWeightKg } from "@/lib/gtipCost";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import ProductLiveStockInline from "@/components/ProductLiveStockInline";
+import {
+  Boxes,
+  Download,
+  FilePenLine,
+  Filter,
+  Layers3,
+  PackagePlus,
+  Search,
+  ShieldCheck,
+  Tags,
+  Upload,
+} from "lucide-react";
 
 const logError = (label: string, error: any) => {
   if (error) {
@@ -55,6 +67,15 @@ const buildWeightSource = (values: any[], productId: string) =>
         value: attr?.value_type === "number" ? item.value_number : item.value_text,
       };
     });
+
+const actionButton =
+  "inline-flex items-center gap-2 rounded-lg border border-white/12 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/16";
+
+const secondaryActionButton =
+  "inline-flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-black/68 transition hover:-translate-y-0.5 hover:border-black/18 hover:shadow-sm";
+
+const dangerActionButton =
+  "rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:bg-rose-100";
 
 export const metadata: Metadata = {
   title: "Ürünler",
@@ -458,151 +479,218 @@ export default async function ProductsPage({
     return queryString ? `?${queryString}` : "";
   };
 
+  const selectedGroupNames = selectedGroupIds
+    .map((id) => groupStats.find((group) => group.id === id)?.name)
+    .filter(Boolean) as string[];
+  const activeFilterCount =
+    (safeQuery ? 1 : 0) +
+    selectedGroupIds.length +
+    (effectiveSupplierFilter ? 1 : 0) +
+    (resolvedParams.gtip ? 1 : 0) +
+    (resolvedParams.netsis ? 1 : 0);
+  const visibleWithGtipCount = productsList.filter((product) => product.gtip_id).length;
+  const visibleWithStockCodeCount = productsList.filter((product) =>
+    Boolean(product.netsis_stok_kodu)
+  ).length;
+  const visibleMissingStockCodeCount = Math.max(productsList.length - visibleWithStockCodeCount, 0);
+  const topGroups = groupStats
+    .filter((group) => group.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
   return (
-    <section className="space-y-6">
+    <section className="space-y-5">
       <ProductsListToast />
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Ürünler
-          </p>
-          <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Ürünler
-          </h2>
-        </div>
-        {canEdit ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Link
-              href="/products/new"
-              className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white"
-            >
-              + Yeni ürün
-            </Link>
-            <Link
-              href="/products/netsis-import"
-              className="rounded-full border border-black/20 bg-white px-4 py-2 text-xs font-semibold text-black/70"
-            >
-              Stok kodu import
-            </Link>
-            <Link
-              href="/products/import-update"
-              className="rounded-full border border-black/20 bg-white px-4 py-2 text-xs font-semibold text-black/70"
-            >
-              Ürün güncelle (import)
-            </Link>
-            <Link
-              href="/products/attributes-export"
-              className="rounded-full border border-[var(--ocean)] bg-white px-4 py-2 text-xs font-semibold text-[var(--ocean)] hover:bg-[var(--ocean)]/10"
-            >
-              Nitelik Export
-            </Link>
-            <Link
-              href="/product-groups"
-              className="rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-semibold"
-            >
-              Kategori yönetimi
-            </Link>
-            <ConfirmActionForm
-              action={deleteSelectedProducts}
-              confirmText="Seçili urunler silinsin mi?"
-              buttonText="Seçiliyi sil"
-              formId="products-delete-selected"
-            />
-            <ConfirmActionForm
-              action={deleteAllProducts}
-              confirmText="Tum urunler silinsin mi?"
-              buttonText="Tumunu sil"
-              formId="products-delete-all"
-            />
+
+      <div className="rounded-lg border border-black/10 bg-[#101817] p-5 text-white shadow-[0_24px_70px_-50px_rgba(16,24,23,0.9)]">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[11px] uppercase tracking-[0.32em] text-white/45">
+              Ürün Kataloğu
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold leading-tight [font-family:var(--font-display)]">
+              Ürünler
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-white/62">
+              Ürün kartları, canlı stok, GTİP, nitelik ve maliyet bilgileri tek ekranda.
+            </p>
           </div>
-        ) : null}
+
+          {canEdit ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/products/new" className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#101817] transition hover:-translate-y-0.5">
+                <PackagePlus className="h-4 w-4" />
+                Yeni ürün
+              </Link>
+              <Link href="/products/import-update" className={actionButton}>
+                <FilePenLine className="h-4 w-4" />
+                Ürün güncelle
+              </Link>
+              <Link href="/products/netsis-import" className={actionButton}>
+                <Upload className="h-4 w-4" />
+                Stok kodu import
+              </Link>
+              <Link href="/products/attributes-export" className={actionButton}>
+                <Download className="h-4 w-4" />
+                Nitelik export
+              </Link>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: "Toplam ürün",
+              value: (totalProductsCount ?? 0).toLocaleString("tr-TR"),
+              helper: "Katalog geneli",
+              icon: Boxes,
+            },
+            {
+              label: "Filtre sonucu",
+              value: totalCount.toLocaleString("tr-TR"),
+              helper: activeFilterCount ? `${activeFilterCount} aktif filtre` : "Tüm kayıtlar",
+              icon: Filter,
+            },
+            {
+              label: "Kategorisiz",
+              value: (uncategorizedCount ?? 0).toLocaleString("tr-TR"),
+              helper: "Grup atanmamış",
+              icon: Tags,
+            },
+            {
+              label: "Bu sayfa",
+              value: productsList.length.toLocaleString("tr-TR"),
+              helper: `${visibleWithStockCodeCount} stok kodlu · ${visibleWithGtipCount} GTİP'li`,
+              icon: ShieldCheck,
+            },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className="rounded-lg border border-white/10 bg-white/8 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-white/45">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold">{item.value}</p>
+                  </div>
+                  <span className="rounded-lg bg-white/10 p-2 text-white/75">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-medium text-white/48">{item.helper}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      <form className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
-        <input type="hidden" name="page" value="1" />
-        <div className={`grid gap-3 ${isSales ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
-          <label className="text-sm font-medium">
-            Arama
-            <input
-              name="q"
-              defaultValue={resolvedParams.q ?? ""}
-              placeholder="Ürün kodu, adı, not"
-              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            />
-          </label>
-          {!isSales ? (
-            <label className="text-sm font-medium">
-              Tedarikçi
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <form className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+          <input type="hidden" name="page" value="1" />
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                Filtre Merkezi
+              </p>
+              <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+                Hızlı arama ve daraltma
+              </h2>
+            </div>
+            <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-black/60">
+              {activeFilterCount ? `${activeFilterCount} aktif` : "Filtre yok"}
+            </span>
+          </div>
+
+          <div className={`mt-4 grid gap-3 ${isSales ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50 lg:col-span-2">
+              Arama
+              <span className="mt-1 flex items-center gap-2 rounded-lg border border-black/10 bg-slate-50 px-3 py-2">
+                <Search className="h-4 w-4 text-black/35" />
+                <input
+                  name="q"
+                  defaultValue={resolvedParams.q ?? ""}
+                  placeholder="Ürün kodu, ad, marka, not"
+                  className="w-full bg-transparent text-sm font-medium normal-case tracking-normal text-black outline-none placeholder:text-black/35"
+                />
+              </span>
+            </label>
+            {!isSales ? (
+              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+                Tedarikçi
+                <select
+                  name="supplier"
+                  defaultValue={effectiveSupplierFilter ?? ""}
+                  className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
+                >
+                  <option value="">Hepsi</option>
+                  {suppliers?.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+              GTİP
               <select
-                name="supplier"
-                defaultValue={effectiveSupplierFilter ?? ""}
-                className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+                name="gtip"
+                defaultValue={resolvedParams.gtip ?? ""}
+                className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
               >
                 <option value="">Hepsi</option>
-                {suppliers?.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
+                <option value="none">GTİP yok</option>
+                {gtips?.map((gtip) => (
+                  <option key={gtip.id} value={gtip.id}>
+                    {gtip.code}
                   </option>
                 ))}
               </select>
             </label>
-          ) : null}
-          <label className="text-sm font-medium">
-            GTIP
-            <select
-              name="gtip"
-              defaultValue={resolvedParams.gtip ?? ""}
-              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              <option value="none">GTIP yok</option>
-              {gtips?.map((gtip) => (
-                <option key={gtip.id} value={gtip.id}>
-                  {gtip.code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            Stok kodu
-            <select
-              name="netsis"
-              defaultValue={resolvedParams.netsis ?? ""}
-              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              <option value="none">Stok kodu yok</option>
-              <option value="exists">Stok kodu var</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            Sayfada
-            <select
-              name="perPage"
-              defaultValue={String(perPage)}
-              className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              {perPageOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option} ürün
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <details
-          className="mt-3 rounded-2xl border border-black/10 bg-[var(--mint)]/15 p-2"
-          open={selectedGroupIds.length > 0}
-        >
-          <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl px-2 py-1 text-xs font-semibold text-black/65">
-            <span className="uppercase tracking-[0.2em]">Kategori filtresi</span>
-            <span className="rounded-full bg-white/80 px-2 py-[2px] text-[11px] font-bold text-[var(--ocean)]">
-              {selectedGroupIds.length ? `${selectedGroupIds.length} secili` : "Hepsi"}
-            </span>
-          </summary>
-          <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto px-1 pb-1">
-            {groupStats.map((group) => {
-              return (
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+              Stok kodu
+              <select
+                name="netsis"
+                defaultValue={resolvedParams.netsis ?? ""}
+                className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
+              >
+                <option value="">Hepsi</option>
+                <option value="none">Stok kodu yok</option>
+                <option value="exists">Stok kodu var</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+              Sayfada
+              <select
+                name="perPage"
+                defaultValue={String(perPage)}
+                className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
+              >
+                {perPageOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option} ürün
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <details
+            className="mt-4 rounded-lg border border-black/10 bg-slate-50 p-3"
+            open={selectedGroupIds.length > 0}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-black/50">
+                Kategori filtresi
+              </span>
+              <span className="rounded-md border border-black/10 bg-white px-2 py-1 text-[11px] font-bold text-black/60">
+                {selectedGroupIds.length ? `${selectedGroupIds.length} seçili` : "Hepsi"}
+              </span>
+            </summary>
+            <div className="mt-3 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1">
+              {groupStats.map((group) => (
                 <label key={group.id} className="inline-flex cursor-pointer items-center">
                   <input
                     type="checkbox"
@@ -611,54 +699,163 @@ export default async function ProductsPage({
                     defaultChecked={selectedGroupIds.includes(group.id)}
                     className="peer sr-only"
                   />
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-2.5 py-1 text-[11px] text-black/70 transition hover:border-[var(--ocean)]/40 peer-checked:border-[var(--ocean)] peer-checked:bg-[var(--ocean)]/12 peer-checked:text-[var(--ocean)]">
-                    <span className="font-semibold">{group.name}</span>
-                    <span className="rounded-full bg-black/10 px-1.5 py-[1px] text-[10px] font-semibold text-black/60 peer-checked:bg-[var(--ocean)]/20 peer-checked:text-[var(--ocean)]/80">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/65 transition hover:border-black/20 peer-checked:border-[#101817] peer-checked:bg-[#101817] peer-checked:text-white">
+                    <span>{group.name}</span>
+                    <span className="rounded-md bg-black/8 px-1.5 py-[1px] text-[10px] peer-checked:bg-white/15">
                       {group.count}
                     </span>
                   </span>
                 </label>
-              );
-            })}
-          </div>
-        </details>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
-            Filtrele
-          </button>
-          <Link
-            href="/products"
-            className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
-          >
-            Temizle
-          </Link>
-        </div>
-      </form>
+              ))}
+            </div>
+          </details>
 
-      <div className="rounded-[36px] border border-black/10 bg-[radial-gradient(circle_at_top_left,#ffffff,#f6f7fb)] p-6 shadow-[0_40px_80px_-50px_rgba(12,45,52,0.7)]">
+          {activeFilterCount ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {safeQuery ? (
+                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
+                  Arama: {safeQuery}
+                </span>
+              ) : null}
+              {selectedGroupNames.map((name) => (
+                <span key={name} className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
+                  {name}
+                </span>
+              ))}
+              {resolvedParams.gtip ? (
+                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
+                  GTİP: {resolvedParams.gtip === "none" ? "yok" : "seçili"}
+                </span>
+              ) : null}
+              {resolvedParams.netsis ? (
+                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
+                  Stok kodu: {resolvedParams.netsis === "none" ? "yok" : "var"}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button className="inline-flex items-center gap-2 rounded-lg bg-[#101817] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5">
+              <Filter className="h-4 w-4" />
+              Filtrele
+            </button>
+            <Link
+              href="/products"
+              className="rounded-lg border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-black/65 transition hover:-translate-y-0.5 hover:bg-slate-50"
+            >
+              Temizle
+            </Link>
+          </div>
+        </form>
+
+        <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+            Kategori Nabzı
+          </p>
+          <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)]">
+            En dolu gruplar
+          </h2>
+          <div className="mt-4 space-y-3">
+            {topGroups.length ? (
+              topGroups.map((group) => {
+                const ratio = totalProductsCount ? (group.count / totalProductsCount) * 100 : 0;
+                return (
+                  <Link
+                    key={group.id}
+                    href={`/products${buildQuery({ group: [group.id], page: "1" })}`}
+                    className="block rounded-lg border border-black/8 bg-slate-50 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="truncate font-semibold text-black/70">{group.name}</span>
+                      <span className="font-bold text-black">{group.count}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/8">
+                      <div
+                        className="h-full rounded-full bg-[#101817]"
+                        style={{ width: `${Math.max(6, ratio)}%` }}
+                      />
+                    </div>
+                  </Link>
+                );
+              })
+            ) : (
+              <div className="rounded-lg border border-black/8 bg-slate-50 px-3 py-3 text-sm text-black/55">
+                Kategori verisi yok.
+              </div>
+            )}
+          </div>
+
+          {canEdit ? (
+            <div className="mt-5 space-y-2 border-t border-black/8 pt-4">
+              <Link href="/product-groups" className={secondaryActionButton}>
+                <Layers3 className="h-4 w-4" />
+                Kategori yönetimi
+              </Link>
+              <div className="flex flex-wrap gap-2">
+                <ConfirmActionForm
+                  action={deleteSelectedProducts}
+                  confirmText="Seçili ürünler silinsin mi?"
+                  buttonText="Seçiliyi sil"
+                  formId="products-delete-selected"
+                  buttonClassName={dangerActionButton}
+                />
+                <ConfirmActionForm
+                  action={deleteAllProducts}
+                  confirmText="Tüm ürünler silinsin mi?"
+                  buttonText="Tümünü sil"
+                  formId="products-delete-all"
+                  buttonClassName={dangerActionButton}
+                />
+              </div>
+            </div>
+          ) : null}
+        </aside>
+      </div>
+
+      <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+              Liste
+            </p>
+            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+              Ürün kayıtları
+            </h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-black/55">
+            <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5">
+              {totalCount
+                ? `${(startIndex + 1).toLocaleString("tr-TR")}-${endIndex.toLocaleString("tr-TR")}`
+                : "0"}{" "}
+              / {totalCount.toLocaleString("tr-TR")}
+            </span>
+            <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5">
+              {visibleMissingStockCodeCount} stok kodu eksik
+            </span>
+          </div>
+        </div>
+
         {totalCount ? (
-          <div className="overflow-x-auto">
-            <div className="min-w-[980px] rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3">
-              {canEdit ? <ProductsSelectionControls formId="products-delete-selected" /> : null}
-              <table className="w-full border-separate border-spacing-y-4">
+          <div className="mt-4 overflow-x-auto">
+            <div className="min-w-[1180px]">
+              {canEdit ? (
+                <div className="mb-3 rounded-lg border border-black/8 bg-slate-50 p-2">
+                  <ProductsSelectionControls formId="products-delete-selected" />
+                </div>
+              ) : null}
+              <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-[0.3em] text-black/45">
-                    {canEdit ? (
-                      <th className="px-4 pt-2">
-                        <span className="sr-only">Sec</span>
-                      </th>
-                    ) : null}
-                    <th className="px-4 pt-2">Kod</th>
-                    <th className="px-4 pt-2">Ürün</th>
-                    <th className="px-4 pt-2">Kategori</th>
-                      <th className="px-4 pt-2">Canli stok</th>
-                      <th className="px-4 pt-2">GTIP</th>
-                      <th className="px-4 pt-2">Nitelikler</th>
-                    {!isSales ? <th className="px-4 pt-2 text-right">Alis (son)</th> : null}
-                    {!isSales ? (
-                      <th className="px-4 pt-2 text-right">KDV'siz maliyet</th>
-                    ) : null}
-                    <th className="px-4 pt-2 text-right">Islem</th>
+                  <tr className="border-b border-black/10 text-left text-[11px] uppercase tracking-[0.22em] text-black/40">
+                    {canEdit ? <th className="w-10 px-3 py-3">Seç</th> : null}
+                    <th className="w-[28%] px-3 py-3">Ürün</th>
+                    <th className="w-[13%] px-3 py-3">Kategori</th>
+                    <th className="w-[13%] px-3 py-3">Stok</th>
+                    <th className="w-[12%] px-3 py-3">GTİP</th>
+                    <th className="w-[22%] px-3 py-3">Nitelikler</th>
+                    {!isSales ? <th className="w-[10%] px-3 py-3 text-right">Son alış</th> : null}
+                    {!isSales ? <th className="w-[11%] px-3 py-3 text-right">KDV'siz</th> : null}
+                    <th className="w-[12%] px-3 py-3 text-right">İşlem</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -668,63 +865,59 @@ export default async function ProductsPage({
                     const groupName =
                       groups?.find((group) => group.id === product.group_id)?.name ?? "-";
                     const productAttributes = mergedAttributesByProduct[product.id] ?? [];
+                    const visibleAttributes = productAttributes.slice(0, 3);
                     const costInfo = costByProduct.get(product.id);
                     const weightKg = weightByProduct[product.id] ?? null;
+                    const gtipCode =
+                      (Array.isArray(product.gtips)
+                        ? product.gtips[0]?.code
+                        : (product.gtips as any)?.code) ?? null;
                     return (
                       <tr
                         key={product.id}
-                        className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/10 [&>td]:bg-[var(--row-bg)] [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl hover:[&>td]:bg-[linear-gradient(120deg,rgba(11,47,54,0.06),rgba(242,166,90,0.14))]"
-                        style={
-                          {
-                            animationDelay: `${index * 45}ms`,
-                            ["--row-bg" as string]: rowColors.bg,
-                            ["--row-accent" as string]: rowColors.accent,
-                          } as CSSProperties
-                        }
+                        className="group border-b border-black/6 transition hover:bg-slate-50"
+                        style={{ ["--row-accent" as string]: rowColors.accent } as CSSProperties}
                       >
                         {canEdit ? (
-                          <td className="px-4 py-4 text-sm text-black/60">
+                          <td className="border-t border-black/6 px-3 py-4 align-top">
                             <input
                               type="checkbox"
                               name="product_ids"
                               value={product.id}
                               form="products-delete-selected"
-                              className="h-4 w-4 rounded border-black/20 text-[var(--ocean)]"
+                              className="h-4 w-4 rounded border-black/20 text-[#101817]"
                             />
                           </td>
                         ) : null}
-                        <td className="px-4 py-4 text-sm font-semibold text-black">
-                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                            <div className="flex items-center gap-3">
+                        <td className="border-t border-black/6 px-3 py-4 align-top">
+                          <Link href={detailHref} className="block">
+                            <div className="flex items-start gap-3">
                               <span
-                                className="h-9 w-1.5 rounded-full"
+                                className="mt-1 h-10 w-1.5 shrink-0 rounded-full"
                                 style={{ backgroundColor: "var(--row-accent)" }}
                               />
-                              {product.code}
+                              <span className="min-w-0">
+                                <span className="inline-flex max-w-full rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] font-bold text-black/65">
+                                  <span className="truncate">{product.code}</span>
+                                </span>
+                                <span className="mt-2 block truncate text-sm font-semibold text-black">
+                                  {product.name}
+                                </span>
+                                <span className="mt-1 block truncate text-xs text-black/50">
+                                  {product.brand ?? "Marka yok"} · {product.description ?? product.notes ?? "-"}
+                                </span>
+                              </span>
                             </div>
                           </Link>
                         </td>
-                        <td className="px-4 py-4">
-                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                            <div className="text-sm font-semibold text-black">
-                              {product.name}
-                            </div>
-                            <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-black/50">
-                              {product.brand ?? "Marka yok"}
-                            </div>
-                            <div className="mt-1 text-xs text-black/55">
-                              {product.description ?? product.notes ?? "-"}
-                            </div>
+                        <td className="border-t border-black/6 px-3 py-4 align-top">
+                          <Link href={detailHref} className="inline-flex max-w-full rounded-lg border border-black/8 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-black/65">
+                            <span className="truncate">{groupName}</span>
                           </Link>
                         </td>
-                        <td className="px-4 py-4 text-sm text-black/70">
-                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                            {groupName}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-black/70">
-                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                            <div className="text-base font-semibold text-black">
+                        <td className="border-t border-black/6 px-3 py-4 align-top">
+                          <Link href={detailHref} className="block">
+                            <span className="block text-base font-semibold text-black">
                               <ProductLiveStockInline
                                 stockCode={
                                   product.netsis_stok_kodu
@@ -732,51 +925,87 @@ export default async function ProductsPage({
                                     : null
                                 }
                               />
+                            </span>
+                            <span className="mt-1 block truncate text-[11px] font-medium text-black/45">
+                              {product.netsis_stok_kodu ?? "Stok kodu yok"}
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="border-t border-black/6 px-3 py-4 align-top">
+                          <Link
+                            href={detailHref}
+                            className={`inline-flex max-w-full rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                              gtipCode
+                                ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : "border border-amber-200 bg-amber-50 text-amber-800"
+                            }`}
+                          >
+                            <span className="truncate">{gtipCode ?? "GTİP yok"}</span>
+                          </Link>
+                        </td>
+                        <td className="border-t border-black/6 px-3 py-4 align-top">
+                          <Link href={detailHref} className="block">
+                            <div className="flex flex-wrap gap-1.5">
+                              {visibleAttributes.length ? (
+                                visibleAttributes.map((attr) => (
+                                  <span
+                                    key={`${product.id}-${attr}`}
+                                    className="max-w-[180px] truncate rounded-md border border-black/8 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-black/55"
+                                  >
+                                    {attr}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-black/40">-</span>
+                              )}
+                              {productAttributes.length > visibleAttributes.length ? (
+                                <span className="rounded-md border border-black/8 bg-white px-2 py-0.5 text-[11px] font-semibold text-black/45">
+                                  +{productAttributes.length - visibleAttributes.length}
+                                </span>
+                              ) : null}
                             </div>
-                          </Link>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-black/70">
-                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                            {(Array.isArray(product.gtips)
-                              ? product.gtips[0]?.code
-                              : (product.gtips as any)?.code) ?? "-"}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-4 text-xs text-black/60">
-                          <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                            {productAttributes.length ? productAttributes.join(", ") : "-"}
                             {weightKg !== null ? (
-                              <div className="mt-1 text-[11px] text-black/50">
+                              <span className="mt-2 block text-[11px] font-semibold text-black/45">
                                 Ağırlık:{" "}
                                 {Number(weightKg).toLocaleString("tr-TR", {
                                   maximumFractionDigits: 2,
                                 })}{" "}
                                 kg
-                              </div>
+                              </span>
                             ) : null}
                           </Link>
                         </td>
                         {!isSales ? (
-                          <td className="px-4 py-4 text-right text-sm font-semibold text-black/80">
-                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                          <td className="border-t border-black/6 px-3 py-4 text-right align-top font-semibold text-black/75">
+                            <Link href={detailHref} className="block">
                               {fmtMoney(costInfo?.basePrice ?? null)}
                             </Link>
                           </td>
                         ) : null}
                         {!isSales ? (
-                          <td className="px-4 py-4 text-right text-sm font-semibold text-black">
-                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                          <td className="border-t border-black/6 px-3 py-4 text-right align-top font-semibold text-black">
+                            <Link href={detailHref} className="block">
                               {fmtMoney(costInfo?.kdvSizMaliyet ?? null)}
                             </Link>
                           </td>
                         ) : null}
-                        <td className="px-4 py-4 text-right">
-                          <Link
-                            href={detailHref}
-                            className="rounded-full border border-black/20 px-3 py-1 text-xs font-semibold text-black/70"
-                          >
-                            Detay
-                          </Link>
+                        <td className="border-t border-black/6 px-3 py-4 text-right align-top">
+                          <div className="flex justify-end gap-2">
+                            {canEdit ? (
+                              <Link
+                                href={`/products/${product.id}/edit`}
+                                className="rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-xs font-semibold text-black/60 transition hover:bg-slate-50"
+                              >
+                                Düzenle
+                              </Link>
+                            ) : null}
+                            <Link
+                              href={detailHref}
+                              className="rounded-lg bg-[#101817] px-2.5 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5"
+                            >
+                              Detay
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -786,23 +1015,24 @@ export default async function ProductsPage({
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-            Henüz ürün yok.
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-medium text-amber-900">
+            Filtreye uygun ürün bulunamadı.
           </div>
         )}
+
         {totalCount > perPage ? (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span className="text-xs text-black/60">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-black/8 pt-4 text-sm">
+            <span className="text-xs font-semibold text-black/55">
               Sayfa {currentPage} / {totalPages}
             </span>
             <div className="flex flex-wrap gap-2">
               <Link
                 href={`/products${buildQuery({ page: String(currentPage - 1) })}`}
                 aria-disabled={currentPage <= 1}
-                className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                className={`rounded-lg px-4 py-2 text-xs font-semibold ${
                   currentPage <= 1
                     ? "cursor-not-allowed border border-black/10 text-black/30"
-                    : "border border-black/20 text-black/70"
+                    : "border border-black/15 bg-white text-black/65 transition hover:-translate-y-0.5 hover:bg-slate-50"
                 }`}
               >
                 Önceki
@@ -810,10 +1040,10 @@ export default async function ProductsPage({
               <Link
                 href={`/products${buildQuery({ page: String(currentPage + 1) })}`}
                 aria-disabled={currentPage >= totalPages}
-                className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                className={`rounded-lg px-4 py-2 text-xs font-semibold ${
                   currentPage >= totalPages
                     ? "cursor-not-allowed border border-black/10 text-black/30"
-                    : "border border-black/20 text-black/70"
+                    : "border border-black/15 bg-white text-black/65 transition hover:-translate-y-0.5 hover:bg-slate-50"
                 }`}
               >
                 Sonraki
@@ -824,8 +1054,5 @@ export default async function ProductsPage({
       </div>
     </section>
   );
+
 }
-
-
-
-

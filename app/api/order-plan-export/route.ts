@@ -138,6 +138,7 @@ const computeTrend = (sales60: number, salesPrev60: number) => {
 };
 
 const ceil = (n: number) => Math.ceil(n);
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const EMPTY_SALES = { sales120: 0, sales60: 0, salesPrev60: 0, sales10y: 0 };
 
 export async function GET(req: NextRequest) {
@@ -298,11 +299,13 @@ export async function GET(req: NextRequest) {
     { header: "Önceki 2A", key: "sales_prev60", width: 14 },
     { header: "Son 2A", key: "sales_60", width: 14 },
     { header: "2026 YTD", key: "sales_120", width: 14 },
+    { header: "Gunluk Talep", key: "daily_demand", width: 14 },
     { header: "10Y", key: "sales_10y", width: 14 },
     { header: "Lead", key: "lead", width: 10 },
     { header: "Safety", key: "safety", width: 10 },
     { header: "İhtiyaç", key: "need", width: 14 },
     { header: "Tavsiye", key: "suggest", width: 14 },
+    { header: "15A Tahmini Ihtiyac", key: "forecast_15m_need", width: 18 },
     { header: "Trend", key: "trend", width: 12 },
     { header: "Plan Girişi", key: "plan_value", width: 14 },
   ];
@@ -320,16 +323,26 @@ export async function GET(req: NextRequest) {
     const available_stock = stock + inTransit + proformaOpen;
     const { lead, safety, groupName } = resolveLeadSafety(p.group_id);
 
-    const trend = computeTrend(sales?.sales60 ?? 0, sales?.salesPrev60 ?? 0);
-    let need = 0;
-    if (available_stock < (sales?.sales120 ?? 0)) {
-      need = sales?.sales120 ?? 0;
-    } else if (available_stock >= (sales?.sales120 ?? 0) && lead + safety >= 120) {
-      need = (sales?.sales120 ?? 0) * 2 - available_stock;
-    }
-    if (need < 0) need = 0;
+    const sales60 = sales?.sales60 ?? 0;
+    const salesPrev60 = sales?.salesPrev60 ?? 0;
+    const sales120 = sales?.sales120 ?? 0;
+    const trend = computeTrend(sales60, salesPrev60);
+    const dailyDemandFrom120 = sales120 > 0 ? sales120 / 120 : 0;
+    const dailyDemandFrom60 = sales60 > 0 ? sales60 / 60 : 0;
+    const blendedDailyDemand =
+      dailyDemandFrom60 > 0
+        ? dailyDemandFrom120 * 0.45 + dailyDemandFrom60 * 0.55
+        : dailyDemandFrom120;
+    const planningHorizonDays = Math.max(30, lead + safety);
+    const grossNeed = blendedDailyDemand * planningHorizonDays;
+    const demandBuffer = blendedDailyDemand > 0 ? blendedDailyDemand * 7 : 0;
+    let need = Math.max(0, grossNeed + demandBuffer - available_stock);
+    if (need < 2) need = 0;
     need = ceil(need);
-    const suggest = ceil(need * trend.multiplier);
+    const multiplier = clamp(trend.multiplier, 0.9, 1.25);
+    const suggest = ceil(need * multiplier);
+    const forecast15mDemand = ceil(blendedDailyDemand * 450 * multiplier);
+    const forecast15mNeed = Math.max(0, forecast15mDemand - available_stock);
 
     ws.addRow({
       code: p.code,
@@ -340,14 +353,16 @@ export async function GET(req: NextRequest) {
       proforma_open: fmt0(proformaOpen),
       rfq: fmt0(rfqQty),
       total_stock: fmt0(stock + inTransit + proformaOpen + rfqQty),
-      sales_prev60: fmt0(sales?.salesPrev60 ?? 0),
-      sales_60: fmt0(sales?.sales60 ?? 0),
-      sales_120: fmt0(sales?.sales120 ?? 0),
+      sales_prev60: fmt0(salesPrev60),
+      sales_60: fmt0(sales60),
+      sales_120: fmt0(sales120),
+      daily_demand: Number(blendedDailyDemand.toFixed(2)),
       sales_10y: fmt0(sales10y ?? 0),
       lead,
       safety,
       need,
       suggest,
+      forecast_15m_need: fmt0(forecast15mNeed),
       trend:
         trend.trend_direction === "increasing"
           ? "satış artıyor"

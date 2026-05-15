@@ -4,8 +4,25 @@ import { deleteProduct } from "@/app/actions/products";
 import { computeCosts, pickWeightKg, GtipRow } from "@/lib/gtipCost";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
-import ProductLiveStockCard from "@/components/ProductLiveStockCard";
+import ProductLiveStockInline from "@/components/ProductLiveStockInline";
+import ProductPriceHistoryChart, {
+  ProductPriceHistoryPoint,
+} from "@/components/ProductPriceHistoryChart";
 import type { Metadata } from "next";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BarChart3,
+  ClipboardList,
+  Factory,
+  FileText,
+  Package,
+  Pencil,
+  Scale,
+  ShieldCheck,
+  ShoppingCart,
+  Tags,
+} from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -18,7 +35,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const title = product?.name || product?.code || "Ürün";
   return { title: `Ürün | ${title}` };
 }
-import HeadTitle from "@/components/HeadTitle";
 
 const fmt = (value: number | string | null | undefined) => {
   if (value === null || value === undefined) return "-";
@@ -54,6 +70,11 @@ const fmtDate = (value: string | null | undefined) => {
   });
 };
 
+const sectionClass = "rounded-lg border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/60 p-3 shadow-sm";
+const sectionHeaderClass = "flex flex-wrap items-center justify-between gap-2 border-b border-black/8 pb-2";
+const tableLinkButtonClass =
+  "rounded-md border border-black/10 bg-white px-2 py-1 text-xs font-semibold text-black/60 transition hover:bg-slate-50";
+
 export default async function ProductDetailPage({
   params,
 }: {
@@ -79,7 +100,7 @@ export default async function ProductDetailPage({
 
   if (!product) {
     return (
-      <section className="rounded-3xl border border-black/10 bg-white p-8 text-sm text-black/60">
+      <section className="rounded-lg border border-black/10 bg-white p-3 text-sm text-black/60">
         Ürün bulunamadı.
       </section>
     );
@@ -135,7 +156,7 @@ export default async function ProductDetailPage({
     supabase
       .from("order_items")
       .select(
-        "order_id, product_id, unit_price, quantity, orders(id, name, created_at, extra_cost_percent, suppliers:orders_supplier_id_fkey(name, country))"
+        "order_id, product_id, unit_price, quantity, orders(id, name, created_at, expected_ready_date, currency, extra_cost_percent, suppliers:orders_supplier_id_fkey(name, country))"
       )
       .eq("product_id", product.id),
     supabase
@@ -243,6 +264,7 @@ export default async function ProductDetailPage({
           country: string | null;
           supplierName: string | null;
           extraCostPercent: number | null;
+          currency: string | null;
           totalQty: number;
           totalAmount: number;
         }
@@ -274,6 +296,7 @@ export default async function ProductDetailPage({
             order,
             country,
             supplierName,
+            currency: order.currency ?? null,
             extraCostPercent:
               Number.isFinite(extraCostPercent) ? extraCostPercent : null,
             totalQty: qty,
@@ -348,9 +371,11 @@ export default async function ProductDetailPage({
           id: order.id,
           name: order.name ?? "Sipariş",
           created_at: order.created_at,
+          expected_ready_date: order.expected_ready_date,
           shipment_eta: orderEtaByOrder.get(order.id) ?? null,
           country,
           supplier_name: supplierName,
+          currency: entry.currency,
           extra_cost_percent: extraCostPercent,
           unit_price: avgUnitPrice,
           quantity: totalQty,
@@ -362,6 +387,21 @@ export default async function ProductDetailPage({
       String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
     );
   })();
+
+  const priceHistory: ProductPriceHistoryPoint[] = linkedOrders
+    .filter((item: any) => Number.isFinite(Number(item.unit_price)) && Number(item.unit_price) > 0)
+    .map((item: any) => ({
+      orderId: item.id,
+      orderName: item.name ?? "Sipariş",
+      date: item.shipment_eta ?? item.expected_ready_date ?? item.created_at ?? null,
+      supplierName: item.supplier_name ?? null,
+      unitPrice: Number(item.unit_price),
+      quantity: Number(item.quantity ?? 0) || 0,
+      currency: item.currency ?? "USD",
+    }))
+    .sort((a, b) =>
+      String(a.date ?? "").localeCompare(String(b.date ?? ""))
+    );
 
   const linkedOrdersWithPrev = linkedOrders.map((item, idx, arr) => {
     const prev = arr[idx + 1];
@@ -444,35 +484,146 @@ export default async function ProductDetailPage({
     );
   })();
 
+  const productGtipCode =
+    (Array.isArray((product as any).gtip)
+      ? (product as any).gtip[0]?.code
+      : (product as any).gtip?.code) ?? null;
+  const latestPricePoint = priceHistory[priceHistory.length - 1] ?? null;
+  const latestLinkedOrder = linkedOrders[0] ?? null;
+  const latestUnitCost = latestLinkedOrder?.unitCost ?? null;
+  const openProductionRatio =
+    proformaQtyTotal > 0 ? Math.min(100, (stillInProductionTotal / proformaQtyTotal) * 100) : 0;
+  const quickStats = [
+    {
+      label: "Canlı stok",
+      value: stockCode ? "Aktif" : "Kod yok",
+      helper: stockCode || "Netsis kodu yok",
+      icon: Package,
+      tone: "border-sky-200 bg-sky-50 text-sky-950",
+    },
+    ...(canSeeFinance
+      ? [
+          {
+            label: "Son alış",
+            value: latestPricePoint
+              ? `${fmtUnitPrice(latestPricePoint.unitPrice)} ${latestPricePoint.currency ?? "USD"}`
+              : product.unit_price
+                ? `${fmtUnitPrice(product.unit_price)} USD`
+                : "-",
+            helper: latestPricePoint ? fmtDate(latestPricePoint.date) : "Ürün kartı fiyatı",
+            icon: BarChart3,
+            tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
+          },
+          {
+            label: "KDV'siz maliyet",
+            value: fmt(latestUnitCost),
+            helper: latestLinkedOrder?.supplier_name ?? "Son siparişe göre",
+            icon: Scale,
+            tone: "border-amber-200 bg-amber-50 text-amber-950",
+          },
+        ]
+      : []),
+    {
+      label: "Üretimde",
+      value: fmt(stillInProductionTotal),
+      helper: `Proforma ${fmt(proformaQtyTotal)} / Fatura ${fmt(invoiceQtyTotal)}`,
+      icon: Factory,
+      tone: "border-orange-200 bg-orange-50 text-orange-950",
+    },
+    {
+      label: "Uyumluluk",
+      value: productGtipCode ? productGtipCode : "GTİP yok",
+      helper: `${(countryRates ?? []).length} ülke oranı`,
+      icon: ShieldCheck,
+      tone: productGtipCode
+        ? "border-teal-200 bg-teal-50 text-teal-950"
+        : "border-rose-200 bg-rose-50 text-rose-950",
+    },
+  ];
+  const cockpitLinks = [
+    {
+      label: "Sipariş",
+      value: linkedOrders.length,
+      href: "#orders",
+      icon: ShoppingCart,
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
+      iconTone: "bg-emerald-100 text-emerald-700",
+    },
+    {
+      label: "RFQ",
+      value: linkedRfqs.length,
+      href: "#rfqs",
+      icon: ClipboardList,
+      tone: "border-cyan-200 bg-cyan-50 text-cyan-950",
+      iconTone: "bg-cyan-100 text-cyan-700",
+    },
+    {
+      label: "Proforma",
+      value: linkedProformas.length,
+      href: "#proformas",
+      icon: FileText,
+      tone: "border-orange-200 bg-orange-50 text-orange-950",
+      iconTone: "bg-orange-100 text-orange-700",
+    },
+    {
+      label: "Nitelik",
+      value: mergedAttributeCards.length,
+      href: "#attributes",
+      icon: Tags,
+      tone: "border-sky-200 bg-sky-50 text-sky-950",
+      iconTone: "bg-sky-100 text-sky-700",
+    },
+  ];
+
   return (
-    <section className="space-y-8">
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-r from-sky-500 via-emerald-500 to-indigo-600 px-6 py-6 text-white shadow-[0_25px_70px_-30px_rgba(15,61,62,0.6)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.15),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.12),transparent_30%)]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-[0.35em] text-white/70">Ürün detayı</p>
-            <h1 className="text-3xl font-semibold leading-tight [font-family:var(--font-display)]">{product.name}</h1>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">Kod: {product.code}</span>
-              <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">
-                GTIP: {(Array.isArray((product as any).gtip)
-                  ? (product as any).gtip[0]?.code
-                  : (product as any).gtip?.code) ?? "-"}
+    <section className="space-y-3">
+      <div className="rounded-lg border border-teal-200/40 bg-[linear-gradient(135deg,#113b5a_0%,#15736f_48%,#df9a57_100%)] p-3 text-white shadow-[0_24px_70px_-50px_rgba(21,115,111,0.9)]">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 max-w-4xl">
+            <p className="text-[11px] uppercase tracking-[0.32em] text-white/45">
+              Ürün Kokpiti
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-lg border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-bold text-white/78">
+                {product.code}
               </span>
-              <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">Grup: {group?.name ?? "Yok"}</span>
-              <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold">
-                Stok kodu: {product.netsis_stok_kodu ?? "-"}
+              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1 text-xs font-semibold text-white/68">
+                {product.brand ?? "Marka yok"}
               </span>
             </div>
-            <ProductLiveStockCard stockCode={stockCode || null} />
+            <h1 className="mt-2 text-xl font-semibold leading-tight [font-family:var(--font-display)]">
+              {product.name}
+            </h1>
+            <p className="mt-1 max-w-3xl text-sm leading-5 text-white/62 line-clamp-2">
+              {product.description ?? product.notes ?? "Ürün açıklaması veya operasyon notu yok."}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold text-white/68">
+              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
+                Grup: {group?.name ?? "Yok"}
+              </span>
+              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
+                GTİP: {productGtipCode ?? "-"}
+              </span>
+              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
+                Stok kodu: {product.netsis_stok_kodu ?? "-"}
+              </span>
+              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
+                Ağırlık: {weightKg !== null ? `${fmt(weightKg)} kg` : "-"}
+              </span>
+              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
+                Canlı stok:{" "}
+                <ProductLiveStockInline stockCode={stockCode || null} />
+              </span>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
+
+          <div className="flex flex-wrap items-center gap-1.5 xl:justify-end">
             {canSeeFinance ? (
               <Link
                 href={`/products/${product.id}/costs`}
-                className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:-translate-y-0.5"
               >
+                <Scale className="h-3.5 w-3.5" />
                 Maliyet
               </Link>
             ) : null}
@@ -480,16 +631,17 @@ export default async function ProductDetailPage({
               <>
                 <Link
                   href={`/products/${product.id}/edit`}
-                  className="rounded-full border border-white/50 bg-transparent px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/12 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/18"
                 >
+                  <Pencil className="h-3.5 w-3.5" />
                   Düzenle
                 </Link>
                 <ConfirmActionForm
                   action={deleteProduct}
-                  confirmText="Ürün silinsin mi? Bu islem geri alinamaz."
-                  buttonText="Ürünu sil"
+                  confirmText="Ürün silinsin mi? Bu işlem geri alınamaz."
+                  buttonText="Sil"
                   className="inline"
-                  buttonClassName="rounded-full border border-white/50 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
+                  buttonClassName="inline-flex items-center gap-1.5 rounded-lg border border-rose-300/30 bg-rose-400/15 px-2.5 py-1.5 text-xs font-semibold text-rose-50 transition hover:-translate-y-0.5 hover:bg-rose-400/25"
                 >
                   <input type="hidden" name="product_id" value={product.id} />
                 </ConfirmActionForm>
@@ -497,146 +649,171 @@ export default async function ProductDetailPage({
             ) : null}
             <Link
               href="/products"
-              className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/12 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/18"
             >
-              Listeye dön
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Liste
             </Link>
           </div>
         </div>
-        <div className="relative mt-5 grid gap-3 md:grid-cols-4">
-          {[
-            ...(canSeeFinance
-              ? [
-                  {
-                    label: "Birim fiyat",
-                    value: product.unit_price ? `${fmtUnitPrice(product.unit_price)} USD` : "-",
-                  },
-                  { label: "Yurtiçi masraf %", value: fmt(product.domestic_cost_percent ?? 0) },
-                ]
-              : []),
-            { label: "Ağırlık (kg)", value: weightKg !== null ? fmt(weightKg) : "-" },
-            { label: "GTİP ülke sayısı", value: (countryRates ?? []).length },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-2xl border border-white/25 bg-white/15 px-4 py-3 text-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-white/40"
-            >
-              <p className="text-[11px] uppercase tracking-[0.2em] text-white/70">{item.label}</p>
-              <p className="mt-2 text-lg font-semibold">{item.value}</p>
-            </div>
-          ))}
+
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          {quickStats.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className={`rounded-lg border px-2.5 py-2 ${item.tone}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-[0.2em] opacity-60">
+                      {item.label}
+                    </p>
+                    <p className="mt-1 truncate text-base font-semibold">{item.value}</p>
+                  </div>
+                  <span className="rounded-md bg-white/75 p-1.5 shadow-sm ring-1 ring-black/5">
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-[11px] font-medium opacity-65">{item.helper}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {!isSales && warnings.length ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-          Eksikler: {warnings.join(", ")}
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Eksikler: {warnings.join(", ")}
+          </div>
         </div>
       ) : null}
 
-      {/* Attributes */}
-      <div className="rounded-2xl border border-black/10 bg-white/90 p-4 shadow-sm backdrop-blur">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold">Nitelikler</p>
-          <span className="text-xs text-black/50">{mergedAttributeCards.length} alan</span>
+      <div className="grid gap-2 md:grid-cols-4">
+        {cockpitLinks.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`rounded-lg border px-2.5 py-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.tone}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] opacity-55">
+                    {item.label}
+                  </p>
+                  <p className="mt-0.5 text-lg font-semibold">{item.value}</p>
+                </div>
+                <span className={`rounded-md p-1.5 ${item.iconTone}`}>
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      <section id="attributes" className="rounded-lg border border-sky-200 bg-sky-50/60 p-3 shadow-sm">
+        <div className={sectionHeaderClass}>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-sky-700/60">
+              Teknik
+            </p>
+            <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
+              Nitelikler
+            </h2>
+          </div>
+          <span className="rounded-lg border border-sky-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-sky-800">
+            {mergedAttributeCards.length} alan
+          </span>
         </div>
         {mergedAttributeCards.length ? (
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {mergedAttributeCards.map((attr) => (
-              <div
-                key={attr.key}
-                className="rounded-xl border border-black/8 bg-gradient-to-br from-slate-50 via-white to-slate-100 px-3 py-2 text-sm shadow-[0_10px_24px_-18px_rgba(15,61,62,0.4)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-18px_rgba(15,61,62,0.45)]"
-              >
-                <p className="text-[11px] font-semibold text-black/60">
+              <div key={attr.key} className="rounded-lg border border-sky-100 bg-white/75 px-2.5 py-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-700/55">
                   {attr.name}
                   {attr.unit ? ` (${attr.unit})` : ""}
                 </p>
-                <p className="mt-1 text-sm font-semibold text-black">{attr.value}</p>
+                <p className="mt-0.5 truncate text-sm font-semibold text-black">{attr.value}</p>
               </div>
             ))}
           </div>
         ) : (
-          <div className="mt-3 rounded-xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
             Kategori seçilmedi veya nitelik yok.
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Linked orders */}
-      <div className="rounded-[30px] border border-black/10 bg-white/95 p-6 shadow-sm backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Bağlı siparişler</p>
-          <span className="text-xs text-black/50">{linkedOrders.length} sipariş</span>
+      <section id="orders" className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 shadow-sm">
+        <div className={sectionHeaderClass}>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-700/60">
+              Operasyon
+            </p>
+            <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
+              Bağlı siparişler
+            </h2>
+          </div>
+          <span className="rounded-lg border border-emerald-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+            {linkedOrders.length} sipariş
+          </span>
         </div>
         {linkedOrders.length ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[980px] text-sm">
+              <thead className="text-left text-[11px] uppercase tracking-[0.22em] text-emerald-800/55">
                 <tr>
-                  <th className="px-3 py-2">Sipariş</th>
-                  <th className="px-3 py-2">Tarih</th>
-                  {canSeeFinance ? <th className="px-3 py-2 text-right">Birim fiyat</th> : null}
-                  <th className="px-3 py-2 text-right">Adet</th>
-                      {role !== "Satis" ? <th className="px-3 py-2">Tedarikçi</th> : null}
-                    <th className="px-3 py-2 text-right">Ülke</th>
-                    {canSeeFinance ? (
-                      <th className="px-3 py-2 text-right">Ekstra masraf (%)</th>
-                    ) : null}
-                  {canSeeFinance ? <th className="px-3 py-2 text-right">Birim maliyet*</th> : null}
-                  {canSeeFinance ? (
-                    <th className="px-3 py-2 text-right">Önceki sip. fark (%)</th>
-                  ) : null}
-                  <th className="px-3 py-2 text-right">İşlem</th>
+                  <th className="px-2.5 py-1.5">Sipariş</th>
+                  <th className="px-2.5 py-1.5">ETA</th>
+                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Birim fiyat</th> : null}
+                  <th className="px-2.5 py-1.5 text-right">Adet</th>
+                  {role !== "Satis" ? <th className="px-2.5 py-1.5">Tedarikçi</th> : null}
+                  <th className="px-2.5 py-1.5">Ülke</th>
+                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Birim maliyet</th> : null}
+                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Fark</th> : null}
+                  <th className="px-2.5 py-1.5 text-right">İşlem</th>
                 </tr>
               </thead>
               <tbody className="text-black/70">
                 {linkedOrdersWithPrev.map((linked, idx) => (
-                  <tr
-                    key={linked.id}
-                    className={`border-t border-black/5 transition hover:-translate-y-0.5 hover:bg-slate-50 ${
-                      idx % 2 === 0 ? "bg-slate-50/40" : "bg-white"
-                    }`}
-                  >
-                    <td className="px-3 py-3 text-sm font-semibold text-black">
-                      <Link href={`/orders/${linked.id}`} className="text-black transition hover:text-[var(--ocean)]">
-                        {linked.name ?? "Sipariş"}
-                      </Link>
+                  <tr key={linked.id} className={idx % 2 === 0 ? "bg-white/75" : "bg-emerald-50/55"}>
+                    <td className="border-t border-black/6 px-2.5 py-1.5 font-semibold text-black">
+                      {linked.name ?? "Sipariş"}
                     </td>
-                    <td className="px-3 py-3">{fmtDate(linked.shipment_eta)}</td>
+                    <td className="border-t border-black/6 px-2.5 py-1.5">{fmtDate(linked.shipment_eta)}</td>
                     {canSeeFinance ? (
-                      <td className="px-3 py-3 text-right">{fmtUnitPrice(linked.unit_price)}</td>
+                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right">{fmtUnitPrice(linked.unit_price)}</td>
                     ) : null}
-                    <td className="px-3 py-3 text-right">{linked.quantity ?? "-"}</td>
-                      {role !== "Satis" ? (
-                        <td className="px-3 py-3">{linked.supplier_name ?? "-"}</td>
-                      ) : null}
-                      <td className="px-3 py-3 text-right">{linked.country ?? "-"}</td>
+                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">{linked.quantity ?? "-"}</td>
+                    {role !== "Satis" ? (
+                      <td className="border-t border-black/6 px-2.5 py-1.5">{linked.supplier_name ?? "-"}</td>
+                    ) : null}
+                    <td className="border-t border-black/6 px-2.5 py-1.5">{linked.country ?? "-"}</td>
                     {canSeeFinance ? (
-                      <td className="px-3 py-3 text-right">{fmtPercent(linked.extra_cost_percent)}</td>
+                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right font-semibold text-black">
+                        {fmt(linked.unitCost)}
+                      </td>
                     ) : null}
                     {canSeeFinance ? (
-                      <td className="px-3 py-3 text-right font-semibold">{fmt(linked.unitCost)}</td>
-                    ) : null}
-                    {canSeeFinance ? (
-                      <td className="px-3 py-3 text-right">
+                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
                         <span
-                          className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
+                          className={`inline-flex rounded-md px-2 py-1 text-[11px] font-semibold ${
                             linked.diffPct === null
                               ? "bg-slate-100 text-black/50"
                               : linked.diffPct > 0
-                              ? "bg-red-100 text-red-700"
-                              : "bg-emerald-100 text-emerald-700"
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-emerald-100 text-emerald-700"
                           }`}
                         >
                           {fmtPercent(linked.diffPct)}
                         </span>
                       </td>
                     ) : null}
-                    <td className="px-3 py-3 text-right">
-                      <Link
-                        href={`/orders/${linked.id}`}
-                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 transition hover:-translate-y-0.5 hover:border-black/30"
-                      >
+                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
+                      <Link href={`/orders/${linked.id}`} className={tableLinkButtonClass}>
                         Detay
                       </Link>
                     </td>
@@ -644,163 +821,149 @@ export default async function ProductDetailPage({
                 ))}
               </tbody>
             </table>
-            <p className="mt-2 text-[11px] text-black/50">
-              *Birim maliyet: sipariş birim fiyatı + tedarikçi ülkesine özel GTİP oranları ile KDV'siz tahmini maliyet. Fark: bir önceki siparişe göre yüzde değişim.
+            <p className="mt-2 text-[11px] text-black/45">
+              Birim maliyet son sipariş fiyatı, ülke bazlı GTİP oranları ve yurtiçi masraf bilgisiyle hesaplanır.
             </p>
           </div>
         ) : (
-          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
+          <div className="mt-2 rounded-lg border border-emerald-200 bg-white/70 px-3 py-2 text-sm text-emerald-900/70">
             Henüz bu ürüne bağlı sipariş yok.
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="rounded-[30px] border border-amber-200 bg-amber-50/60 p-6 shadow-sm backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Uretimde</p>
-          <span className="text-xs text-black/60">
-            Acik miktar: {fmt(stillInProductionTotal)} (Proforma: {fmt(proformaQtyTotal)} / Fatura: {fmt(invoiceQtyTotal)})
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 pb-2">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-amber-800/65">
+                Üretim
+              </p>
+              <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
+                Üretimde kalan
+              </h2>
+            </div>
+            <span className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-900">
+              {fmt(stillInProductionTotal)}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/70">
+              <div
+                className="h-full rounded-full bg-amber-600"
+                style={{ width: `${Math.max(4, openProductionRatio)}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-xs font-medium text-amber-900/75">
+              Proforma {fmt(proformaQtyTotal)} / Fatura {fmt(invoiceQtyTotal)}
+            </p>
+          </div>
+          {stillInProductionRows.length ? (
+            <div className="mt-2.5 space-y-1.5">
+              {stillInProductionRows.slice(0, 6).map((item: any) => (
+                <Link
+                  key={`in-production-${item.id}`}
+                  href={`/proformalar/${item.id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white/75 px-2.5 py-1.5 text-sm transition hover:bg-white"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-black">{item.proforma_no ?? "-"}</span>
+                    <span className="block truncate text-xs text-black/50">{item?.suppliers?.name ?? "-"}</span>
+                  </span>
+                  <span className="text-sm font-semibold text-amber-800">{fmt(item.openQty)}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+              Açıkta kalan ürün yok.
+            </div>
+          )}
+        </div>
+
+        <div id="rfqs" className="rounded-lg border border-cyan-200 bg-cyan-50/55 p-3 shadow-sm">
+          <div className={sectionHeaderClass}>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-700/60">
+                Satınalma
+              </p>
+              <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
+                Bağlı RFQ'lar
+              </h2>
+            </div>
+            <span className="rounded-lg border border-cyan-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-cyan-800">
+              {linkedRfqs.length} RFQ
+            </span>
+          </div>
+          {linkedRfqs.length ? (
+            <div className="mt-2 grid gap-1.5">
+              {linkedRfqs.slice(0, 8).map((rfq: any) => (
+                <Link
+                  key={rfq.id}
+                  href={`/rfqs/${rfq.id}`}
+                  className="grid gap-2 rounded-lg border border-cyan-100 bg-white/75 px-2.5 py-1.5 text-sm transition hover:bg-white hover:shadow-sm sm:grid-cols-[1fr_auto]"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-black">{rfq.code ?? "-"}</span>
+                    <span className="block truncate text-xs text-black/50">{rfq.title ?? "-"}</span>
+                  </span>
+                  <span className="self-center rounded-md border border-cyan-100 bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-800">
+                    {fmt(rfq.totalQty)} adet
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 rounded-lg border border-cyan-200 bg-white/70 px-3 py-2 text-sm text-cyan-900/70">
+              Henüz bu ürüne bağlı RFQ yok.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section id="proformas" className="rounded-lg border border-orange-200 bg-orange-50/50 p-3 shadow-sm">
+        <div className={sectionHeaderClass}>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-orange-700/60">
+              Proforma
+            </p>
+            <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
+              Bağlı proformalar
+            </h2>
+          </div>
+          <span className="rounded-lg border border-orange-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-orange-800">
+            {linkedProformas.length} proforma
           </span>
         </div>
-        {stillInProductionRows.length ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
-                <tr>
-                  <th className="px-3 py-2">Proforma</th>
-                  <th className="px-3 py-2">Tedarikci</th>
-                  <th className="px-3 py-2">Tarih</th>
-                  <th className="px-3 py-2 text-right">Proforma adet</th>
-                  <th className="px-3 py-2 text-right">Uretimde kalan</th>
-                  <th className="px-3 py-2 text-right">Islem</th>
-                </tr>
-              </thead>
-              <tbody className="text-black/70">
-                {stillInProductionRows.map((item: any, idx: number) => (
-                  <tr
-                    key={`in-production-${item.id}`}
-                    className={`border-t border-black/5 transition hover:bg-amber-50 ${
-                      idx % 2 === 0 ? "bg-white/70" : "bg-white"
-                    }`}
-                  >
-                    <td className="px-3 py-3 font-semibold text-[var(--ocean)]">{item.proforma_no ?? "-"}</td>
-                    <td className="px-3 py-3">{item?.suppliers?.name ?? "-"}</td>
-                    <td className="px-3 py-3">{fmtDate(item.proforma_date)}</td>
-                    <td className="px-3 py-3 text-right">{fmt(item.totalQty)}</td>
-                    <td className="px-3 py-3 text-right font-semibold text-amber-700">{fmt(item.openQty)}</td>
-                    <td className="px-3 py-3 text-right">
-                      <Link
-                        href={`/proformalar/${item.id}`}
-                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 transition hover:border-black/30"
-                      >
-                        Detay
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Acikta kalan urun yok. Tum proforma miktarlari faturalanmis gorunuyor.
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-[30px] border border-black/10 bg-white/95 p-6 shadow-sm backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Bağlı RFQ'lar</p>
-          <span className="text-xs text-black/50">{linkedRfqs.length} RFQ</span>
-        </div>
-        {linkedRfqs.length ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
-                <tr>
-                  <th className="px-3 py-2">RFQ</th>
-                  <th className="px-3 py-2">Başlık</th>
-                  <th className="px-3 py-2">Durum</th>
-                  <th className="px-3 py-2 text-right">Toplam adet</th>
-                  <th className="px-3 py-2">Son yanıt</th>
-                  <th className="px-3 py-2 text-right">İşlem</th>
-                </tr>
-              </thead>
-              <tbody className="text-black/70">
-                {linkedRfqs.map((rfq: any, idx: number) => (
-                  <tr
-                    key={rfq.id}
-                    className={`border-t border-black/5 transition hover:bg-slate-50 ${
-                      idx % 2 === 0 ? "bg-slate-50/40" : "bg-white"
-                    }`}
-                  >
-                    <td className="px-3 py-3 font-semibold text-[var(--ocean)]">{rfq.code ?? "-"}</td>
-                    <td className="px-3 py-3">{rfq.title ?? "-"}</td>
-                    <td className="px-3 py-3 capitalize">{rfq.status ?? "-"}</td>
-                    <td className="px-3 py-3 text-right">{fmt(rfq.totalQty)}</td>
-                    <td className="px-3 py-3">{fmtDate(rfq.response_due_date)}</td>
-                    <td className="px-3 py-3 text-right">
-                      <Link
-                        href={`/rfqs/${rfq.id}`}
-                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 transition hover:border-black/30"
-                      >
-                        Detay
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
-            Henüz bu ürüne bağlı RFQ yok.
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-[30px] border border-black/10 bg-white/95 p-6 shadow-sm backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Bağlı Proformalar</p>
-          <span className="text-xs text-black/50">{linkedProformas.length} proforma</span>
-        </div>
         {linkedProformas.length ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-[0.3em] text-black/40">
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[820px] text-sm">
+              <thead className="text-left text-[11px] uppercase tracking-[0.22em] text-orange-800/55">
                 <tr>
-                  <th className="px-3 py-2">Proforma</th>
-                  <th className="px-3 py-2">Tedarikçi</th>
-                  <th className="px-3 py-2">Durum</th>
-                  <th className="px-3 py-2">Tarih</th>
-                  <th className="px-3 py-2 text-right">Adet</th>
-                  {canSeeFinance ? <th className="px-3 py-2 text-right">Tutar</th> : null}
-                  <th className="px-3 py-2 text-right">İşlem</th>
+                  <th className="px-2.5 py-1.5">Proforma</th>
+                  <th className="px-2.5 py-1.5">Tedarikçi</th>
+                  <th className="px-2.5 py-1.5">Durum</th>
+                  <th className="px-2.5 py-1.5">Tarih</th>
+                  <th className="px-2.5 py-1.5 text-right">Adet</th>
+                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Tutar</th> : null}
+                  <th className="px-2.5 py-1.5 text-right">İşlem</th>
                 </tr>
               </thead>
               <tbody className="text-black/70">
                 {linkedProformas.map((proforma: any, idx: number) => (
-                  <tr
-                    key={proforma.id}
-                    className={`border-t border-black/5 transition hover:bg-slate-50 ${
-                      idx % 2 === 0 ? "bg-slate-50/40" : "bg-white"
-                    }`}
-                  >
-                    <td className="px-3 py-3 font-semibold text-[var(--ocean)]">{proforma.proforma_no ?? "-"}</td>
-                    <td className="px-3 py-3">{proforma?.suppliers?.name ?? "-"}</td>
-                    <td className="px-3 py-3 capitalize">{proforma.status ?? "-"}</td>
-                    <td className="px-3 py-3">{fmtDate(proforma.proforma_date)}</td>
-                    <td className="px-3 py-3 text-right">{fmt(proforma.totalQty)}</td>
+                  <tr key={proforma.id} className={idx % 2 === 0 ? "bg-white/75" : "bg-orange-50/55"}>
+                    <td className="border-t border-black/6 px-2.5 py-1.5 font-semibold text-black">{proforma.proforma_no ?? "-"}</td>
+                    <td className="border-t border-black/6 px-2.5 py-1.5">{proforma?.suppliers?.name ?? "-"}</td>
+                    <td className="border-t border-black/6 px-2.5 py-1.5 capitalize">{proforma.status ?? "-"}</td>
+                    <td className="border-t border-black/6 px-2.5 py-1.5">{fmtDate(proforma.proforma_date)}</td>
+                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">{fmt(proforma.totalQty)}</td>
                     {canSeeFinance ? (
-                      <td className="px-3 py-3 text-right">
+                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
                         {fmt(proforma.totalAmount)} {proforma.currency ?? ""}
                       </td>
                     ) : null}
-                    <td className="px-3 py-3 text-right">
-                      <Link
-                        href={`/proformalar/${proforma.id}`}
-                        className="rounded-full border border-black/15 px-3 py-1 text-xs font-semibold text-black/70 transition hover:border-black/30"
-                      >
+                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
+                      <Link href={`/proformalar/${proforma.id}`} className={tableLinkButtonClass}>
                         Detay
                       </Link>
                     </td>
@@ -810,15 +973,16 @@ export default async function ProductDetailPage({
             </table>
           </div>
         ) : (
-          <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
+          <div className="mt-2 rounded-lg border border-orange-200 bg-white/70 px-3 py-2 text-sm text-orange-900/70">
             Henüz bu ürüne bağlı proforma yok.
           </div>
         )}
-      </div>
+      </section>
 
+      {canSeeFinance ? (
+        <ProductPriceHistoryChart data={priceHistory} />
+      ) : null}
     </section>
   );
+
 }
-
-
-

@@ -42,23 +42,23 @@ export default function SupplierQuoteList({
       {suppliers.map((s) => (
         <li
           key={s.id}
-          className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
-            s.isSelected ? "border-[var(--ocean)] bg-[var(--ocean)]/10" : "border-black/5 bg-black/5"
+          className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 transition ${
+            s.isSelected ? "border-emerald-200 bg-emerald-50" : "border-black/10 bg-slate-50 hover:bg-white"
           }`}
         >
-          <div className="flex flex-col">
-            <span className="font-semibold">{s.name}</span>
-            <span className="text-xs text-black/50">{s.id}</span>
+          <div className="min-w-0">
+            <span className="block truncate font-semibold">{s.name}</span>
+            <span className="text-[11px] text-black/45">{s.id.slice(0, 8).toUpperCase()}</span>
           </div>
           {s.hasQuote ? (
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
                 disabled={readOnly}
-                className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold ${
                   s.isSelected
                     ? "border border-emerald-300 bg-emerald-50 text-emerald-700"
-                    : "border border-black/10 bg-white text-black/70 hover:border-[var(--ocean)] hover:text-[var(--ocean)]"
+                    : "border border-black/10 bg-white text-black/70 hover:border-emerald-300 hover:text-emerald-700"
                 } ${readOnly ? "pointer-events-none opacity-70" : ""}`}
                 onClick={async () => {
                   if (readOnly || s.isSelected) return;
@@ -89,11 +89,12 @@ export default function SupplierQuoteList({
               ) : null}
             </div>
           ) : (
-            <span className="rounded-full bg-black/5 px-3 py-1 text-[11px] text-black/50">Teklif yok</span>
+            <span className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-black/45 ring-1 ring-black/10">
+              Teklif yok
+            </span>
           )}
         </li>
       ))}
     </ul>
   );
 }
-

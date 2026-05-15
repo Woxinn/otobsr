@@ -2,6 +2,78 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.617 - 2026-05-15
+
+- RFQ Excel export'a masraf yüzdesi, masraf dahil birim maliyet ve masraf dahil toplam maliyet kolonları eklendi
+- Teklif matrisi üzerinden alınan Excel export artık ekranda girilen masraf override değerlerini de export'a taşır
+- `0` ve eksik fiyatlar maliyet/fark hesaplarında geçerli teklif olarak değerlendirilmez
+
+## v0.3.616 - 2026-05-15
+
+- RFQ detay ekranı matrisi merkeze alan kompakt çalışma masası düzenine taşındı
+- Header tek satırlı mini yapıya, metrikler chip bar'a, ürün/tedarikçi/belge alanları katlanır destek panellerine çevrildi
+- Teklif matrisi kolon genişlikleri, fiyat hücreleri ve masraf/kar girişleri daha sıkı hale getirildi
+
+## v0.3.615 - 2026-05-15
+
+- RFQ detay ekranı yeni operasyon paneli tasarım diline hizalandı
+- Koyu kompakt hero, özet kartları, düzenli ürün/tedarikçi/belge blokları ve daha okunabilir teklif matrisi eklendi
+- Tedarikçi teklif listesi ve RFQ teklif gridinde eksik/0 fiyat uyarıları daha görünür hale getirildi
+
+## v0.3.614 - 2026-05-15
+
+- RFQ teklif karşılaştırmasında `0` girilen fiyatlar da eksik fiyat gibi değerlendirilir
+- `0` fiyatlı satırlar toplamdan hariç tutulur, eksik ürün sayısına dahil edilir ve hücrede ayrıca uyarı verir
+
+## v0.3.613 - 2026-05-15
+
+- RFQ teklif karşılaştırmasında tedarikçi toplamı artık eksik fiyat olsa da girilen satırlar üzerinden gösterilir
+- Eksik fiyatlı tedarikçi toplamlarında `Kısmi toplam` ve kaç ürünün fiyatının eksik olduğu açıkça gösterilir
+- Eksik ürün uyarısı tedarikçi kolon başlığına da taşındı, böylece toplam satırına inmeden görülebilir
+- Toplam fark yüzdesi yanıltıcı olmaması için eksik ürün adediyle uyarı verir
+
+## v0.3.612 - 2026-05-15
+
+- Siparişler listesi yeni operasyon paneli tasarım diline hizalandı
+- Üst hero, özet kartları, filtre merkezi ve dense liste alanı daha kompakt hale getirildi
+- ETA, sevkiyat, kalan ödeme ve eksik evrak sinyalleri daha sakin/okunabilir satır düzenine taşındı
+
+## v0.3.611 - 2026-05-15
+
+- Ürün detay kokpiti daha kompakt hale getirildi
+- Hero, metrik kartları, kısayollar, tablolar ve üretim/RFQ/proforma bloklarında dikey boşluklar azaltıldı
+- Fiyat geçmişi grafiği daha kısa ve ürün detay ritmine uyumlu bir yapıya çekildi
+
+## v0.3.610 - 2026-05-15
+
+- Ürün detay sayfası yeni `Ürün Kokpiti` düzeniyle yeniden tasarlandı
+- Üst hero, hızlı metrik kartları, ilişki kısayolları, fiyat geçmişi, teknik nitelikler ve operasyon bölümleri aynı tasarım diline hizalandı
+- Bağlı sipariş/RFQ/proforma ve üretimde kalan alanları daha okunabilir, kompakt ve aksiyon odaklı hale getirildi
+
+## v0.3.609 - 2026-05-14
+
+- Ürünler sayfası modern katalog düzeniyle yeniden tasarlandı
+- Üst özet kartları, aksiyon butonları, filtre merkezi, kategori nabzı ve dense ürün tablosu aynı tasarım diline hizalandı
+- Ürün satırlarına daha okunabilir stok/GTİP/nitelik/maliyet alanları ve hızlı detay/düzenleme aksiyonları eklendi
+
+## v0.3.608 - 2026-05-14
+
+- Uygulama header/nav alanı modern ve minimal bir topbar düzenine taşındı
+- Logo, sistem adı, kullanıcı e-postası, rol, versiyon, hesap ve çıkış kontrolleri tek düzenli blokta toplandı
+- Çok sayıdaki modül linki ana modüller + kapalı duran planlama/kütüphane/ayar grupları olarak sadeleştirildi
+
+## v0.3.607 - 2026-05-14
+
+- Dashboard ilk ekranı modern ve minimal `Operasyon Masası` düzenine taşındı
+- Üst odak kartları, aksiyon merkezi, kompakt sipariş/sevkiyat durum barları ve üretim akışı yeniden tasarlandı
+- Finans ve grafik bölümleri daha sakin bir alt analiz düzenine alındı
+
+## v0.3.606 - 2026-05-14
+
+- Urun detay sayfasina siparis referansli `Fiyat Gecmisi` grafigi eklendi
+- Grafik; son fiyat, ortalama, min/max fiyat, toplam adet ve ilk/son fiyat degisimini gosterir
+- Fiyat gecmisi finans yetkisi olan rollerde gorunur ve siparis detaylarina hizli referans linkleri sunar
+
 ## v0.3.605 - 2026-05-05
 
 - MSSQL canli stok/satis akisindan `TBLSTHAR` kullanimlari tamamen kaldirildi

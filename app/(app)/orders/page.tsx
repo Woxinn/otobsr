@@ -1,7 +1,17 @@
 ﻿import Link from "next/link";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
-import { Download } from "lucide-react";
+import {
+  Archive,
+  ClipboardList,
+  Download,
+  FilePlus,
+  Filter,
+  PackageCheck,
+  Search,
+  Ship,
+  WalletCards,
+} from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit, canViewFinance } from "@/lib/roles";
 import OrdersToast from "@/components/OrdersToast";
@@ -514,76 +524,188 @@ export default async function OrdersPage({
     };
   };
 
+  const getEarliestEta = (order: any) => {
+    const list = shipmentsByOrder.get(order.id) ?? [];
+    const dates = list
+      .map((s) => s.eta_current)
+      .filter((v): v is string => Boolean(v))
+      .map((v) => new Date(v))
+      .filter((d) => !Number.isNaN(d.getTime()));
+    if (!dates.length) return null;
+    return new Date(Math.min(...dates.map((d) => d.getTime())));
+  };
+
+  const isDelayedOrder = (order: any) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return (shipmentsByOrder.get(order.id) ?? []).some((shipment) => {
+      if (!shipment.eta_current || shipment.warehouse_delivery_date) return false;
+      const eta = new Date(shipment.eta_current);
+      eta.setHours(0, 0, 0, 0);
+      return eta <= today;
+    });
+  };
+
+  const activeFilterCount =
+    (resolvedParams.q ? 1 : 0) +
+    (effectiveSupplierFilter ? 1 : 0) +
+    (effectivePaymentFilter ? 1 : 0) +
+    (effectiveIncotermFilter ? 1 : 0) +
+    (resolvedParams.shipmentStatus ? 1 : 0) +
+    (resolvedParams.orderStatus ? 1 : 0) +
+    (resolvedParams.readyFrom || resolvedParams.readyTo ? 1 : 0) +
+    (resolvedParams.archived ? 1 : 0);
+
+  const activeOrdersCount = (orders ?? []).filter((order) => order.archived !== true).length;
+  const archivedOrdersCount = (orders ?? []).filter((order) => order.archived === true).length;
+  const delayedOrdersCount = filtered.filter((order) => isDelayedOrder(order)).length;
+  const visibleMissingDocsCount = canSeeFinance
+    ? filtered.reduce((sum, order) => sum + (missingOrderDocsByOrder.get(order.id)?.length ?? 0), 0)
+    : 0;
+  const filteredRemainingTotal = canSeeFinance
+    ? filtered.reduce((sum, order) => {
+        const total = Number(order.total_amount ?? 0);
+        const paid = paidTotals[order.id] ?? 0;
+        return sum + (remainingByOrder.get(order.id) ?? Math.max(0, total - paid));
+      }, 0)
+    : 0;
+
+  const statCards = [
+    {
+      label: "Aktif sipariş",
+      value: activeOrdersCount.toLocaleString("tr-TR"),
+      helper: `${archivedOrdersCount.toLocaleString("tr-TR")} arşivde`,
+      icon: PackageCheck,
+      tone: "border-sky-200 bg-sky-50 text-sky-950",
+    },
+    {
+      label: "Filtre sonucu",
+      value: totalCount.toLocaleString("tr-TR"),
+      helper: activeFilterCount ? `${activeFilterCount} filtre aktif` : "Tüm görünüm",
+      icon: Filter,
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
+    },
+    {
+      label: "Geciken ETA",
+      value: delayedOrdersCount.toLocaleString("tr-TR"),
+      helper: "Teslim tarihi geçip kapanmayan",
+      icon: Ship,
+      tone: "border-rose-200 bg-rose-50 text-rose-950",
+    },
+    ...(canSeeFinance
+      ? [
+          {
+            label: "Kalan ödeme",
+            value: filteredRemainingTotal.toLocaleString("tr-TR", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
+            helper: visibleMissingDocsCount
+              ? `${visibleMissingDocsCount} eksik evrak`
+              : "Evrak eksiği yok",
+            icon: WalletCards,
+            tone: "border-amber-200 bg-amber-50 text-amber-950",
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_10%_8%,#eef2ff_14%,#f5f7fb_45%,#ffffff_100%)] px-3 pb-10 pt-6 md:px-6">
-      <section className="space-y-8">
+    <section className="space-y-5">
         <OrdersToast />
 
-        {/* HERO */}
-        <div className="relative overflow-hidden rounded-[32px] border border-white/30 bg-[linear-gradient(125deg,#2ec6ff,#4e6df6,#b25cff)] p-6 text-white shadow-[0_30px_80px_-40px_rgba(42,67,101,0.65)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_20%,rgba(255,255,255,0.28),transparent_35%),radial-gradient(circle_at_80%_12%,rgba(255,255,255,0.22),transparent_40%)]" />
-          <div className="relative flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.32em] text-white/85">Siparişler</p>
-              <h1 className="text-3xl font-semibold [font-family:var(--font-display)]">Sipariş Listesi</h1>
-              <p className="mt-2 text-sm text-white/85">
-                Siparişleri filtreleyin, izleyin veya yeni sipariş oluşturun.
+        <div className="rounded-lg border border-black/10 bg-[#101817] p-5 text-white shadow-[0_24px_70px_-50px_rgba(16,24,23,0.9)]">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-[11px] uppercase tracking-[0.32em] text-white/40">
+                Sipariş Operasyonları
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold leading-tight [font-family:var(--font-display)]">
+                Siparişler
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/60">
+                ETA, sevkiyat, ödeme, evrak ve üretim durumunu tek listede takip edin.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative rounded-full bg-white/25 px-5 py-3 text-right shadow-lg backdrop-blur">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-white/85">Toplam</p>
-                <p className="text-2xl font-bold">{orders?.length ?? 0}</p>
-                <div className="absolute inset-0 rounded-full border border-white/30" />
-              </div>
+
+            <div className="flex flex-wrap items-center gap-2">
               {!isSales ? (
-                <Link
-                  href="/api/orders/items-export"
-                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-semibold text-[var(--ocean)] shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:shadow-xl"
-                >
-                  <Download size={16} /> Tüm sipariş kalemleri (Excel)
+                <Link href="/api/orders/items-export" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20">
+                  <Download className="h-4 w-4" />
+                  Kalem Export
                 </Link>
               ) : null}
               {canEditPage ? (
-                <Link
-                  href="/orders/new"
-                  className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:shadow-xl"
-                >
-                  + Yeni Sipariş
+                <Link href="/orders/new" className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-teal-950 transition hover:-translate-y-0.5">
+                  <FilePlus className="h-4 w-4" />
+                  Yeni Sipariş
                 </Link>
               ) : null}
+              <Link
+                href={archivedMode === "only" ? "/orders" : "/orders?archived=only"}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
+              >
+                <Archive className="h-4 w-4" />
+                {archivedMode === "only" ? "Aktifler" : "Arşiv"}
+              </Link>
             </div>
+          </div>
+
+          <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {statCards.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className={`rounded-lg border px-3 py-2 ${item.tone}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-[0.2em] opacity-60">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 truncate text-lg font-semibold">{item.value}</p>
+                    </div>
+                    <span className="rounded-md bg-white/75 p-1.5 shadow-sm ring-1 ring-black/5">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-medium opacity-65">{item.helper}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* FILTERS */}
-        <form className="rounded-[26px] border border-white/70 bg-white/85 p-6 shadow-[0_30px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <form className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Arama ve Filtreleme</p>
-              <h3 className="text-xl font-semibold text-slate-900">Filtreler</h3>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                Kontrol Merkezi
+              </p>
+              <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)]">
+                Filtreler
+              </h2>
             </div>
-            <div className="flex gap-2 text-sm font-semibold">
-              <button className="rounded-full bg-[linear-gradient(135deg,#2ec6ff,#3f7cfb,#9b5cff)] px-5 py-2 text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:shadow-xl">
+            <div className="flex flex-wrap gap-2 text-sm font-semibold">
+              <button className="inline-flex items-center gap-2 rounded-lg bg-[#101817] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5">
+                <Search className="h-4 w-4" />
                 Filtrele
               </button>
               <Link
                 href="/orders"
-                className="rounded-full border border-slate-200 bg-white px-5 py-2 text-slate-700 transition hover:border-sky-300 hover:text-sky-600"
+                className="rounded-lg border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-black/60 transition hover:-translate-y-0.5 hover:bg-slate-50"
               >
                 Temizle
               </Link>
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <label className="text-sm font-semibold text-slate-800">
               Arama
               <input
                 name="q"
                 defaultValue={resolvedParams.q ?? ""}
                 placeholder="Siparis adi, not, incoterm"
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
               />
             </label>
 
@@ -593,7 +715,7 @@ export default async function OrdersPage({
                 <select
                   name="supplier"
                   defaultValue={effectiveSupplierFilter ?? ""}
-                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                  className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
                 >
                   <option value="">Hepsi</option>
                   {suppliers?.map((supplier) => (
@@ -611,7 +733,7 @@ export default async function OrdersPage({
                 <select
                   name="payment"
                   defaultValue={effectivePaymentFilter ?? ""}
-                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                  className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
                 >
                   <option value="">Hepsi</option>
                   <option value="TT">TT</option>
@@ -628,7 +750,7 @@ export default async function OrdersPage({
                   name="incoterm"
                   defaultValue={effectiveIncotermFilter ?? ""}
                   placeholder="FOB, CIF"
-                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                  className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
                 />
               </label>
             ) : null}
@@ -638,7 +760,7 @@ export default async function OrdersPage({
               <select
                 name="archived"
                 defaultValue={resolvedParams.archived ?? ""}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
               >
                 <option value="">Aktif</option>
                 <option value="only">Sadece arşiv</option>
@@ -651,7 +773,7 @@ export default async function OrdersPage({
               <select
                 name="shipmentStatus"
                 defaultValue={resolvedParams.shipmentStatus ?? ""}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
               >
                 <option value="">Hepsi</option>
                 <option value="planlandi">Planlandi</option>
@@ -668,7 +790,7 @@ export default async function OrdersPage({
               <select
                 name="orderStatus"
                 defaultValue={resolvedParams.orderStatus ?? ""}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
               >
                 <option value="">Hepsi</option>
                 <option value="siparis-verildi">Siparis Verildi</option>
@@ -689,7 +811,7 @@ export default async function OrdersPage({
                 type="date"
                 name="readyFrom"
                 defaultValue={resolvedParams.readyFrom ?? ""}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
               />
             </label>
 
@@ -699,7 +821,7 @@ export default async function OrdersPage({
                 type="date"
                 name="readyTo"
                 defaultValue={resolvedParams.readyTo ?? ""}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
               />
             </label>
 
@@ -708,7 +830,7 @@ export default async function OrdersPage({
               <select
                 name="perPage"
                 defaultValue={String(perPage)}
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-inner focus:border-sky-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
               >
                 {perPageOptions.map((opt) => (
                   <option key={opt} value={opt}>
@@ -720,20 +842,24 @@ export default async function OrdersPage({
           </div>
         </form>
 
-        {/* TABLE */}
-        <div className="rounded-[36px] border border-black/10 bg-[radial-gradient(circle_at_top_left,#ffffff,#f6f7fb)] p-6 shadow-[0_40px_80px_-50px_rgba(12,45,52,0.7)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">Siparis panosu</p>
-            <h3 className="text-lg font-semibold">Mevcut siparisler</h3>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">Liste</p>
+            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+              Sipariş kayıtları
+            </h2>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/70 shadow-sm">
-              {totalCount} kayit
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-black/50">
+            <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5">
+              {totalCount
+                ? `${(pageStart + 1).toLocaleString("tr-TR")}-${Math.min(pageStart + pageItems.length, totalCount).toLocaleString("tr-TR")}`
+                : "0"}{" "}
+              / {totalCount.toLocaleString("tr-TR")}
             </span>
             <Link
               href={archivedMode === "only" ? "/orders" : "/orders?archived=only"}
-              className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/70 hover:border-black/30"
+              className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-black/60 transition hover:-translate-y-0.5 hover:bg-slate-50"
             >
               {archivedMode === "only" ? "Aktifleri göster" : "Arşivi göster"}
             </Link>
@@ -744,11 +870,11 @@ export default async function OrdersPage({
             <div className="overflow-x-auto">
               {canEditPage ? (
             <form action={bulkUpdateOrders}>
-              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-black/70">
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-black/10 bg-slate-50 p-2 text-xs font-semibold text-black/70">
                 <span>Toplu işlem:</span>
                 <select
                   name="bulk_action"
-                  className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs"
+                  className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs"
                   defaultValue="archive"
                 >
                   <option value="archive">Arşivle</option>
@@ -758,7 +884,7 @@ export default async function OrdersPage({
                 </select>
                 <select
                   name="bulk_status"
-                  className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs"
+                  className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs"
                   defaultValue=""
                 >
                   <option value="">Durum seçin</option>
@@ -770,24 +896,24 @@ export default async function OrdersPage({
                 </select>
                 <button
                   type="submit"
-                  className="rounded-full border border-black/20 bg-[var(--peach)] px-4 py-1.5 text-xs font-semibold text-black/70 hover:border-black/40"
+                  className="rounded-lg bg-[#101817] px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5"
                 >
                   Uygula
                 </button>
-                <span className="text-[11px] text-black/45">Seç ve uygula (sil işlemi geri alınamaz)</span>
+                <span className="text-[11px] text-black/40">Seç ve uygula (sil işlemi geri alınamaz)</span>
               </div>
-              <div className="w-full rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
-                <table className="w-full table-fixed border-separate border-spacing-y-3 text-[13px]">
+              <div className="w-full min-w-[1050px]">
+                <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
                   <thead>
-                    <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
-                      <th className="w-[40px] px-2 pt-2"></th>
-                      <th className="w-[110px] px-3 pt-2">Order ID</th>
-                      <th className="w-[220px] px-3 pt-2">Siparis</th>
-                      <th className="w-[110px] px-3 pt-2">ETA</th>
-                      <th className="w-[130px] px-3 pt-2">Shipment</th>
-                        {canSeeFinance ? <th className="w-[150px] px-3 pt-2">Toplam</th> : null}
-                        {canSeeFinance ? <th className="w-[140px] px-3 pt-2">Kalan</th> : null}
-                      <th className="w-[170px] px-2 pt-2 text-right">Aksiyon</th>
+                    <tr className="border-b border-black/10 text-left text-[11px] uppercase tracking-[0.22em] text-black/40">
+                      <th className="w-10 px-3 py-3">Seç</th>
+                      <th className="w-[13%] px-3 py-3">Order</th>
+                      <th className="w-[27%] px-3 py-3">Sipariş</th>
+                      <th className="w-[11%] px-3 py-3">ETA</th>
+                      <th className="w-[16%] px-3 py-3">Sevkiyat</th>
+                        {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Toplam</th> : null}
+                        {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Kalan</th> : null}
+                      <th className="w-[13%] px-3 py-3 text-right">İşlem</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -800,21 +926,12 @@ export default async function OrdersPage({
                           ? missingOrderDocsByOrder.get(order.id) ?? []
                           : [];
                         const rowColors = rowColorsFromId(order.id);
-                        const eta = (() => {
-                          const list = shipmentsByOrder.get(order.id) ?? [];
-                          const dates = list
-                            .map((s) => s.eta_current)
-                            .filter((v): v is string => Boolean(v))
-                            .map((v) => new Date(v))
-                            .filter((d) => !Number.isNaN(d.getTime()));
-                          if (!dates.length) return null;
-                          return new Date(Math.min(...dates.map((d) => d.getTime())));
-                        })();
+                        const eta = getEarliestEta(order);
                         const isArchived = Boolean(order.archived);
                         return (
                           <tr
                             key={order.id}
-                            className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/10 [&>td]:bg-[var(--row-bg)] [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl hover:[&>td]:bg-[linear-gradient(120deg,rgba(11,47,54,0.06),rgba(242,166,90,0.14))]"
+                            className="group border-b border-black/5 transition hover:bg-slate-50 [&>td]:border-t [&>td]:border-black/5"
                             style={
                               {
                                 animationDelay: `${index * 45}ms`,
@@ -848,7 +965,7 @@ export default async function OrdersPage({
                                     Arşivde
                                   </span>
                                 ) : null}
-                                <div className="mt-1 text-xs text-black/55">
+                                <div className="mt-1 text-xs text-black/50">
                                   {formatNumber(resolveOrderQuantity(order), 0)} adet |{" "}
                                   {formatNumber(
                                     packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
@@ -940,17 +1057,17 @@ export default async function OrdersPage({
               </div>
             </form>
               ) : (
-              <div className="w-full rounded-[30px] border border-black/10 bg-[linear-gradient(130deg,#f7f7fb,#eef1f7)] p-3 shadow-inner">
-                <table className="w-full table-fixed border-separate border-spacing-y-3 text-[13px]">
+              <div className="w-full min-w-[980px]">
+                <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
                   <thead>
-                    <tr className="text-left text-[11px] uppercase tracking-[0.3em] text-black/50">
-                      <th className="w-[110px] px-3 pt-2">Order ID</th>
-                      <th className="w-[220px] px-3 pt-2">Siparis</th>
-                      <th className="w-[110px] px-3 pt-2">ETA</th>
-                      <th className="w-[130px] px-3 pt-2">Shipment</th>
-                      {canSeeFinance ? <th className="w-[150px] px-3 pt-2">Toplam</th> : null}
-                      {canSeeFinance ? <th className="w-[140px] px-3 pt-2">Kalan</th> : null}
-                      <th className="w-[170px] px-2 pt-2 text-right">Aksiyon</th>
+                    <tr className="border-b border-black/10 text-left text-[11px] uppercase tracking-[0.22em] text-black/40">
+                      <th className="w-[13%] px-3 py-3">Order</th>
+                      <th className="w-[31%] px-3 py-3">Sipariş</th>
+                      <th className="w-[12%] px-3 py-3">ETA</th>
+                      <th className="w-[16%] px-3 py-3">Sevkiyat</th>
+                      {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Toplam</th> : null}
+                      {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Kalan</th> : null}
+                      <th className="w-[12%] px-3 py-3 text-right">İşlem</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -961,17 +1078,12 @@ export default async function OrdersPage({
                       const remaining = remainingByOrder.get(order.id) ?? Math.max(0, total - paid);
                       const missingDocs = canSeeFinance ? missingOrderDocsByOrder.get(order.id) ?? [] : [];
                       const rowColors = rowColorsFromId(order.id);
-                      const eta = (() => {
-                        const list = shipmentsByOrder.get(order.id) ?? [];
-                        const dates = list.map((s) => s.eta_current).filter((v): v is string => Boolean(v)).map((v) => new Date(v)).filter((d) => !Number.isNaN(d.getTime()));
-                        if (!dates.length) return null;
-                        return new Date(Math.min(...dates.map((d) => d.getTime())));
-                      })();
+                      const eta = getEarliestEta(order);
                       const isArchived = Boolean(order.archived);
                       return (
                         <tr
                           key={order.id}
-                          className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/10 [&>td]:bg-[var(--row-bg)] [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl hover:[&>td]:bg-[linear-gradient(120deg,rgba(11,47,54,0.06),rgba(242,166,90,0.14))]"
+                          className="group border-b border-black/5 transition hover:bg-slate-50 [&>td]:border-t [&>td]:border-black/5"
                           style={
                             {
                               animationDelay: `${index * 45}ms`,
@@ -995,7 +1107,7 @@ export default async function OrdersPage({
                             <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
                               <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
                               {isArchived ? <span className="mt-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">Arşivde</span> : null}
-                              <div className="mt-1 text-xs text-black/55">
+                              <div className="mt-1 text-xs text-black/50">
                                 {formatNumber(resolveOrderQuantity(order), 0)} adet |{" "}
                                 {formatNumber(
                                   packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
@@ -1056,7 +1168,6 @@ export default async function OrdersPage({
           ) : null}
         </div>
       </section>
-    </div>
   );
 }
 

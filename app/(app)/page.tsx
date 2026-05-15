@@ -5,6 +5,15 @@ import { getShipmentFlags } from "@/lib/shipments";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import MonthlyOrdersChart from "@/components/MonthlyOrdersChart";
 import SupplierDonutChart from "@/components/SupplierDonutChart";
+import {
+  BarChart3,
+  CalendarClock,
+  CircleDollarSign,
+  ClipboardList,
+  FileWarning,
+  PackageCheck,
+  Ship,
+} from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Gösterge Paneli",
@@ -482,403 +491,567 @@ export default async function DashboardPage() {
     return { order, diffDays };
   });
 
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const supplierNameOf = (order: any) =>
+    (Array.isArray(order?.suppliers)
+      ? order.suppliers[0]?.name
+      : order?.suppliers?.name) ?? "Tedarikçi yok";
+
+  const urgentProductionRows = withCountdown
+    .filter(({ diffDays }) => diffDays !== null && diffDays <= 7)
+    .sort((a, b) => (a.diffDays ?? 999) - (b.diffDays ?? 999));
+
+  const delayedShipmentActions = (flags ?? [])
+    .filter((item) => item.flags.overdue)
+    .sort((a, b) =>
+      String(a.shipment.eta_current ?? "").localeCompare(String(b.shipment.eta_current ?? ""))
+    )
+    .slice(0, 4)
+    .map((item) => ({
+      key: `shipment-${item.shipment.id}`,
+      title: item.shipment.file_no ?? "Shipment",
+      description: `ETA gecikti · ${formatDate(item.shipment.eta_current)}`,
+      meta: "Sevkiyat",
+      href: `/shipments/${item.shipment.id}`,
+      tone: "critical",
+      priority: 1,
+      icon: Ship,
+    }));
+
+  const missingDocumentActions = ordersWithMissing.slice(0, 5).map((item) => ({
+    key: `missing-doc-${item.order.id}`,
+    title: item.order.name ?? "Sipariş",
+    description: `${item.missing.length} eksik evrak · ${item.missing.slice(0, 2).join(", ")}`,
+    meta: formatDate(item.order.expected_ready_date),
+    href: `/orders/${item.order.id}`,
+    tone: "warning",
+    priority: 2,
+    icon: FileWarning,
+  }));
+
+  const productionActions = urgentProductionRows.slice(0, 4).map(({ order, diffDays }) => ({
+    key: `production-${order.id}`,
+    title: order.name ?? "Sipariş",
+    description:
+      diffDays === null
+        ? "Üretim tarihi bekleniyor"
+        : diffDays < 0
+          ? `${Math.abs(diffDays)} gün gecikti`
+          : diffDays === 0
+            ? "Bugün hazır olmalı"
+            : `${diffDays} gün içinde hazır`,
+    meta: supplierNameOf(order),
+    href: `/orders/${order.id}`,
+    tone: diffDays !== null && diffDays < 0 ? "critical" : "info",
+    priority: diffDays !== null && diffDays < 0 ? 1 : 3,
+    icon: CalendarClock,
+  }));
+
+  const paymentActions = canSeeFinance
+    ? ordersWithRemainingPayment.slice(0, 4).map((row) => ({
+        key: `payment-${row.id}`,
+        title: row.name,
+        description: `${formatMoney(row.remaining)} ${row.currency} kalan ödeme`,
+        meta: formatDate(row.expected_ready_date),
+        href: `/orders/${row.id}`,
+        tone: "money",
+        priority: 4,
+        icon: CircleDollarSign,
+      }))
+    : [];
+
+  const actionItems = [
+    ...delayedShipmentActions,
+    ...missingDocumentActions,
+    ...productionActions,
+    ...paymentActions,
+  ]
+    .sort((a, b) => a.priority - b.priority)
+    .slice(0, 12);
+
+  const statusTone = {
+    critical: {
+      shell: "border-rose-200 bg-rose-50 text-rose-900",
+      icon: "bg-rose-600 text-white",
+      pill: "bg-rose-100 text-rose-700",
+    },
+    warning: {
+      shell: "border-amber-200 bg-amber-50 text-amber-950",
+      icon: "bg-amber-500 text-white",
+      pill: "bg-amber-100 text-amber-800",
+    },
+    info: {
+      shell: "border-sky-200 bg-sky-50 text-sky-950",
+      icon: "bg-sky-600 text-white",
+      pill: "bg-sky-100 text-sky-700",
+    },
+    money: {
+      shell: "border-emerald-200 bg-emerald-50 text-emerald-950",
+      icon: "bg-emerald-600 text-white",
+      pill: "bg-emerald-100 text-emerald-700",
+    },
+  };
+
+  const focusCards = [
+    {
+      label: "Geciken sevkiyat",
+      value: delayed,
+      helper: `${totalOpen} açık shipment`,
+      href: "/shipments?shipmentStatus=geciken",
+      icon: Ship,
+      accent: "border-rose-200 bg-rose-50 text-rose-900",
+    },
+    {
+      label: "Eksik evrak",
+      value: ordersWithMissing.length,
+      helper: "Sipariş dosyası",
+      href: "/orders",
+      icon: FileWarning,
+      accent: "border-amber-200 bg-amber-50 text-amber-950",
+    },
+    {
+      label: "Yakın üretim",
+      value: urgentProductionRows.length,
+      helper: "7 gün ve gecikenler",
+      href: "/orders?orderStatus=uretimde",
+      icon: CalendarClock,
+      accent: "border-sky-200 bg-sky-50 text-sky-950",
+    },
+    canSeeFinance
+      ? {
+          label: "Kalan ödeme",
+          value: formatMoney(remainingPayments),
+          helper: "USD toplam",
+          href: "/orders",
+          icon: CircleDollarSign,
+          accent: "border-emerald-200 bg-emerald-50 text-emerald-950",
+        }
+      : {
+          label: "Hazır sipariş",
+          value: producedOrders.length,
+          helper: "Üretim tamam",
+          href: "/orders?orderStatus=hazir",
+          icon: PackageCheck,
+          accent: "border-emerald-200 bg-emerald-50 text-emerald-950",
+        },
+  ];
+
+  const TR_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+  const orderMonthlyData = (() => {
+    const nowChart = new Date();
+    const monthlyMap = new Map<string, number>();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(nowChart.getFullYear(), nowChart.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      monthlyMap.set(key, 0);
+    }
+    (orders ?? []).forEach((order) => {
+      if (!order.created_at) return;
+      const d = new Date(order.created_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      if (monthlyMap.has(key)) monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + 1);
+    });
+    return Array.from(monthlyMap.entries()).map(([key, count]) => {
+      const [, m] = key.split("-");
+      return { month: TR_MONTHS[parseInt(m, 10)], count };
+    });
+  })();
+
+  const supplierDistributionData = (() => {
+    const supplierMap = new Map<string, number>();
+    (orders ?? []).forEach((order) => {
+      const name = supplierNameOf(order);
+      supplierMap.set(name, (supplierMap.get(name) ?? 0) + 1);
+    });
+    const sorted = Array.from(supplierMap.entries()).sort((a, b) => b[1] - a[1]);
+    const top5 = sorted.slice(0, 5).map(([name, count]) => ({ name, count }));
+    const otherCount = sorted.slice(5).reduce((sum, [, count]) => sum + count, 0);
+    if (otherCount > 0) top5.push({ name: "Diğer", count: otherCount });
+    return top5;
+  })();
+
+  const shipmentMax = Math.max(...liveStatusStrip.map((item) => item.value), 1);
+  const orderMax = Math.max(...orderLiveStatusStrip.map((item) => item.value), 1);
+
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-          Dashboard
-        </p>
-        <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-          Genel gorunum ve risk merkezi
-        </h2>
-      </div>
-
-      {/* Uretim odakli kartlar - tek satir */}
-      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-2xl border border-black/10 bg-[var(--peach)]/50 p-4">
-            <p className="text-xs uppercase tracking-widest text-black/50">
-              Hazir tarihi girilmemis
+      <div className="rounded-lg border border-black/10 bg-[#101817] p-5 text-white shadow-[0_24px_70px_-50px_rgba(16,24,23,0.9)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <p className="text-[11px] uppercase tracking-[0.32em] text-white/45">
+              Operasyon Masası
             </p>
-            <p className="mt-2 text-2xl font-semibold">
-              {missingReadyOrders.length}
+            <h1 className="mt-2 text-3xl font-semibold leading-tight [font-family:var(--font-display)]">
+              Bugünün odak işleri
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-white/62">
+              Kritik sevkiyat, evrak, üretim ve ödeme sinyalleri tek ekranda.
             </p>
-            <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
-              {missingReadyOrders.slice(0, 6).map((o) => (
-                <div key={o.id} className="rounded-xl bg-white/70 px-3 py-2">
-                  <Link
-                    href={`/orders/${o.id}`}
-                    className="font-semibold text-black hover:underline"
-                  >
-                    {o.name ?? "Siparis"}
-                  </Link>
-                  {!isSales ? (
-                    <p className="text-[11px] text-black/60">
-                      {(Array.isArray((o as any).suppliers)
-                        ? (o as any).suppliers[0]?.name
-                        : (o as any).suppliers?.name) ?? "Tedarikçi yok"}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-              {missingReadyOrders.length === 0 ? (
-                <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
-                  Hepsi girilmis.
-                </div>
-              ) : null}
-            </div>
           </div>
-
-          <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/60 p-4">
-            <p className="text-xs uppercase tracking-widest text-black/50">
-              Uretimde (tarih girildi)
-            </p>
-            <p className="mt-2 text-2xl font-semibold">
-              {inProductionOrders.length}
-            </p>
-            <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
-              {withCountdown
-                .sort((a, b) => (a.diffDays ?? 999) - (b.diffDays ?? 999))
-                .slice(0, 6)
-                .map(({ order, diffDays }) => (
-                  <div key={order.id} className="rounded-xl bg-white/70 px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Link
-                        href={`/orders/${order.id}`}
-                        className="font-semibold text-black hover:underline"
-                      >
-                        {order.name ?? "Siparis"}
-                      </Link>
-                      <span className="text-[11px] text-black/60">
-                        {diffDays === null
-                          ? "-"
-                          : diffDays > 0
-                            ? `${diffDays} gun`
-                            : diffDays === 0
-                              ? "Bugun"
-                              : `${Math.abs(diffDays)} gun gecikti`}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-black/60">
-                      {order.expected_ready_date ?? "-"}
-                      {!isSales
-                        ? ` | ${(Array.isArray((order as any).suppliers)
-                          ? (order as any).suppliers[0]?.name
-                          : (order as any).suppliers?.name) ?? "Tedarikçi yok"
-                        }`
-                        : ""}
-                    </p>
-                  </div>
-                ))}
-              {inProductionOrders.length === 0 ? (
-                <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
-                  Liste bos.
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/60 p-4">
-            <p className="text-xs uppercase tracking-widest text-black/50">
-              Uretim tamamlanmis
-            </p>
-            <p className="mt-2 text-2xl font-semibold">
-              {producedOrders.length}
-            </p>
-            <div className="mt-3 space-y-1 text-xs text-black/70 max-h-40 overflow-y-auto">
-              {producedOrders.slice(0, 6).map((o) => (
-                <div key={o.id} className="rounded-xl bg-white/70 px-3 py-2">
-                  <Link
-                    href={`/orders/${o.id}`}
-                    className="font-semibold text-black hover:underline"
-                  >
-                    {o.name ?? "Siparis"}
-                  </Link>
-                  <p className="text-[11px] text-black/60">
-                    {o.expected_ready_date ?? "-"}
-                    {!isSales
-                      ? ` | ${(Array.isArray((o as any).suppliers)
-                        ? (o as any).suppliers[0]?.name
-                        : (o as any).suppliers?.name) ?? "Tedarikçi yok"
-                      }`
-                      : ""}
-                  </p>
-                </div>
-              ))}
-              {producedOrders.length === 0 ? (
-                <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] text-black/60">
-                  Hicbiri tamamlanmamis.
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {!isSales ? (
-        <div className="rounded-3xl border border-black/10 bg-white/95 p-4 shadow-sm animate-[fade-up_700ms_ease-out]">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs uppercase tracking-[0.28em] text-black/45">
-              Canli Durum Seridi - Shipment
-            </p>
-            <span className="rounded-full border border-black/15 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
-              Toplam shipment: {totalOpen}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-lg border border-white/10 bg-white/8 px-3 py-2 font-semibold text-white/75">
+              {new Date().toLocaleDateString("tr-TR", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+              })}
             </span>
-          </div>
-          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
-            {liveStatusStrip.map((item, idx) => (
-              <Link
-                key={item.label}
-                href={`/shipments?shipmentStatus=${item.filter}`}
-                className={`rounded-2xl border border-black/10 bg-gradient-to-br ${item.tone} p-3 transition duration-300 hover:-translate-y-0.5 hover:shadow-md`}
-                style={{ animationDelay: `${idx * 60}ms` }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/75">
-                    {item.label}
-                  </p>
-                  <p className="text-xl font-bold text-black">{item.value}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="rounded-3xl border border-black/10 bg-white/95 p-4 shadow-sm animate-[fade-up_700ms_ease-out]">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs uppercase tracking-[0.28em] text-black/45">
-            Canli Durum Seridi - Siparis
-          </p>
-          <span className="rounded-full border border-black/15 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
-            Toplam siparis: {orders?.length ?? 0}
-          </span>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {orderLiveStatusStrip.map((item, idx) => (
             <Link
-              key={item.label}
-              href={`/orders?orderStatus=${item.filter}`}
-              className={`rounded-2xl border border-black/10 bg-gradient-to-br ${item.tone} p-3 transition duration-300 hover:-translate-y-0.5 hover:shadow-md`}
-              style={{ animationDelay: `${idx * 60}ms` }}
+              href="/orders"
+              className="rounded-lg border border-white/15 bg-white px-3 py-2 font-semibold text-[#101817] transition hover:-translate-y-0.5"
             >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/75">
-                  {item.label}
-                </p>
-                <p className="text-xl font-bold text-black">{item.value}</p>
-              </div>
+              Siparişler
             </Link>
-          ))}
+            <Link
+              href="/shipments"
+              className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/15"
+            >
+              Shipments
+            </Link>
+          </div>
         </div>
       </div>
 
-      {canSeeFinance ? (
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.28em] text-black/45">Finans Ozet</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              {[
-                {
-                  label: "Bu ay yapilan odeme",
-                  value: `${formatMoney(monthlyPaid)} USD`,
-                  tone: "bg-emerald-50",
-                },
-                {
-                  label: "Bekleyen odeme",
-                  value: `${formatMoney(pendingPayments)} USD`,
-                  tone: "bg-amber-50",
-                },
-                {
-                  label: "Kalan odeme",
-                  value: `${formatMoney(remainingPayments)} USD`,
-                  tone: "bg-rose-50",
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className={`rounded-2xl border border-black/10 ${item.tone} p-4`}
-                >
-                  <p className="text-xs uppercase tracking-widest text-black/50">
-                    {item.label}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {focusCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <Link
+              key={card.label}
+              href={card.href}
+              className={`group rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.accent}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.24em] opacity-60">
+                    {card.label}
                   </p>
-                  <p className="mt-3 text-xl font-semibold">{item.value}</p>
+                  <p className="mt-3 text-3xl font-semibold tracking-tight">
+                    {card.value}
+                  </p>
                 </div>
-              ))}
-            </div>
-            </div>
-            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs uppercase tracking-[0.28em] text-black/45">Kalan Odemesi Olan Siparisler</p>
-                <span className="rounded-full border border-black/15 bg-[var(--sand)] px-3 py-1 text-[11px] font-semibold text-black/70">
-                  {ordersWithRemainingPayment.length} siparis
+                <span className="rounded-lg bg-white/80 p-2 shadow-sm ring-1 ring-black/5 transition group-hover:scale-105">
+                  <Icon className="h-4 w-4" />
                 </span>
               </div>
-              <div className="mt-4 max-h-[380px] space-y-2 overflow-y-auto pr-1">
-                {ordersWithRemainingPayment.length ? (
-                  ordersWithRemainingPayment.map((row) => (
-                    <div
-                      key={row.id}
-                      className="flex items-center justify-between rounded-2xl border border-black/10 bg-slate-50 px-3 py-2 text-sm"
-                    >
-                      <div className="min-w-0">
-                        <Link href={`/orders/${row.id}`} className="truncate font-semibold text-[var(--ocean)] hover:underline">
-                          {row.name}
-                        </Link>
-                        <p className="text-[11px] text-black/55">
-                          Hazir tarih: {row.expected_ready_date ? new Date(row.expected_ready_date).toLocaleDateString("tr-TR") : "-"}
-                        </p>
+              <p className="mt-3 text-xs font-medium opacity-65">{card.helper}</p>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.8fr)]">
+        <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                Aksiyon Merkezi
+              </p>
+              <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+                Öncelikli takip listesi
+              </h2>
+            </div>
+            <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-black/65">
+              {actionItems.length} aksiyon
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {actionItems.length ? (
+              actionItems.map((item) => {
+                const Icon = item.icon;
+                const tone = statusTone[item.tone as keyof typeof statusTone];
+                return (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    className={`grid gap-3 rounded-lg border p-3 transition hover:-translate-y-0.5 hover:shadow-sm sm:grid-cols-[auto_1fr_auto] ${tone.shell}`}
+                  >
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${tone.icon}`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-black">{item.title}</p>
+                        <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${tone.pill}`}>
+                          {item.meta}
+                        </span>
                       </div>
-                      <div className="text-right">
-                        <p className="text-[11px] uppercase tracking-wider text-black/45">Kalan</p>
-                        <p className="font-semibold text-rose-700">
-                          {formatMoney(row.remaining)} {row.currency}
-                        </p>
-                      </div>
+                      <p className="mt-1 text-xs leading-5 text-black/62">{item.description}</p>
                     </div>
+                    <span className="self-center text-xs font-semibold text-black/45">Aç</span>
+                  </Link>
+                );
+              })
+            ) : (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-5 text-sm font-medium text-emerald-800">
+                Şu an kritik aksiyon görünmüyor.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside className="space-y-5">
+          <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                  Canlı Akış
+                </p>
+                <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)]">
+                  Sipariş durumları
+                </h2>
+              </div>
+              <ClipboardList className="h-5 w-5 text-black/35" />
+            </div>
+            <div className="mt-4 space-y-3">
+              {orderLiveStatusStrip.map((item) => (
+                <Link
+                  key={item.label}
+                  href={`/orders?orderStatus=${item.filter}`}
+                  className="block rounded-lg border border-black/8 bg-slate-50 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="font-semibold text-black/70">{item.label}</span>
+                    <span className="font-bold text-black">{item.value}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/8">
+                    <div
+                      className="h-full rounded-full bg-[var(--ocean)]"
+                      style={{ width: `${Math.max(6, (item.value / orderMax) * 100)}%` }}
+                    />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          {!isSales ? (
+            <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                    Sevkiyat
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)]">
+                    Shipment durumları
+                  </h2>
+                </div>
+                <Ship className="h-5 w-5 text-black/35" />
+              </div>
+              <div className="mt-4 space-y-3">
+                {liveStatusStrip.map((item) => (
+                  <Link
+                    key={item.label}
+                    href={`/shipments?shipmentStatus=${item.filter}`}
+                    className="block rounded-lg border border-black/8 bg-slate-50 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-semibold text-black/70">{item.label}</span>
+                      <span className="font-bold text-black">{item.value}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/8">
+                      <div
+                        className="h-full rounded-full bg-[var(--clay)]"
+                        style={{ width: `${Math.max(6, (item.value / shipmentMax) * 100)}%` }}
+                      />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </aside>
+      </div>
+
+      <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+              Üretim Akışı
+            </p>
+            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+              Hazırlık ve teslim odağı
+            </h2>
+          </div>
+          <PackageCheck className="h-5 w-5 text-black/35" />
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          {[
+            {
+              label: "Tarih bekleyen",
+              count: missingReadyOrders.length,
+              rows: missingReadyOrders.slice(0, 5).map((order) => ({
+                id: order.id,
+                title: order.name ?? "Sipariş",
+                meta: supplierNameOf(order),
+                href: `/orders/${order.id}`,
+              })),
+              empty: "Tarihsiz sipariş yok.",
+              tone: "border-amber-200 bg-amber-50",
+            },
+            {
+              label: "Üretimde",
+              count: inProductionOrders.length,
+              rows: withCountdown
+                .sort((a, b) => (a.diffDays ?? 999) - (b.diffDays ?? 999))
+                .slice(0, 5)
+                .map(({ order, diffDays }) => ({
+                  id: order.id,
+                  title: order.name ?? "Sipariş",
+                  meta:
+                    diffDays === null
+                      ? formatDate(order.expected_ready_date)
+                      : diffDays < 0
+                        ? `${Math.abs(diffDays)} gün gecikti`
+                        : diffDays === 0
+                          ? "Bugün"
+                          : `${diffDays} gün`,
+                  href: `/orders/${order.id}`,
+                })),
+              empty: "Üretimde sipariş yok.",
+              tone: "border-sky-200 bg-sky-50",
+            },
+            {
+              label: "Hazır",
+              count: producedOrders.length,
+              rows: producedOrders.slice(0, 5).map((order) => ({
+                id: order.id,
+                title: order.name ?? "Sipariş",
+                meta: `${formatDate(order.expected_ready_date)} · ${supplierNameOf(order)}`,
+                href: `/orders/${order.id}`,
+              })),
+              empty: "Hazır sipariş yok.",
+              tone: "border-emerald-200 bg-emerald-50",
+            },
+          ].map((column) => (
+            <div key={column.label} className={`rounded-lg border p-4 ${column.tone}`}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-black">{column.label}</p>
+                <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-bold text-black/70">
+                  {column.count}
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {column.rows.length ? (
+                  column.rows.map((row) => (
+                    <Link
+                      key={row.id}
+                      href={row.href}
+                      className="block rounded-lg border border-black/8 bg-white/75 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                    >
+                      <p className="truncate text-sm font-semibold text-black">{row.title}</p>
+                      <p className="mt-1 truncate text-xs text-black/55">{row.meta}</p>
+                    </Link>
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-black/10 bg-[var(--mint)]/40 px-3 py-2 text-sm text-black/70">
-                    Kalan odemesi olan siparis yok.
+                  <div className="rounded-lg border border-black/8 bg-white/65 px-3 py-3 text-xs font-medium text-black/55">
+                    {column.empty}
                   </div>
                 )}
               </div>
             </div>
-          </div>
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.28em] text-black/45 mb-4">
-              Yapilan Odemelerin Aylik Dagilimi
-            </p>
-            <MonthlyOrdersChart data={paymentMonthlyData} />
-          </div>
+          ))}
         </div>
-      ) : null}
+      </section>
 
-      {/* ---- Grafikler ---- */}
-      {!isSales ? (() => {
-        const TR_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-        const nowChart = new Date();
-        const monthlyMap = new Map<string, number>();
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(nowChart.getFullYear(), nowChart.getMonth() - i, 1);
-          const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
-          monthlyMap.set(key, 0);
-        }
-        (orders ?? []).forEach((o) => {
-          if (!o.created_at) return;
-          const d = new Date(o.created_at);
-          const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
-          if (monthlyMap.has(key)) monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + 1);
-        });
-        const monthlyData = Array.from(monthlyMap.entries()).map(([key, count]) => {
-          const [, m] = key.split("-");
-          return { month: TR_MONTHS[parseInt(m, 10)], count };
-        });
-
-        const supplierMap = new Map<string, number>();
-        (orders ?? []).forEach((o) => {
-          const supName = (Array.isArray((o as any).suppliers)
-            ? (o as any).suppliers[0]?.name
-            : (o as any).suppliers?.name) ?? "Bilinmiyor";
-          supplierMap.set(supName, (supplierMap.get(supName) ?? 0) + 1);
-        });
-        const sorted = Array.from(supplierMap.entries()).sort((a, b) => b[1] - a[1]);
-        const top5 = sorted.slice(0, 5).map(([name, count]) => ({ name, count }));
-        const otherCount = sorted.slice(5).reduce((s, [, c]) => s + c, 0);
-        if (otherCount > 0) top5.push({ name: "Diğer", count: otherCount });
-
-        return (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm animate-[fade-up_700ms_ease-out]">
-              <p className="text-xs uppercase tracking-[0.28em] text-black/45 mb-4">Aylık Sipariş Trendi</p>
-              <MonthlyOrdersChart data={monthlyData} />
-            </div>
-            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm animate-[fade-up_700ms_ease-out]">
-              <p className="text-xs uppercase tracking-[0.28em] text-black/45 mb-4">Tedarikçi Bazlı Dağılım</p>
-              <SupplierDonutChart data={top5} />
-            </div>
-          </div>
-        );
-      })() : null}
-
-      <div className="grid gap-6">
-        <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold">Operasyon Notlari</p>
-          <div className="mt-4 rounded-2xl border border-rose-200/60 bg-gradient-to-br from-rose-50 to-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
-                <p className="text-sm font-semibold text-black">Eksik evrakli siparisler</p>
-                <span className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-rose-700">
-                  {ordersWithMissing.length}
-                </span>
+      {canSeeFinance ? (
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
+          <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-black/8 pb-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                  Finans
+                </p>
+                <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+                  Ödeme görünümü
+                </h2>
               </div>
-              <Link
-                href="/orders"
-                className="text-xs font-semibold text-[var(--ocean)] hover:underline"
-              >
-                Tum siparisler
-              </Link>
+              <CircleDollarSign className="h-5 w-5 text-black/35" />
             </div>
-            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1 text-xs text-black/70">
-              {ordersWithMissing.length ? (
-                ordersWithMissing.map((item) => (
-                  <div
-                    key={item.order.id}
-                    className="rounded-xl border border-rose-200/70 bg-white px-3 py-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {[
+                { label: "Bu ay ödendi", value: monthlyPaid, tone: "bg-emerald-50 text-emerald-900" },
+                { label: "Bekleyen", value: pendingPayments, tone: "bg-amber-50 text-amber-950" },
+                { label: "Kalan", value: remainingPayments, tone: "bg-rose-50 text-rose-900" },
+              ].map((item) => (
+                <div key={item.label} className={`rounded-lg border border-black/8 p-4 ${item.tone}`}>
+                  <p className="text-[11px] uppercase tracking-[0.2em] opacity-65">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 text-xl font-semibold">{formatMoney(item.value)} USD</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+              {ordersWithRemainingPayment.length ? (
+                ordersWithRemainingPayment.slice(0, 10).map((row) => (
+                  <Link
+                    key={row.id}
+                    href={`/orders/${row.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-black/8 bg-slate-50 px-3 py-2 text-sm transition hover:bg-white hover:shadow-sm"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <Link
-                        href={`/orders/${item.order.id}`}
-                        className="font-semibold text-black hover:text-[var(--ocean)] hover:underline"
-                      >
-                        {item.order.name ?? "Siparis"}
-                      </Link>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                          {item.missing.length} eksik
-                        </span>
-                        <span className="text-[10px] text-black/55">
-                          {item.order.expected_ready_date ?? "-"}
-                        </span>
-                      </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-black">{row.name}</p>
+                      <p className="text-xs text-black/50">{formatDate(row.expected_ready_date)}</p>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {item.missing.slice(0, 3).map((name) => (
-                        <span
-                          key={`${item.order.id}-${name}`}
-                          className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700"
-                        >
-                          {name}
-                        </span>
-                      ))}
-                      {item.missing.length > 3 ? (
-                        <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[10px] font-semibold text-black/70">
-                          +{item.missing.length - 3}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+                    <p className="whitespace-nowrap text-sm font-semibold text-rose-700">
+                      {formatMoney(row.remaining)} {row.currency}
+                    </p>
+                  </Link>
                 ))
               ) : (
-                <div className="rounded-xl border border-black/10 bg-white px-3 py-2 text-[11px] text-black/60">
-                  Eksik evraki olan siparis bulunamadi.
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-800">
+                  Kalan ödemesi olan sipariş yok.
                 </div>
               )}
             </div>
           </div>
-          <div className="mt-6">
-            <Link
-              href="/shipments"
-              className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Shipments listesine git
-            </Link>
+          <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+            <p className="mb-4 text-[11px] uppercase tracking-[0.28em] text-black/40">
+              Aylık Ödeme
+            </p>
+            <MonthlyOrdersChart data={paymentMonthlyData} />
           </div>
-        </div>
-      </div>
+        </section>
+      ) : null}
+
+      {!isSales ? (
+        <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-black/8 pb-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                Analiz
+              </p>
+              <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+                Trend ve dağılım
+              </h2>
+            </div>
+            <BarChart3 className="h-5 w-5 text-black/35" />
+          </div>
+          <div className="mt-5 grid gap-5 lg:grid-cols-2">
+            <div className="rounded-lg border border-black/8 bg-slate-50 p-4">
+              <p className="mb-3 text-sm font-semibold text-black/70">Aylık sipariş trendi</p>
+              <MonthlyOrdersChart data={orderMonthlyData} />
+            </div>
+            <div className="rounded-lg border border-black/8 bg-slate-50 p-4">
+              <p className="mb-3 text-sm font-semibold text-black/70">Tedarikçi dağılımı</p>
+              <SupplierDonutChart data={supplierDistributionData} />
+            </div>
+          </div>
+        </section>
+      ) : null}
     </section>
   );
-}
 
+}

@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const fmt0 = (n: number) => Number(n ?? 0);
 const ceil = (n: number) => Math.ceil(n);
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 const computeTrend = (sales60: number, salesPrev60: number) => {
   if (salesPrev60 === 0) return { trendDirection: "stable", multiplier: 1 };
@@ -66,18 +67,20 @@ const applyWorksheetStyle = (ws: ExcelJS.Worksheet) => {
     "I",
     "J",
     "K",
-    "L",
     "M",
     "N",
     "O",
     "P",
+    "Q",
     "R",
+    "T",
   ];
   integerCols.forEach((col) => {
     ws.getColumn(col).numFmt = "#,##0";
   });
 
-  ws.getColumn("Q").alignment = { horizontal: "center", vertical: "middle" };
+  ws.getColumn("L").numFmt = "#,##0.00";
+  ws.getColumn("S").alignment = { horizontal: "center", vertical: "middle" };
 };
 
 const fetchAllRows = async (supabase: any, jobId: string) => {
@@ -159,11 +162,13 @@ export async function GET(
     { header: "Onceki 2A", key: "sales_prev60", width: 14 },
     { header: "Son 2A", key: "sales_60", width: 14 },
     { header: "2026 YTD", key: "sales_120", width: 14 },
+    { header: "Gunluk Talep", key: "daily_demand", width: 14 },
     { header: "10Y", key: "sales_10y", width: 14 },
     { header: "Lead", key: "lead", width: 10 },
     { header: "Safety", key: "safety", width: 10 },
     { header: "Ihtiyac", key: "need", width: 14 },
     { header: "Tavsiye", key: "suggest", width: 14 },
+    { header: "15A Tahmini Ihtiyac", key: "forecast_15m_need", width: 18 },
     { header: "Trend", key: "trend", width: 12 },
     { header: "Plan Girisi", key: "plan_value", width: 14 },
   ];
@@ -184,14 +189,21 @@ export async function GET(
     const availableStock = stock + inTransit + proformaOpen;
 
     const trend = computeTrend(sales60, salesPrev60);
-    let need = 0;
-    if (availableStock < sales120) {
-      need = sales120;
-    } else if (availableStock >= sales120 && lead + safety >= 120) {
-      need = sales120 * 2 - availableStock;
-    }
-    if (need < 0) need = 0;
+    const dailyDemandFrom120 = sales120 > 0 ? sales120 / 120 : 0;
+    const dailyDemandFrom60 = sales60 > 0 ? sales60 / 60 : 0;
+    const blendedDailyDemand =
+      dailyDemandFrom60 > 0
+        ? dailyDemandFrom120 * 0.45 + dailyDemandFrom60 * 0.55
+        : dailyDemandFrom120;
+    const planningHorizonDays = Math.max(30, lead + safety);
+    const grossNeed = blendedDailyDemand * planningHorizonDays;
+    const demandBuffer = blendedDailyDemand > 0 ? blendedDailyDemand * 7 : 0;
+    let need = Math.max(0, grossNeed + demandBuffer - availableStock);
+    if (need < 2) need = 0;
     need = ceil(need);
+    const multiplier = clamp(trend.multiplier, 0.9, 1.25);
+    const forecast15mDemand = ceil(blendedDailyDemand * 450 * multiplier);
+    const forecast15mNeed = Math.max(0, forecast15mDemand - availableStock);
 
     const added = ws.addRow({
       code: row.code,
@@ -205,11 +217,13 @@ export async function GET(
       sales_prev60: fmt0(salesPrev60),
       sales_60: fmt0(sales60),
       sales_120: fmt0(sales120),
+      daily_demand: Number(blendedDailyDemand.toFixed(2)),
       sales_10y: fmt0(sales10y),
       lead,
       safety,
       need,
-      suggest: ceil(need * trend.multiplier),
+      suggest: ceil(need * multiplier),
+      forecast_15m_need: fmt0(forecast15mNeed),
       trend:
         trend.trendDirection === "increasing"
           ? "satis artiyor"
@@ -219,7 +233,7 @@ export async function GET(
       plan_value: fmt0(Number(row.plan_value ?? 0)),
     });
 
-    const trendCell = added.getCell(17);
+    const trendCell = added.getCell(19);
     if (trend.trendDirection === "increasing") {
       trendCell.font = { color: { argb: "FF166534" }, bold: true };
     } else if (trend.trendDirection === "decreasing") {

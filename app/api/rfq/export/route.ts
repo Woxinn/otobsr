@@ -35,6 +35,22 @@ export async function GET(request: Request) {
   if (!rfqId) {
     return NextResponse.json({ error: "rfq_id gerekli" }, { status: 400 });
   }
+  let costOverrides: Record<string, number> = {};
+  const rawCostOverrides = searchParams.get("cost_overrides");
+  if (rawCostOverrides) {
+    try {
+      const parsed = JSON.parse(rawCostOverrides);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        costOverrides = Object.fromEntries(
+          Object.entries(parsed)
+            .map(([key, value]) => [key, Number(value)])
+            .filter(([, value]) => Number.isFinite(value))
+        );
+      }
+    } catch {
+      costOverrides = {};
+    }
+  }
 
   const supabase = await createSupabaseServerClient();
 
@@ -186,13 +202,19 @@ export async function GET(request: Request) {
     return qi?.unit_price ?? null;
   };
 
+  const isValidQuotePrice = (price: number | null | undefined): price is number =>
+    typeof price === "number" && Number.isFinite(price) && price > 0;
+
+  const getDomesticCostPercent = (item: ItemRow) =>
+    costOverrides[item.id] ?? item.domestic_cost_percent ?? null;
+
   const isComparableCurrency = (sup: SupplierRow) => !rfq.currency || !sup.currency || String(sup.currency) === String(rfq.currency);
 
   const getItemBaseline = (item: ItemRow): Baseline => {
     const offerPrices = supplierList
       .filter((sup) => isComparableCurrency(sup))
       .map((sup) => getPrice(sup, item))
-      .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+      .filter((price): price is number => isValidQuotePrice(price));
 
     if (offerPrices.length >= 2) return { kind: "offer" as const, value: Math.min(...offerPrices) };
     if (offerPrices.length === 1 && item.target_unit_price != null && Number(item.target_unit_price) !== 0) {
@@ -208,10 +230,35 @@ export async function GET(request: Request) {
       const qty = Number(item.quantity ?? 0);
       const price = getPrice(sup, item);
       if (!Number.isFinite(qty) || qty <= 0) continue;
-      if (price == null || !Number.isFinite(price)) return null;
+      if (!isValidQuotePrice(price)) return null;
       total += qty * price;
     }
     return total;
+  };
+
+  const getSupplierCostTotal = (sup: SupplierRow) => {
+    if (!isComparableCurrency(sup)) return null;
+    let total = 0;
+    let used = false;
+    for (const item of normalizedItems) {
+      const qty = Number(item.quantity ?? 0);
+      const price = getPrice(sup, item);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      if (!isValidQuotePrice(price)) continue;
+      const costResult = calculateDisplayedNetCost({
+        basePrice: price,
+        domesticCostPercent: getDomesticCostPercent(item),
+        weightKg: item.weight_kg ?? null,
+        gtipBase: item.gtip ?? null,
+        countryRates: item.country_rates ?? [],
+        selectedCountry: sup.country ?? null,
+      });
+      const netCost = costResult?.netCost ?? null;
+      if (netCost == null || !Number.isFinite(netCost)) continue;
+      total += qty * Number(netCost);
+      used = true;
+    }
+    return used ? total : null;
   };
 
   const targetTotal = (() => {
@@ -245,13 +292,15 @@ export async function GET(request: Request) {
     { header: "Product name", key: "name", width: 32 },
     { header: "RFQ quantity", key: "qty", width: 14 },
     { header: "Target unit price", key: "target_price", width: 16, style: { numFmt: "#,##0.000000" } },
+    { header: "Expense %", key: "domestic_cost_percent", width: 12, style: { numFmt: "0.00%" } },
   ];
 
   supplierList.forEach((sup) => {
     columns.push(
       { header: `${sup.name} price`, key: `price_${sup.id}`, width: 14, style: { numFmt: "#,##0.000000" } },
       { header: `${sup.name} diff %`, key: `diff_pct_${sup.id}`, width: 12, style: { numFmt: "0.00%" } },
-      { header: `${sup.name} net cost`, key: `cost_${sup.id}`, width: 16, style: { numFmt: "#,##0.000000" } }
+      { header: `${sup.name} unit cost incl. expense`, key: `cost_${sup.id}`, width: 20, style: { numFmt: "#,##0.000000" } },
+      { header: `${sup.name} total cost incl. expense`, key: `total_cost_${sup.id}`, width: 22, style: { numFmt: "#,##0.000000" } }
     );
   });
 
@@ -268,16 +317,17 @@ export async function GET(request: Request) {
       name: item.product_name ?? "",
       qty: item.quantity ?? "",
       target_price: item.target_unit_price ?? null,
+      domestic_cost_percent: getDomesticCostPercent(item) != null ? Number(getDomesticCostPercent(item)) / 100 : null,
     };
     const baseline = getItemBaseline(item);
 
     supplierList.forEach((sup) => {
       const price = getPrice(sup, item);
       const costResult =
-        price != null
+        isValidQuotePrice(price)
           ? calculateDisplayedNetCost({
               basePrice: price,
-              domesticCostPercent: item.domestic_cost_percent ?? null,
+              domesticCostPercent: getDomesticCostPercent(item),
               weightKg: item.weight_kg ?? null,
               gtipBase: item.gtip ?? null,
               countryRates: item.country_rates ?? [],
@@ -286,36 +336,43 @@ export async function GET(request: Request) {
           : null;
       const netCost = costResult?.netCost ?? null;
       const diffPct =
-        price != null && isComparableCurrency(sup) && baseline.value != null && baseline.value !== 0
+        isValidQuotePrice(price) && isComparableCurrency(sup) && baseline.value != null && baseline.value !== 0
           ? (price - baseline.value) / baseline.value
           : null;
 
       row[`price_${sup.id}`] = price;
       row[`diff_pct_${sup.id}`] = diffPct;
       row[`cost_${sup.id}`] = netCost != null ? Number(netCost) : null;
+      row[`total_cost_${sup.id}`] =
+        netCost != null && Number.isFinite(Number(item.quantity ?? 0))
+          ? Number(netCost) * Number(item.quantity ?? 0)
+          : null;
     });
 
     const excelRow = ws.addRow(row);
     const comparablePrices = supplierList
       .filter((sup) => isComparableCurrency(sup))
       .map((sup) => row[`price_${sup.id}`])
-      .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+      .filter((price): price is number => isValidQuotePrice(price));
     const minPrice = comparablePrices.length > 0 ? Math.min(...comparablePrices) : null;
 
     supplierList.forEach((sup) => {
       const priceCell = excelRow.getCell(`price_${sup.id}`);
       const diffPctCell = excelRow.getCell(`diff_pct_${sup.id}`);
       const costCell = excelRow.getCell(`cost_${sup.id}`);
+      const totalCostCell = excelRow.getCell(`total_cost_${sup.id}`);
 
       priceCell.alignment = { horizontal: "right" };
       diffPctCell.alignment = { horizontal: "right" };
       costCell.alignment = { horizontal: "right" };
+      totalCostCell.alignment = { horizontal: "right" };
 
       if (minPrice !== null && Number(priceCell.value) === minPrice) {
         const green = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFC6EFCE" } };
         priceCell.fill = green;
         diffPctCell.fill = green;
         costCell.fill = green;
+        totalCostCell.fill = green;
       }
 
       const diffPctValue = row[`diff_pct_${sup.id}`];
@@ -333,6 +390,9 @@ export async function GET(request: Request) {
       if (costCell.value === null || costCell.value === "") {
         costCell.font = { color: { argb: "FF9CA3AF" }, italic: true };
       }
+      if (totalCostCell.value === null || totalCostCell.value === "") {
+        totalCostCell.font = { color: { argb: "FF9CA3AF" }, italic: true };
+      }
     });
   });
 
@@ -341,6 +401,7 @@ export async function GET(request: Request) {
     name: "Quantity x unit price",
     qty: "",
     target_price: targetTotal,
+    domestic_cost_percent: null,
   };
 
   supplierList.forEach((sup) => {
@@ -349,6 +410,7 @@ export async function GET(request: Request) {
     totalRow[`price_${sup.id}`] = total;
     totalRow[`diff_pct_${sup.id}`] = diffPct;
     totalRow[`cost_${sup.id}`] = null;
+    totalRow[`total_cost_${sup.id}`] = getSupplierCostTotal(sup);
   });
 
   const excelTotalRow = ws.addRow(totalRow);

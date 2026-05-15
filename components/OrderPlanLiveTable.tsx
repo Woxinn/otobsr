@@ -44,10 +44,12 @@ type PreparedRow = {
   row: PlanRow;
   metric: LiveMetric;
   plan: {
+    daily_demand: number;
     base_order_quantity: number;
     trend_direction: "increasing" | "decreasing" | "stable";
     multiplier: number;
     trend_based_suggestion: number;
+    forecast_18m_need: number;
     use_core_quantity: boolean;
     final_order_quantity: number;
   };
@@ -77,6 +79,7 @@ const rowColorsFromId = (id: string) => {
 };
 
 const ceil = (n: number) => Math.ceil(n);
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 const computeTrend = (
   sales60: number,
@@ -106,28 +109,39 @@ const computePlan = ({
   use_core_quantity?: boolean;
 }): PreparedRow["plan"] => {
   const use_core_quantity = false;
-  let base_order_quantity = 0;
-  if (available_stock < sales_2026_ytd) {
-    base_order_quantity = sales_2026_ytd;
-  } else if (available_stock >= sales_2026_ytd && lead_time_days + safety_days >= 120) {
-    const target_stock = sales_2026_ytd * 2;
-    base_order_quantity = target_stock - available_stock;
-  } else {
-    base_order_quantity = 0;
-  }
-  if (base_order_quantity < 0) base_order_quantity = 0;
+
+  // 120 gunluk satisi gunluk tüketime çevirip lead+safety ufkunda net ihtiyaci hesapla.
+  const dailyDemandFrom120 = sales_2026_ytd > 0 ? sales_2026_ytd / 120 : 0;
+  const dailyDemandFrom60 = sales_last_60_days > 0 ? sales_last_60_days / 60 : 0;
+  const blendedDailyDemand = dailyDemandFrom60 > 0 ? (dailyDemandFrom120 * 0.45 + dailyDemandFrom60 * 0.55) : dailyDemandFrom120;
+
+  // Asgari plan ufku: en az 30 gunluk ileriye bak.
+  const planningHorizonDays = Math.max(30, lead_time_days + safety_days);
+  const grossNeed = blendedDailyDemand * planningHorizonDays;
+
+  // Hizli tuketime sahip urunlerde küçük dalgalanmalar stokout olusturmasin diye tampon.
+  const demandBuffer = blendedDailyDemand > 0 ? blendedDailyDemand * 7 : 0;
+  let base_order_quantity = Math.max(0, grossNeed + demandBuffer - available_stock);
+
+  // Düşük hareketli urunlerde 1-2 adetlik gürültüyü kırp.
+  if (base_order_quantity < 2) base_order_quantity = 0;
   base_order_quantity = ceil(base_order_quantity);
 
   const trend = computeTrend(sales_last_60_days, sales_previous_60_days);
-  const multiplier = trend.multiplier;
+  // Trend etkisini daha kontrollü uygula; asiri ziplamayi ve cok sert dususu sinirla.
+  const multiplier = clamp(trend.multiplier, 0.9, 1.25);
   const trend_based_suggestion = ceil(base_order_quantity * multiplier);
+  const forecast18mDemand = ceil(blendedDailyDemand * 450 * multiplier);
+  const forecast_18m_need = Math.max(0, forecast18mDemand - available_stock);
   const final_order_quantity = use_core_quantity ? base_order_quantity : trend_based_suggestion;
 
   return {
+    daily_demand: blendedDailyDemand,
     base_order_quantity,
     trend_direction: trend.trend_direction,
     multiplier,
     trend_based_suggestion,
+    forecast_18m_need,
     use_core_quantity,
     final_order_quantity,
   };
@@ -395,8 +409,10 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
       "Onceki 60",
       "Son 60",
       "Son 120",
+      "Gunluk Talep",
       "Ihtiyac",
       "Tavsiye",
+      "15A Tahmini Ihtiyac",
     ];
     const rowsCsv = displayRows.map(({ row, metric, plan }) => [
       row.code,
@@ -409,8 +425,10 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
       metric.salesPrev60,
       metric.sales60,
       metric.sales120,
+      Number(plan.daily_demand.toFixed(4)),
       plan.base_order_quantity,
       plan.final_order_quantity,
+      plan.forecast_18m_need,
     ]);
     const escape = (value: string | number) => `"${String(value).replaceAll("\"", "\"\"")}"`;
     const csv = [headers.map(escape).join(","), ...rowsCsv.map((line) => line.map(escape).join(","))].join("\n");
@@ -628,6 +646,12 @@ export default function OrderPlanLiveTable({ rows, needOnly }: Props) {
                       ? "satis azaliyor"
                       : "stabil"}
                     )
+                  </div>
+                  <div className="text-[11px] text-black/70">
+                    Gunluk talep: {plan.daily_demand.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-xs font-semibold text-black/80">
+                    15A tahmini ihtiyac: {fmt(plan.forecast_18m_need)}
                   </div>
                   <div className="text-[10px] text-black/50">
                     Lead/Safety: {row.lead}g / {row.safety}g
