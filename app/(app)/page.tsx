@@ -46,7 +46,7 @@ export default async function DashboardPage() {
   const { data: shipments } = await supabase
     .from("shipments")
     .select(
-      "id, file_no, status, eta_current, atd_actual, warehouse_delivery_date, archived_at"
+      "id, file_no, status, eta_current, atd_actual, ata_actual, warehouse_delivery_date, archived_at"
     )
     .is("archived_at", null);
 
@@ -132,7 +132,9 @@ export default async function DashboardPage() {
       flags: getShipmentFlags(
         {
           eta_current: shipment.eta_current,
+          ata_actual: shipment.ata_actual,
           warehouse_delivery_date: shipment.warehouse_delivery_date,
+          status: shipment.status,
         },
         shipmentDocs,
         shipmentDocumentTypes

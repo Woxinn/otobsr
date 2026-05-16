@@ -569,76 +569,84 @@ export default function OrderDeclarationTryLab({
 
   return (
     <>
-      <div className="space-y-3">
-        <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">Masraf ve kur paneli</p>
+      <div className="space-y-2">
+        <div className="rounded-lg border border-amber-200 bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-800/70">Masraf ve kur paneli</p>
+              <p className="mt-1 text-xs text-black/50">Giderleri gir, TL maliyet dağılımı anında yenilensin.</p>
+            </div>
+            <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-950">
+              {orderCurrency} / TRY: {formatNumber(rate, 4)}
+            </span>
+          </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
-            <label className="block rounded-xl border border-black/10 bg-[var(--paper)]/70 px-3 py-2.5">
-              <span className="text-xs text-black/50">Navlun ({orderCurrency})</span>
+            <label className="block rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2">
+              <span className="text-xs font-semibold text-amber-900/70">Navlun ({orderCurrency})</span>
               <div className="mt-2 flex gap-2">
-                <input value={freightInput} onChange={(e) => setFreightInput(e.target.value)} inputMode="decimal" className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none" />
-                <select value={freightCurrency} onChange={(e) => setFreightCurrency(e.target.value)} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none">
+                <input value={freightInput} onChange={(e) => setFreightInput(e.target.value)} inputMode="decimal" className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-black outline-none" />
+                <select value={freightCurrency} onChange={(e) => setFreightCurrency(e.target.value)} className="rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm font-semibold text-black outline-none">
                   {manualCurrencyOptions.map((option) => (
                     <option key={`freight-${option}`} value={option}>{option}</option>
                   ))}
                 </select>
               </div>
             </label>
-            <label className="block rounded-xl border border-black/10 bg-[var(--paper)]/70 px-3 py-2.5">
-              <span className="text-xs text-black/50">Sigorta ({orderCurrency})</span>
+            <label className="block rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2">
+              <span className="text-xs font-semibold text-amber-900/70">Sigorta ({orderCurrency})</span>
               <div className="mt-2 flex gap-2">
-                <input value={insuranceInput} onChange={(e) => setInsuranceInput(e.target.value)} inputMode="decimal" className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none" />
-                <select value={insuranceCurrency} onChange={(e) => setInsuranceCurrency(e.target.value)} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none">
+                <input value={insuranceInput} onChange={(e) => setInsuranceInput(e.target.value)} inputMode="decimal" className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-black outline-none" />
+                <select value={insuranceCurrency} onChange={(e) => setInsuranceCurrency(e.target.value)} className="rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm font-semibold text-black outline-none">
                   {manualCurrencyOptions.map((option) => (
                     <option key={`insurance-${option}`} value={option}>{option}</option>
                   ))}
                 </select>
               </div>
             </label>
-            <label className="block rounded-xl border border-black/10 bg-[var(--paper)]/70 px-3 py-2.5">
-              <span className="text-xs text-black/50">Damga</span>
+            <label className="block rounded-lg border border-black/10 bg-[#fbfaf6] px-3 py-2">
+              <span className="text-xs font-semibold text-black/55">Damga</span>
               <div className="mt-2 flex gap-2">
-                <input value={stampTaxInput} onChange={(e) => setStampTaxInput(e.target.value)} inputMode="decimal" className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none" />
-                <select value={stampTaxCurrency} onChange={(e) => setStampTaxCurrency(e.target.value)} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none">
+                <input value={stampTaxInput} onChange={(e) => setStampTaxInput(e.target.value)} inputMode="decimal" className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-sm font-semibold text-black outline-none" />
+                <select value={stampTaxCurrency} onChange={(e) => setStampTaxCurrency(e.target.value)} className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm font-semibold text-black outline-none">
                   {manualCurrencyOptions.map((option) => (
                     <option key={`stamp-${option}`} value={option}>{option}</option>
                   ))}
                 </select>
               </div>
             </label>
-            <label className="block rounded-xl border border-black/10 bg-[var(--paper)]/70 px-3 py-2.5">
-              <span className="text-xs text-black/50">Depo</span>
+            <label className="block rounded-lg border border-black/10 bg-[#fbfaf6] px-3 py-2">
+              <span className="text-xs font-semibold text-black/55">Depo</span>
               <div className="mt-2 flex gap-2">
-                <input value={warehouseInput} onChange={(e) => setWarehouseInput(e.target.value)} inputMode="decimal" className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none" />
-                <select value={warehouseCurrency} onChange={(e) => setWarehouseCurrency(e.target.value)} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none">
+                <input value={warehouseInput} onChange={(e) => setWarehouseInput(e.target.value)} inputMode="decimal" className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-sm font-semibold text-black outline-none" />
+                <select value={warehouseCurrency} onChange={(e) => setWarehouseCurrency(e.target.value)} className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm font-semibold text-black outline-none">
                   {manualCurrencyOptions.map((option) => (
                     <option key={`warehouse-${option}`} value={option}>{option}</option>
                   ))}
                 </select>
               </div>
             </label>
-            <label className="block rounded-xl border border-black/10 bg-[var(--paper)]/70 px-3 py-2.5">
-              <span className="text-xs text-black/50">Banka</span>
+            <label className="block rounded-lg border border-black/10 bg-[#fbfaf6] px-3 py-2">
+              <span className="text-xs font-semibold text-black/55">Banka</span>
               <div className="mt-2 flex gap-2">
-                <input value={bankInput} onChange={(e) => setBankInput(e.target.value)} inputMode="decimal" className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none" />
-                <select value={bankCurrency} onChange={(e) => setBankCurrency(e.target.value)} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none">
+                <input value={bankInput} onChange={(e) => setBankInput(e.target.value)} inputMode="decimal" className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-sm font-semibold text-black outline-none" />
+                <select value={bankCurrency} onChange={(e) => setBankCurrency(e.target.value)} className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm font-semibold text-black outline-none">
                   {manualCurrencyOptions.map((option) => (
                     <option key={`bank-${option}`} value={option}>{option}</option>
                   ))}
                 </select>
               </div>
             </label>
-            <label className="block rounded-xl border border-black/10 bg-[var(--paper)]/70 px-3 py-2.5">
-              <span className="text-xs text-black/50">Diger + Kur</span>
+            <label className="block rounded-lg border border-black/10 bg-[#fbfaf6] px-3 py-2">
+              <span className="text-xs font-semibold text-black/55">Diger + Kur</span>
               <div className="mt-2 flex gap-2">
-                <input value={otherInput} onChange={(e) => setOtherInput(e.target.value)} inputMode="decimal" className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none" />
-                <select value={otherCurrency} onChange={(e) => setOtherCurrency(e.target.value)} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none">
+                <input value={otherInput} onChange={(e) => setOtherInput(e.target.value)} inputMode="decimal" className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-sm font-semibold text-black outline-none" />
+                <select value={otherCurrency} onChange={(e) => setOtherCurrency(e.target.value)} className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm font-semibold text-black outline-none">
                   {manualCurrencyOptions.map((option) => (
                     <option key={`other-${option}`} value={option}>{option}</option>
                   ))}
                 </select>
               </div>
-              <input value={rateInput} onChange={(e) => setRateInput(e.target.value)} inputMode="decimal" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black outline-none" />
+              <input value={rateInput} onChange={(e) => setRateInput(e.target.value)} inputMode="decimal" className="mt-2 w-full rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-sm font-semibold text-black outline-none" />
             </label>
           </div>
           <p className="mt-2 text-[11px] text-black/50">
@@ -646,25 +654,25 @@ export default function OrderDeclarationTryLab({
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {summaryCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-2xl border border-black/10 bg-white/95 p-3 shadow-[0_12px_30px_-24px_rgba(0,0,0,0.3)]"
+              className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 shadow-[0_12px_30px_-24px_rgba(0,0,0,0.3)]"
             >
-              <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">{card.label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-900/65">{card.label}</p>
               <p className="mt-2 text-lg font-semibold leading-tight text-black">{card.value}</p>
               <p className="mt-1 text-[11px] text-black/55">{card.hint}</p>
             </div>
           ))}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {taxBreakdownCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-2xl border border-black/10 bg-white/95 p-3 shadow-[0_12px_30px_-24px_rgba(0,0,0,0.25)]"
+              className="rounded-lg border border-black/10 bg-white/95 p-3 shadow-[0_12px_30px_-24px_rgba(0,0,0,0.25)]"
             >
-              <p className="text-[11px] uppercase tracking-[0.2em] text-black/40">{card.label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/40">{card.label}</p>
               <p className="mt-2 text-base font-semibold text-black">{card.value}</p>
               <p className="mt-1 text-[11px] text-black/55">{card.hint}</p>
             </div>
@@ -672,17 +680,17 @@ export default function OrderDeclarationTryLab({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
-        <div className="border-b border-black/8 px-5 py-4">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">GTIP bazlı hesap</p>
-          <h2 className="mt-2 text-lg font-semibold text-black">Beyanname GTIP toplamları (TL)</h2>
+      <div className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-sm">
+        <div className="border-b border-black/8 px-3 py-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-black/40">GTIP bazlı hesap</p>
+          <h2 className="mt-1 text-base font-semibold text-black">Beyanname GTIP toplamları (TL)</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-[2080px] table-fixed text-sm">
-            <thead className="bg-[var(--paper)]/80 text-left text-[11px] uppercase tracking-[0.18em] text-black/45">
+          <table className="min-w-[1840px] table-fixed text-xs">
+            <thead className="bg-[#fbfaf6] text-left text-[10px] uppercase tracking-[0.16em] text-black/45">
               <tr>
-                <th className="sticky left-0 z-20 w-[270px] border-b border-r border-black/8 bg-[var(--paper)]/95 px-4 py-3">GTIP</th>
-                <th className="w-[120px] border-b border-r border-black/8 px-3 py-3 text-right">Kalem</th>
+                <th className="sticky left-0 z-20 w-[240px] border-b border-r border-black/8 bg-[#fbfaf6] px-3 py-2">GTIP</th>
+                <th className="w-[90px] border-b border-r border-black/8 px-3 py-2 text-right">Kalem</th>
                 <th className="w-[90px] border-b border-r border-black/8 px-3 py-3 text-right">Adet</th>
                 <th className="w-[110px] border-b border-r border-black/8 px-3 py-3 text-right">Net kg</th>
                 <th className="w-[110px] border-b border-r border-black/8 px-3 py-3 text-right">Brut kg</th>
@@ -706,7 +714,7 @@ export default function OrderDeclarationTryLab({
             <tbody>
               {gtipRows.map((line, index) => (
                 <tr key={line.id} className={index % 2 === 0 ? "bg-white" : "bg-black/[0.015]"}>
-                  <td className="sticky left-0 z-10 border-b border-r border-black/8 bg-inherit px-4 py-4 align-top">
+                  <td className="sticky left-0 z-10 border-b border-r border-black/8 bg-inherit px-4 py-2.5 align-top">
                     <div className="space-y-1">
                       <p className="font-semibold text-black">{line.gtipCode}</p>
                       <p className="text-black/65">Toplam {formatNumber(line.lineCount, 0)} kalem</p>
@@ -724,17 +732,17 @@ export default function OrderDeclarationTryLab({
                       ) : null}
                     </div>
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.lineCount, 0)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.quantity, 0)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.netKg, 3)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatNumber(line.grossKg, 3)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatNumber(line.lineCount, 0)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatNumber(line.quantity, 0)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatNumber(line.netKg, 3)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatNumber(line.grossKg, 3)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">
                     {formatTry(line.quantity > 0 ? line.fobTotalTry / line.quantity : 0, 6)}
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.fobTotalTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.freightShareTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.insuranceShareTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatTry(line.fobTotalTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatTry(line.freightShareTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatTry(line.insuranceShareTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">
                     <div>
                       <p>{formatTry(line.customsBaseTry)}</p>
                       <p className="mt-1 text-[11px] text-black/45">CIF: {formatTry(line.cifTry)}</p>
@@ -742,9 +750,9 @@ export default function OrderDeclarationTryLab({
                       <p className="mt-1 text-[11px] text-black/45">Kural: max(CIF, Gozetim)</p>
                     </div>
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.extraCostShareTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.stampTaxShareTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatTry(line.extraCostShareTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatTry(line.stampTaxShareTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">
                     <div>
                       {formatTry(line.vatBaseTry)}
                       <p className="mt-1 text-[11px] text-black/45">Gumruk matrahi: {formatTry(line.customsBaseTry)}</p>
@@ -758,7 +766,7 @@ export default function OrderDeclarationTryLab({
                       ) : null}
                     </div>
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">
                     <div>
                       {formatTry(line.customsDutyTry)}
                       <p className="mt-1 text-[11px] text-black/45">
@@ -766,7 +774,7 @@ export default function OrderDeclarationTryLab({
                       </p>
                     </div>
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">
                     <div>
                       {formatTry(line.additionalDutyTry)}
                       <p className="mt-1 text-[11px] text-black/45">
@@ -774,8 +782,8 @@ export default function OrderDeclarationTryLab({
                       </p>
                     </div>
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">{formatTry(line.antiDumpingTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right">
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">{formatTry(line.antiDumpingTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right">
                     <div>
                       {formatTry(line.vatTry)}
                       <p className="mt-1 text-[11px] text-black/45">
@@ -783,9 +791,9 @@ export default function OrderDeclarationTryLab({
                       </p>
                     </div>
                   </td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right font-medium">{formatTry(line.totalTaxesTry)}</td>
-                  <td className="border-b border-r border-black/8 px-3 py-4 text-right font-semibold text-black">{formatTry(line.landedTotalTry)}</td>
-                  <td className="border-b border-black/8 px-3 py-4 text-right font-semibold text-black">
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right font-medium">{formatTry(line.totalTaxesTry)}</td>
+                  <td className="border-b border-r border-black/8 px-3 py-2.5 text-right font-semibold text-black">{formatTry(line.landedTotalTry)}</td>
+                  <td className="border-b border-black/8 px-3 py-2.5 text-right font-semibold text-black">
                     {formatTry(line.quantity > 0 ? line.landedTotalTry / line.quantity : 0, 6)}
                   </td>
                 </tr>
@@ -793,26 +801,26 @@ export default function OrderDeclarationTryLab({
             </tbody>
             <tfoot className="bg-[var(--paper)]/85">
               <tr className="font-semibold text-black">
-                <td className="sticky left-0 z-10 border-r border-t border-black/8 bg-[var(--paper)]/95 px-4 py-4">Toplam</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-black/50">-</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(gtipTotalsTry.quantity, 0)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(gtipTotalsTry.netKg, 3)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatNumber(gtipTotalsTry.grossKg, 3)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">-</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.fobTotalTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.freightShareTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.insuranceShareTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.customsBaseTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.extraCostShareTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.stampTaxShareTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.vatBaseTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.customsDutyTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.additionalDutyTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.antiDumpingTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.vatTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.totalTaxesTry)}</td>
-                <td className="border-r border-t border-black/8 px-3 py-4 text-right">{formatTry(gtipTotalsTry.landedTotalTry)}</td>
-                <td className="border-t border-black/8 px-3 py-4 text-right">
+                <td className="sticky left-0 z-10 border-r border-t border-black/8 bg-[var(--paper)]/95 px-4 py-2.5">Toplam</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-black/50">-</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatNumber(gtipTotalsTry.quantity, 0)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatNumber(gtipTotalsTry.netKg, 3)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatNumber(gtipTotalsTry.grossKg, 3)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">-</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.fobTotalTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.freightShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.insuranceShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.customsBaseTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.extraCostShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.stampTaxShareTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.vatBaseTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.customsDutyTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.additionalDutyTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.antiDumpingTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.vatTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.totalTaxesTry)}</td>
+                <td className="border-r border-t border-black/8 px-3 py-2.5 text-right">{formatTry(gtipTotalsTry.landedTotalTry)}</td>
+                <td className="border-t border-black/8 px-3 py-2.5 text-right">
                   {formatTry(gtipTotalsTry.quantity > 0 ? gtipTotalsTry.landedTotalTry / gtipTotalsTry.quantity : 0, 6)}
                 </td>
               </tr>
@@ -823,3 +831,4 @@ export default function OrderDeclarationTryLab({
     </>
   );
 }
+

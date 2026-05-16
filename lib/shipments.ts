@@ -17,7 +17,9 @@ const toDateOnly = (value: Date) =>
 export function getShipmentFlags(
   shipment: {
     eta_current: string | null;
+    ata_actual?: string | null;
     warehouse_delivery_date: string | null;
+    status?: string | null;
   },
   documents: DocumentItem[],
   documentTypes: DocumentType[]
@@ -50,15 +52,31 @@ export function getShipmentFlags(
       )
     : false;
 
+  const normalizedStatus = (shipment.status ?? "")
+    .toLowerCase()
+    .replaceAll("ı", "i")
+    .replaceAll("ğ", "g")
+    .replaceAll("ş", "s")
+    .replaceAll("ö", "o")
+    .replaceAll("ü", "u")
+    .replaceAll("ç", "c")
+    .trim();
+  const arrivalReached =
+    Boolean(shipment.ata_actual || shipment.warehouse_delivery_date) ||
+    ["gemiden indi", "gumrukte", "depoya teslim edildi", "teslim edildi", "tamamlandi"].includes(
+      normalizedStatus
+    );
+
   const etaApproaching =
     etaDate !== null &&
     etaDate.getTime() >= today.getTime() &&
-    etaDate.getTime() <= threeDaysLater.getTime();
+    etaDate.getTime() <= threeDaysLater.getTime() &&
+    !arrivalReached;
 
   const overdue =
     etaDate !== null &&
     etaDate.getTime() <= today.getTime() &&
-    !shipment.warehouse_delivery_date;
+    !arrivalReached;
 
   let risk = "Normal";
   if (overdue) {

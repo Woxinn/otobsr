@@ -111,7 +111,7 @@ export default async function ShipmentsPage({
   const { data: shipments } = await supabase
     .from("shipments")
     .select(
-      "id, file_no, reference, tags, eta_current, etd_planned, atd_actual, status, container_no, archived_at, warehouse_delivery_date, forwarders(name), origin_port:ports!origin_port_id(name), destination_port:ports!destination_port_id(name)"
+      "id, file_no, reference, tags, eta_current, etd_planned, atd_actual, ata_actual, status, container_no, archived_at, warehouse_delivery_date, forwarders(name), origin_port:ports!origin_port_id(name), destination_port:ports!destination_port_id(name)"
     )
     .order(sortConfig.column, { ascending: sortConfig.ascending, nullsFirst: false });
 
@@ -412,7 +412,9 @@ export default async function ShipmentsPage({
     const flags = getShipmentFlags(
       {
         eta_current: shipment.eta_current,
+        ata_actual: shipment.ata_actual,
         warehouse_delivery_date: shipment.warehouse_delivery_date,
+        status: shipment.status,
       },
       shipmentDocs,
       shipmentDocumentTypes
@@ -441,7 +443,9 @@ export default async function ShipmentsPage({
     const flags = getShipmentFlags(
       {
         eta_current: shipment.eta_current,
+        ata_actual: shipment.ata_actual,
         warehouse_delivery_date: shipment.warehouse_delivery_date,
+        status: shipment.status,
       },
       shipmentDocs,
       shipmentDocumentTypes

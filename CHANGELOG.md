@@ -2,6 +2,15 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.618 - 2026-05-15
+
+- Sipariş detay ekranı kompakt operasyon masası düzenine taşındı
+- Özet alanı mini header, yoğun metrik chip'leri ve daha sakin aksiyon bar yapısına çekildi
+- Durum akışı, eksik belge uyarıları ve sekme navigasyonu yeni dense tasarım diline hizalandı
+- Finans metrikleri operasyon bilgilerinden ayrışması için amber renk ailesine taşındı
+- Beyanname Lab ekranı finans odaklı kompakt header, amber metrikler, dense masraf paneli ve daha sıkı GTİP tablosuyla güncellendi
+- Dashboard ve shipment risk hesaplarında ATA girilmiş veya varış sonrası statüdeki kayıtların ETA gecikti/yaklaşıyor sayılması engellendi
+
 ## v0.3.617 - 2026-05-15
 
 - RFQ Excel export'a masraf yüzdesi, masraf dahil birim maliyet ve masraf dahil toplam maliyet kolonları eklendi

@@ -118,7 +118,9 @@ export default async function ShipmentDetailPage({
   const flags = getShipmentFlags(
     {
       eta_current: shipment.eta_current,
+      ata_actual: shipment.ata_actual,
       warehouse_delivery_date: shipment.warehouse_delivery_date,
+      status: shipment.status,
     },
     documents ?? [],
     shipmentDocumentTypes

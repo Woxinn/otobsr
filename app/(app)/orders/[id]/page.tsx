@@ -20,7 +20,20 @@ import { createOrderPayment, deleteOrderPayment } from "@/app/actions/order-paym
 import { deleteOrderDocument } from "@/app/actions/order-documents";
 import OrderDocumentUploader from "@/components/OrderDocumentUploader";
 import PaymentDocLink from "@/components/PaymentDocLink";
-import { Download } from "lucide-react";
+import {
+  ArrowLeft,
+  Boxes,
+  CalendarDays,
+  Download,
+  Edit3,
+  FileArchive,
+  FileText,
+  PackageCheck,
+  PackageSearch,
+  ReceiptText,
+  Ship,
+  WalletCards,
+} from "lucide-react";
 import DocumentDownloadButton from "@/components/DocumentDownloadButton";
 import type { Metadata } from "next";
 
@@ -818,273 +831,278 @@ export default async function OrderDetailPage({
 
   const docById = new Map((orderDocuments ?? []).map((d) => [d.id, d]));
   const docByPath = new Map((orderDocuments ?? []).map((d) => [d.storage_path, d]));
+  const supplierName =
+    suppliers?.find((supplier) => supplier.id === order.supplier_id)?.name ?? "-";
+  const shipmentLabel = linkedShipments.length
+    ? linkedShipments.map((item) => item.file_no ?? "Shipment").join(", ")
+    : "-";
+  const summaryChips = [
+    !isSales
+      ? { label: "Tedarikçi", value: supplierName, icon: FileText }
+      : null,
+    { label: "Adet", value: formatNumber(resolvedTotalQty, 0), icon: Boxes },
+    !isSales
+      ? { label: "Net kg", value: `${formatNumber(packingTotals.netWeight)} kg`, icon: PackageCheck }
+      : null,
+    canSeeFinance && !isSales
+      ? { label: "Toplam", value: formatMoney(order.total_amount ?? null, order.currency), icon: ReceiptText, tone: "finance" }
+      : null,
+    canSeeFinance && !isSales
+      ? { label: "Ödenen", value: formatMoney(paidTotal, order.currency), icon: WalletCards, tone: "finance" }
+      : null,
+    canSeeFinance && !isSales
+      ? { label: "Kalan", value: formatMoney(remainingTotal, order.currency), icon: WalletCards, tone: "finance" }
+      : null,
+    !isSales
+      ? { label: "Eksik belge", value: `${missingOrderTypes.length}`, icon: FileArchive }
+      : null,
+    !isSales ? { label: "Shipment", value: shipmentLabel, icon: Ship } : null,
+  ].filter(Boolean) as { label: string; value: string; icon: typeof FileText; tone?: "finance" }[];
+  const tabItems = isSales
+    ? [{ key: "products", label: "Ürünler", icon: PackageSearch }]
+    : [
+        { key: "products", label: "Ürünler", icon: PackageSearch },
+        { key: "packing", label: "Packing Listesi", icon: Boxes },
+        { key: "payments", label: "Ödemeler", icon: WalletCards },
+        { key: "documents", label: "Belgeler", icon: FileArchive },
+      ];
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-4">
       <OrderItemsToast orderId={order.id} />
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {canEditPage ? (
-          <>
+      <div className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
+              <span className="rounded-lg border border-black/10 bg-[#f7f3ea] px-2.5 py-1 text-black/60">
+                Sipariş
+              </span>
+              <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1">
+                #{order.id.slice(0, 8).toUpperCase()}
+              </span>
+              <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-800">
+                {orderStatusLabel}
+              </span>
+              {!isSales ? (
+                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1">
+                  {order.currency ?? "USD"}
+                </span>
+              ) : null}
+              <span className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1">
+                <CalendarDays size={13} /> Hazır: {order.expected_ready_date ?? "-"} · {readyCountdown}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1">
+                <Ship size={13} /> ETA: {formatDate(orderEta)}
+              </span>
+            </div>
+            <h1 className="mt-2 truncate text-2xl font-semibold text-black">
+              {order.name ?? "Sipariş"}
+            </h1>
+            <p className="mt-1 max-w-4xl truncate text-sm text-black/55">
+              {order.reference_name ?? order.notes ?? "Sipariş operasyon kaydı"}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
             <Link
-              href={`/orders/${order.id}/edit`}
-              className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
+              href="/orders"
+              className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-black/70 transition hover:border-black/30"
             >
-              Düzenle
+              <ArrowLeft size={14} /> Liste
             </Link>
-            <ConfirmActionForm
-              action={deleteOrder}
-              confirmText="Bu siparis silinsin mi? Bu islem geri alinamaz."
-              buttonText="Siparişi sil"
-            >
-              <input type="hidden" name="order_id" value={order.id} />
-            </ConfirmActionForm>
-          </>
-        ) : null}
-        <Link
-          href="/orders"
-          className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
-        >
-          Listeye dön
-        </Link>
-        {canEditPage ? (
-          <Link
-            href={`/api/export-gumruk?orderId=${order.id}`}
-            className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-md"
-            data-skip-route-loader
-          >
-            Gümrük Excel&apos;i indir
-          </Link>
-        ) : null}
-        {canEditPage ? (
-          <Link
-            href={`/api/orders/${order.id}/insurance-form`}
-            className="rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:shadow-md"
-            data-skip-route-loader
-          >
-            Navlun sigortası formu
-          </Link>
-        ) : null}
-        {canEditPage ? (
-          <Link
-            href={`/orders/${order.id}/insurance-mail`}
-            className="rounded-full border border-black/15 bg-[var(--sky)]/50 px-4 py-2 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            Sigorta e-postasi hazirla
-          </Link>
-        ) : null}
-        {canSeeFinance ? (
-          <Link
-            href={`/orders/${order.id}/beyanname`}
-            className="rounded-full border border-black/15 bg-[var(--mint)] px-4 py-2 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            Beyanname Lab
-          </Link>
-        ) : null}
-      </div>
-      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-black/40">Sipariş özeti</p>
-            <h3 className="text-2xl font-semibold">{order.name ?? "Sipariş"}</h3>
+            {canEditPage ? (
+              <Link
+                href={`/orders/${order.id}/edit`}
+                className="inline-flex items-center gap-1 rounded-lg bg-black px-3 py-2 text-white transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <Edit3 size={14} /> Düzenle
+              </Link>
+            ) : null}
+            {canEditPage ? (
+              <Link
+                href={`/api/export-gumruk?orderId=${order.id}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-[#f7f3ea] px-3 py-2 text-black transition hover:-translate-y-0.5 hover:shadow-md"
+                data-skip-route-loader
+              >
+                <Download size={14} /> Gümrük Excel
+              </Link>
+            ) : null}
+            {canEditPage ? (
+              <Link
+                href={`/api/orders/${order.id}/insurance-form`}
+                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-black/75 transition hover:border-black/30"
+                data-skip-route-loader
+              >
+                Navlun formu
+              </Link>
+            ) : null}
+            {canEditPage ? (
+              <Link
+                href={`/orders/${order.id}/insurance-mail`}
+                className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sky-900 transition hover:border-sky-300"
+              >
+                Sigorta mail
+              </Link>
+            ) : null}
+            {canSeeFinance ? (
+              <Link
+                href={`/orders/${order.id}/beyanname`}
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950 transition hover:border-amber-300"
+              >
+                Beyanname Lab
+              </Link>
+            ) : null}
+            {canEditPage ? (
+              <ConfirmActionForm
+                action={deleteOrder}
+                confirmText="Bu siparis silinsin mi? Bu islem geri alinamaz."
+                buttonText="Sil"
+              >
+                <input type="hidden" name="order_id" value={order.id} />
+              </ConfirmActionForm>
+            ) : null}
           </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {/* Sol: Sipariş bilgisi */}
-          <div className="rounded-2xl border border-black/10 bg-white/80 px-3 py-3 text-sm">
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-black/70">
-              {!isSales ? (
-                <>
-                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 font-semibold text-black/70">
-                    Tedarikçi:{" "}
-                    {suppliers?.find((supplier) => supplier.id === order.supplier_id)?.name ?? "-"}
-                  </span>
-                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 font-semibold text-black/70">
-                    Odeme: {order.payment_method ?? "-"}
-                  </span>
-                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 font-semibold text-black/70">
-                    Incoterm: {order.incoterm ?? "-"}
-                  </span>
-                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 font-semibold text-black/70">
-                    Konşimento No: {order.consignment_no ?? "-"}
-                  </span>
-                  <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                    Para birimi: {order.currency ?? "USD"}
-                  </span>
-                </>
-              ) : null}
-              <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                Adet: {formatNumber(resolvedTotalQty, 0)}
-              </span>
-              {!isSales ? (
-                <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                  Agirlik: {formatNumber(packingTotals.netWeight)} kg
-                </span>
-              ) : null}
-              <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                Liman varis: {formatDate(orderEta)}
-              </span>
-              {!isSales && insuranceTotals.amount > 0 ? (
-                <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                  Navlun sigortası: {formatMoney(insuranceTotals.amount, insuranceTotals.currency)}
-                </span>
-              ) : null}
-              {freightTotals.amount > 0 ? (
-                <span className="rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                  Navlun fatura: {formatMoney(freightTotals.amount, freightTotals.currency)}
-                </span>
-              ) : null}
-              {!isSales ? (
-                <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-black/20 bg-[var(--mint)]/60 px-3 py-1 text-[12px] font-semibold text-black">
-                  <span>Shipment:</span>
-                  {linkedShipments.length ? (
-                    linkedShipments.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={`/shipments/${item.id}`}
-                        className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--ocean)] underline-offset-2 hover:underline"
-                      >
-                        {item.file_no ?? "Shipment"}
-                      </Link>
-                    ))
-                  ) : (
-                    <span>-</span>
-                  )}
-                </span>
-              ) : null}
-                </div>
-              </div>
 
-              {/* Orta: Eksik belge + toplam */}
-              <div className="space-y-3">
-                {isSales ? null : (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-[11px]">Eksik belgeler</p>
-                      <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold">
-                        {missingOrderTypes.length}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {missingOrderTypes.length ? (
-                        missingOrderTypes.map((item) => (
-                          <span
-                            key={item}
-                            className="rounded-full border border-red-200 bg-white px-2 py-0.5 text-[11px] font-semibold"
-                          >
-                            {item}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-red-700/80">Eksik belge yok.</span>
-                      )}
-                    </div>
-                  </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+          {summaryChips.map((chip) => {
+            const Icon = chip.icon;
+            const isFinanceChip = chip.tone === "finance";
+            return (
+              <div
+                key={chip.label}
+                className={`min-w-0 rounded-lg border px-3 py-2 ${
+                  isFinanceChip
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-black/10 bg-[#fbfaf6]"
+                }`}
+              >
+                <div
+                  className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                    isFinanceChip ? "text-amber-800/70" : "text-black/40"
+                  }`}
+                >
+                  <Icon size={12} /> {chip.label}
+                </div>
+                <p
+                  className={`mt-1 truncate text-sm font-semibold ${
+                    isFinanceChip ? "text-amber-950" : "text-black/80"
+                  }`}
+                  title={chip.value}
+                >
+                  {chip.value}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {!isSales ? (
+          <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_1.4fr]">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold">Eksik belgeler</p>
+                <span className="rounded-md bg-white px-2 py-0.5 font-semibold">
+                  {missingOrderTypes.length}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {missingOrderTypes.length ? (
+                  missingOrderTypes.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-md border border-red-200 bg-white px-2 py-0.5 text-[11px] font-semibold"
+                    >
+                      {item}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-red-700/80">Eksik belge yok.</span>
                 )}
-
-                {canSeeFinance && !isSales ? (
-                  <div className="rounded-2xl border border-black/10 bg-[var(--sky)]/40 px-3 py-3 text-xs">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-black/40">Toplam tutar</p>
-                    <p className="mt-1 text-lg font-semibold text-black">
-                      {formatMoney(order.total_amount ?? null, order.currency)}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-[#1f3c88]">
-                      Ödenen: {formatMoney(paidTotal, order.currency)}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-[#8a1a1a]">
-                      Kalan: {formatMoney(remainingTotal, order.currency)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-black/60">Hazir: {order.expected_ready_date ?? "-"}</p>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Sağ: Siparis durumu */}
-              <div className="rounded-2xl border border-black/10 bg-white px-3 py-3 text-xs space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-black/50">Sipariş durumu</p>
-                  <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-[10px] font-semibold text-black/70">
-                    {orderStatusLabel}
-                  </span>
-                </div>
-                {!isSales ? (
-                  <form action={updateOrderStatus} className="flex flex-wrap gap-2 text-[11px]">
-                    <input type="hidden" name="order_id" value={order.id} />
-                    {orderStatusOptions.map((opt) => {
-                      const active = (order.order_status ?? "").toLowerCase() === opt.toLowerCase();
-                      return (
-                        <button
-                          key={opt}
-                          type="submit"
-                          name="order_status"
-                          value={opt}
-                          className={`rounded-full px-3 py-1.5 font-semibold transition ${
-                            active
-                              ? "bg-black text-white"
-                              : "border border-black/15 bg-white text-black/70 hover:border-black/40"
-                          }`}
-                        >
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </form>
-                ) : null}
               </div>
             </div>
 
-            {/* Adet/Ağırlık/Para birimi/Shipment chip'lere taşındı */}
+            <details className="rounded-lg border border-black/10 bg-white px-3 py-2 text-xs" open>
+              <summary className="cursor-pointer select-none font-semibold text-black/70">
+                Durum akışı · {orderStatusLabel}
+              </summary>
+              <form action={updateOrderStatus} className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                <input type="hidden" name="order_id" value={order.id} />
+                {orderStatusOptions.map((opt) => {
+                  const active = (order.order_status ?? "").toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="submit"
+                      name="order_status"
+                      value={opt}
+                      className={`rounded-lg px-2.5 py-1.5 font-semibold transition ${
+                        active
+                          ? "bg-black text-white"
+                          : "border border-black/10 bg-[#fbfaf6] text-black/65 hover:border-black/30"
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </form>
+            </details>
           </div>
+        ) : null}
+      </div>
 
-      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
-          <h3 className="text-lg font-semibold">Sipariş detayları</h3>
-          <div className="flex flex-wrap gap-2 text-sm">
-            {(isSales
-              ? [{ key: "products", label: "Ürünler" }]
-              : [
-                  { key: "products", label: "Ürünler" },
-                  { key: "packing", label: "Packing Listesi" },
-                  { key: "payments", label: "Odemeler" },
-                  { key: "documents", label: "Belgeler" },
-                ]
-            ).map((tab) => (
-              <Link
-                key={tab.key}
-                href={`/orders/${order.id}?tab=${tab.key}`}
-                className={`rounded-full px-4 py-2 text-xs font-semibold ${
-                  activeTab === tab.key
-                    ? "bg-[var(--ocean)] text-white"
-                    : "border border-black/10 bg-white text-black/70"
-                }`}
-              >
-                {tab.label}
-              </Link>
-            ))}
+      <div className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/35">
+              Operasyon kayıtları
+            </p>
+            <h3 className="text-lg font-semibold">Sipariş detayları</h3>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-sm">
+            {tabItems.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.key}
+                  href={`/orders/${order.id}?tab=${tab.key}`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                    activeTab === tab.key
+                      ? "bg-black text-white"
+                      : "border border-black/10 bg-white text-black/65 hover:border-black/30"
+                  }`}
+                >
+                  <Icon size={14} />
+                  {tab.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
         {activeTab === "products" ? (
-          <div className="mt-6 space-y-4 text-sm">
+          <div className="mt-4 space-y-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h4 className="text-lg font-semibold">Ürün kalemleri</h4>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
-                  <span>
-                    Toplam: {formatNumber(resolvedTotalQty, 0)} adet
-                    {isSales ? "" : ` | ${formatMoney(totalsAll.amount, order.currency)}`}
-                  </span>
-                    {canEditPage && orderItems?.length ? (
-                      <ConfirmActionForm
-                        action={deleteAllOrderItems}
-                        confirmText="Tum urun kalemleri silinsin mi?"
-                        buttonText="Tumunu sil"
-                        className="inline"
-                      >
-                        <input type="hidden" name="order_id" value={order.id} />
-                      </ConfirmActionForm>
-                    ) : null}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
+                <span>
+                  Toplam: {formatNumber(resolvedTotalQty, 0)} adet
+                  {isSales ? "" : ` | ${formatMoney(totalsAll.amount, order.currency)}`}
+                </span>
+                {canEditPage && orderItems?.length ? (
+                  <ConfirmActionForm
+                    action={deleteAllOrderItems}
+                    confirmText="Tum urun kalemleri silinsin mi?"
+                    buttonText="Tumunu sil"
+                    className="inline"
+                  >
+                    <input type="hidden" name="order_id" value={order.id} />
+                  </ConfirmActionForm>
+                ) : null}
               </div>
             </div>
-              <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm">
+            <div className="rounded-lg border border-black/10 bg-white p-4 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1">
                   {!isSales ? (
@@ -1162,7 +1180,7 @@ export default async function OrderDetailPage({
             {orderItems?.length ? (
               <div className="space-y-4">
                 {canEditPage && !isSales ? (
-                  <details className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
+                  <details className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                     <summary className="cursor-pointer select-none text-sm font-semibold text-[var(--ocean)]">
                       Hizli duzenlemeyi ac
                     </summary>
@@ -1183,7 +1201,7 @@ export default async function OrderDetailPage({
                     </div>
                   </details>
                 ) : null}
-              <div className="overflow-x-auto rounded-3xl border border-black/10 bg-white p-6 shadow-[0_24px_50px_-34px_rgba(15,61,62,0.6)]">
+              <div className="overflow-x-auto rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dashed border-black/10 pb-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">
@@ -1359,14 +1377,14 @@ export default async function OrderDetailPage({
               </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+              <div className="rounded-lg border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
                 Ürün kalemi bulunamadı. İlk ürünü ekleyin.
               </div>
             )}
 
             {!isSales ? (
               <div className="space-y-3">
-                <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm shadow-sm">
+                <div className="rounded-lg border border-black/10 bg-white p-4 text-sm shadow-sm">
                   <p className="text-base font-semibold">Katalogdan ürün ekle</p>
                   <p className="mt-1 text-xs text-black/60">
                     Mevcut ürün kodu / adı ile arayıp hızlıca satır ekleyin.
@@ -1381,7 +1399,7 @@ export default async function OrderDetailPage({
                 </div>
                 <form
                   action={completeSingleMissingProduct}
-                  className="rounded-2xl border border-black/10 bg-white p-4 text-sm shadow-sm"
+                  className="rounded-lg border border-black/10 bg-white p-4 text-sm shadow-sm"
                 >
                   <input type="hidden" name="order_id" value={order.id} />
                   <p className="text-base font-semibold">Yeni ürün oluştur + kalem ekle</p>
@@ -1422,7 +1440,7 @@ export default async function OrderDetailPage({
 
         {activeTab === "packing" ? (
           <>
-          <div className="mt-6 space-y-4 text-sm">
+          <div className="mt-4 space-y-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h4 className="text-lg font-semibold">Packing listesi</h4>
               <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
@@ -1434,7 +1452,7 @@ export default async function OrderDetailPage({
             </div>
 
             <div className="flex flex-wrap gap-3 md:flex-nowrap">
-              <div className="flex-1 min-w-[180px] rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
                   Koli
                 </p>
@@ -1443,7 +1461,7 @@ export default async function OrderDetailPage({
                 </p>
                 <p className="text-xs text-black/60">Toplam koli adedi</p>
               </div>
-              <div className="flex-1 min-w-[180px] rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
                   Net (kg)
                 </p>
@@ -1452,7 +1470,7 @@ export default async function OrderDetailPage({
                 </p>
                 <p className="text-xs text-black/60">Toplam net ağırlık</p>
               </div>
-              <div className="flex-1 min-w-[180px] rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
                   Brut (kg)
                 </p>
@@ -1461,7 +1479,7 @@ export default async function OrderDetailPage({
                 </p>
                 <p className="text-xs text-black/60">Toplam brüt ağırlık</p>
               </div>
-              <div className="flex-1 min-w-[180px] rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
                   CBM
                 </p>
@@ -1472,7 +1490,7 @@ export default async function OrderDetailPage({
               </div>
             </div>
 
-            <details className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+            <details className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
               <summary className="cursor-pointer text-sm font-semibold">
                 Toplamları düzenle
               </summary>
@@ -1546,7 +1564,7 @@ export default async function OrderDetailPage({
               </form>
             </details>
 
-            <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+            <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
@@ -1622,7 +1640,7 @@ export default async function OrderDetailPage({
           </div>
 
           {!isSales ? (
-          <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">Packing list import</p>
@@ -1638,7 +1656,7 @@ export default async function OrderDetailPage({
               </Link>
             </div>
 
-            <div className="rounded-2xl border border-black/10 bg-[var(--sand)]/60 p-3 text-xs text-black/70">
+            <div className="rounded-lg border border-black/10 bg-[var(--sand)]/60 p-3 text-xs text-black/70">
               <p className="font-semibold mb-1">Toplam özet</p>
               <div className="flex flex-wrap gap-4">
                 {(() => {
@@ -1666,7 +1684,7 @@ export default async function OrderDetailPage({
 
             {packingLists?.length ? (
               <div className="space-y-3">
-                <div className="overflow-auto rounded-2xl border border-black/10">
+                <div className="overflow-auto rounded-lg border border-black/10">
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--sky)]/50 text-left text-[11px] uppercase tracking-[0.2em] text-black/50">
                       <tr>
@@ -1711,7 +1729,7 @@ export default async function OrderDetailPage({
                   </table>
                 </div>
 
-                <details className="rounded-2xl border border-black/10 bg-[var(--mint)]/40 p-3">
+                <details className="rounded-lg border border-black/10 bg-[var(--mint)]/40 p-3">
                   <summary className="cursor-pointer text-xs font-semibold text-black/70 mb-2">
                     Ürün bazlı toplam
                   </summary>
@@ -1742,7 +1760,7 @@ export default async function OrderDetailPage({
                 </details>
               </div>
             ) : (
-              <div className="rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
+              <div className="rounded-lg border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
                 Henüz packing list importu yok.
               </div>
             )}
@@ -1752,7 +1770,7 @@ export default async function OrderDetailPage({
       ) : null}
 
       {activeTab === "payments" ? (
-          <div className="mt-6 space-y-4 text-sm">
+          <div className="mt-4 space-y-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h4 className="text-lg font-semibold">Odemeler</h4>
               <span className="text-xs text-black/60">
@@ -1760,7 +1778,7 @@ export default async function OrderDetailPage({
               </span>
             </div>
             {orderPayments?.length ? (
-              <div className="overflow-x-auto rounded-3xl border border-black/10 bg-white p-6 shadow-[0_24px_50px_-34px_rgba(15,61,62,0.6)]">
+              <div className="overflow-x-auto rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dashed border-black/10 pb-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">
@@ -1840,14 +1858,14 @@ export default async function OrderDetailPage({
                 </table>
               </div>
             ) : (
-              <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+              <div className="rounded-lg border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
                 Ödeme kaydı bulunamadı.
               </div>
             )}
 
             <form
               action={createOrderPayment}
-              className="rounded-2xl border border-dashed border-black/10 bg-white p-4 text-sm"
+              className="rounded-lg border border-dashed border-black/10 bg-white p-4 text-sm"
             >
               <input type="hidden" name="order_id" value={order.id} />
               <p className="font-semibold">Yeni odeme ekle</p>
@@ -1895,14 +1913,14 @@ export default async function OrderDetailPage({
         ) : null}
 
         {activeTab === "documents" ? (
-          <div className="mt-6 space-y-4 text-sm">
+          <div className="mt-4 space-y-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h4 className="text-lg font-semibold">Belgeler</h4>
               <span className="text-xs text-black/60">
                 {orderDocuments?.length ?? 0} belge
               </span>
             </div>
-            <div className="rounded-2xl border border-black/10 bg-[var(--sand)] px-4 py-3 text-xs text-black/70">
+            <div className="rounded-lg border border-black/10 bg-[var(--sand)] px-4 py-3 text-xs text-black/70">
               Eksik evraklar:{" "}
               {missingOrderTypes.length ? missingOrderTypes.join(", ") : "Yok"}
             </div>
@@ -1998,7 +2016,7 @@ export default async function OrderDetailPage({
                 </table>
               </div>
             ) : (
-              <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
+              <div className="rounded-lg border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
                 Belge bulunamadı.
               </div>
             )}
@@ -2014,6 +2032,7 @@ export default async function OrderDetailPage({
     </section>
   );
 }
+
 
 
 

@@ -4,6 +4,15 @@ import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import { fetchTcmbTryRate } from "@/lib/tcmb";
 import { resolveOrderItemWeights } from "@/lib/order-weight";
 import OrderDeclarationTryLab from "@/components/OrderDeclarationTryLab";
+import {
+  ArrowLeft,
+  Calculator,
+  Coins,
+  FileWarning,
+  Landmark,
+  PackageCheck,
+  Scale,
+} from "lucide-react";
 
 type RouteParams = {
   id: string;
@@ -540,110 +549,183 @@ export default async function OrderDeclarationLabPage({
   const initialTryRate = tcmbRate.rate && tcmbRate.rate > 0 ? tcmbRate.rate : 1;
   const summaryNet = weightResolution.totals.summaryNetKg;
   const summaryGross = weightResolution.totals.summaryGrossKg;
+  const labMetrics = [
+    {
+      label: "Sipariş toplamı",
+      value: formatMoney(order.total_amount, orderCurrency),
+      hint: orderCurrency,
+      icon: Coins,
+      tone: "finance",
+    },
+    {
+      label: "Satır",
+      value: formatNumber(lines.length, 0),
+      hint: `${formatNumber(totalQty, 0)} adet`,
+      icon: PackageCheck,
+    },
+    {
+      label: "Net / Brut",
+      value: `${formatNumber(summaryNet)} / ${formatNumber(summaryGross)} kg`,
+      hint: "Packing özeti",
+      icon: Scale,
+    },
+    {
+      label: "Navlun",
+      value: formatMoney(freightTotal, orderCurrency),
+      hint: "Belgeden okunan",
+      icon: Landmark,
+      tone: "finance",
+    },
+    {
+      label: "Sigorta",
+      value: formatMoney(insuranceTotal, orderCurrency),
+      hint: "Belgeden okunan",
+      icon: Landmark,
+      tone: "finance",
+    },
+    {
+      label: "Uyarı",
+      value: formatNumber(uniqueWarnings.length, 0),
+      hint: uniqueWarnings.length ? "Kontrol gerekli" : "Temiz",
+      icon: FileWarning,
+      tone: uniqueWarnings.length ? "warning" : undefined,
+    },
+  ];
 
   return (
-    <section className="space-y-6">
-      <div className="rounded-[28px] border border-black/10 bg-[linear-gradient(135deg,#f7faf9_0%,#eef6f3_60%,#f6f2e8_100%)] p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-black/45">
-              <span className="rounded-full bg-black/5 px-3 py-1">Prototype</span>
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-900">Beyanname Lab q9m2</span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-black">
-                {order.name ?? order.reference_name ?? "Siparis"}
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-black/60">
-                Urun bazli gumruk vergileri, ortak masraf dagitimi ve vergili maliyet prototipi.
-                Bu ekran izole kuruldu; begenilmezse tek route olarak kaldirilabilir.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs text-black/70">
-              <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
-                Tedarikci: {supplier?.name ?? "-"}
+    <section className="space-y-4">
+      <div className="rounded-lg border border-amber-200 bg-[linear-gradient(135deg,#fff8e7_0%,#fffaf1_56%,#f7f3ea_100%)] p-3 shadow-sm">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-900/60">
+              <span className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-1">Finans Lab</span>
+              <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-950">
+                <Calculator size={13} /> Beyanname
               </span>
-              <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
-                Siparis para birimi: {orderCurrency}
+              <span className="rounded-lg border border-black/10 bg-white/70 px-2.5 py-1 text-black/50">
+                {orderCurrency} / TRY
               </span>
-              <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
-                Oran ulkesi:{" "}
+              <span className="rounded-lg border border-black/10 bg-white/70 px-2.5 py-1 text-black/50">
+                TCMB: {formatNumber(initialTryRate, 4)} · {tcmbRate.date ?? "-"}
+              </span>
+            </div>
+            <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-black">
+              {order.name ?? order.reference_name ?? "Siparis"}
+            </h1>
+            <p className="mt-1 max-w-4xl truncate text-sm text-black/55">
+              Ürün bazlı gümrük vergileri, ortak masraf dağıtımı ve vergili maliyet çalışma alanı.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold text-black/60">
+              <span className="rounded-lg border border-black/10 bg-white/75 px-2.5 py-1">
+                Tedarikçi: {supplier?.name ?? "-"}
+              </span>
+              <span className="rounded-lg border border-black/10 bg-white/75 px-2.5 py-1">
+                Oran ülkesi:{" "}
                 {supplierCountryLabel
-                  ? `${supplierCountryLabel}${gtipRateById.size ? ` (${gtipRateById.size} GTIP ulke override)` : " (GTIP genel fallback)"}`
-                  : "GTIP genel (tedarikci ulkesi yok)"}
-              </span>
-              <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
-                Siparis toplami: {formatMoney(order.total_amount, orderCurrency)}
-              </span>
-              <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1">
-                Satir sayisi: {formatNumber(lines.length, 0)}
+                  ? `${supplierCountryLabel}${gtipRateById.size ? ` · ${gtipRateById.size} GTIP override` : " · genel fallback"}`
+                  : "GTIP genel"}
               </span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/orders/${order.id}`}
-              className="rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:shadow-sm"
+              className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-black/70 transition hover:border-black/30"
             >
-              Siparise don
+              <ArrowLeft size={14} /> Siparişe dön
             </Link>
           </div>
         </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          {labMetrics.map((metric) => {
+            const Icon = metric.icon;
+            const isFinance = metric.tone === "finance";
+            const isWarning = metric.tone === "warning";
+            return (
+              <div
+                key={metric.label}
+                className={`rounded-lg border px-3 py-2 ${
+                  isFinance
+                    ? "border-amber-300 bg-amber-100/70"
+                    : isWarning
+                    ? "border-red-200 bg-red-50"
+                    : "border-black/10 bg-white/75"
+                }`}
+              >
+                <div
+                  className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                    isFinance ? "text-amber-900/70" : isWarning ? "text-red-800/70" : "text-black/40"
+                  }`}
+                >
+                  <Icon size={12} /> {metric.label}
+                </div>
+                <p className="mt-1 truncate text-sm font-semibold text-black" title={metric.value}>
+                  {metric.value}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] text-black/50">{metric.hint}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+      <div className="grid gap-3 xl:grid-cols-[1.35fr_1fr]">
+        <details className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
+          <summary className="cursor-pointer select-none text-sm font-semibold text-black">
+            Hesap varsayımları ve dağıtım mantığı
+          </summary>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">Hesap varsayimlari</p>
+              <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-black/40">Hesap varsayımları</p>
               <h2 className="mt-2 text-lg font-semibold text-black">Dagitim ve vergi mantigi</h2>
             </div>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
             {[
               "Navlun once net agirlik, agirlik yoksa FOB payi ile dagitilir.",
               "Sigorta tum kalemlere FOB payi ile dagitilir.",
               "Vergi matrahi max(CIF, gozetim matrahi) olarak alinmistir.",
               "GV, ilave vergi, anti-damping ve KDV urun satirinda ayri ayri gosterilir.",
             ].map((item) => (
-              <div key={item} className="rounded-2xl border border-black/10 bg-[var(--paper)]/65 px-4 py-3 text-sm text-black/70">
+              <div key={item} className="rounded-lg border border-black/10 bg-[#fbfaf6] px-3 py-2 text-xs text-black/65">
                 {item}
               </div>
             ))}
           </div>
-        </div>
+        </details>
 
-        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-black/40">Kontrol ozeti</p>
-          <div className="mt-4 space-y-3 text-sm text-black/70">
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+        <div className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-black/40">Kontrol özeti</p>
+          <div className="mt-3 grid gap-2 text-xs text-black/70 sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-black/10 bg-[#fbfaf6] px-3 py-2">
               <span>Packing net agirlik</span>
               <span className="font-semibold text-black">{formatNumber(summaryNet)} kg</span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-black/10 bg-[#fbfaf6] px-3 py-2">
               <span>Packing brut agirlik</span>
               <span className="font-semibold text-black">{formatNumber(summaryGross)} kg</span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
               <span>Dokumandan gelen navlun</span>
               <span className="font-semibold text-black">{formatMoney(freightTotal, orderCurrency)}</span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/10 bg-[var(--paper)]/70 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
               <span>Dokumandan gelen sigorta</span>
               <span className="font-semibold text-black">{formatMoney(insuranceTotal, orderCurrency)}</span>
             </div>
           </div>
           {uniqueWarnings.length ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-800">
+            <details className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2" open>
+              <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-800">
                 Uyarilar
-              </p>
-              <ul className="mt-3 space-y-2 text-sm text-amber-900">
+              </summary>
+              <ul className="mt-2 space-y-1.5 text-xs text-amber-900">
                 {uniqueWarnings.map((warning) => (
                   <li key={warning}>- {warning}</li>
                 ))}
               </ul>
-            </div>
+            </details>
           ) : null}
         </div>
       </div>
