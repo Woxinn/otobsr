@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/api/mssql-bridge/agent/")) {
+  if (pathname.startsWith("/api/mssql-bridge/agent/") || pathname.startsWith("/api/poke/mcp")) {
     return NextResponse.next();
   }
 

@@ -2,6 +2,17 @@
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 
+## v0.3.620 - 2026-06-10
+
+- Poke entegrasyonu için read-only MCP endpoint altyapısı eklendi
+- MCP tool setine dashboard öncelikleri, geciken shipmentlar, ürün arama, tedarikçi açık siparişleri, RFQ eksik fiyatları ve sipariş ödeme özeti eklendi
+- MCP erişimi `POKE_MCP_API_KEY` ile korunacak, finans verileri varsayılan kapalı olacak şekilde yapılandırıldı
+
+## v0.3.619 - 2026-05-18
+
+- Ürünler modülüne seçili ürünleri Excel olarak dışa aktarma özelliği eklendi
+- Ürün export dosyasına ürün kodu, ürün adı, marka, stok/Netsis kodu, kategori, GTİP, fiyat ve nitelik alanları eklendi
+
 ## v0.3.618 - 2026-05-15
 
 - Sipariş detay ekranı kompakt operasyon masası düzenine taşındı
