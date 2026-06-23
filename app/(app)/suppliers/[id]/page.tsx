@@ -1,9 +1,10 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canViewFinance } from "@/lib/roles";
 import { updateSupplier } from "@/app/actions/master-data";
 import CountrySelect from "@/components/CountrySelect";
+import SupplierStatement from "@/components/SupplierStatement";
 import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -41,7 +42,7 @@ export default async function SupplierDetailPage({
 
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, name, payment_method, total_amount, currency, expected_ready_date, created_at, order_status")
+    .select("id, name, reference_name, payment_method, total_amount, currency, expected_ready_date, created_at, order_status")
     .eq("supplier_id", supplier.id)
     .order("created_at", { ascending: false });
 
@@ -84,7 +85,7 @@ export default async function SupplierDetailPage({
   const { data: orderPayments } = orderIds.length && canSeeFinance
     ? await supabase
         .from("order_payments")
-        .select("order_id, amount, status, currency")
+        .select("id, order_id, amount, status, currency, payment_date, method, notes, created_at")
         .in("order_id", orderIds)
     : { data: [] };
 
@@ -252,6 +253,71 @@ export default async function SupplierDetailPage({
         .map((rfq: any) => [String(rfq.id), rfq])
     ).values()
   );
+
+  // Cari Hesap Ekstresi için hareketleri birleştirip kronolojik bakiye hesaplayalım
+  const statementTransactions = (() => {
+    if (!isPriv || !canSeeFinance) return [];
+
+    const list: any[] = [];
+
+    // Siparişleri (Faturaları) ekle
+    (orders ?? []).forEach((order) => {
+      const date = order.created_at || order.expected_ready_date || new Date().toISOString();
+      list.push({
+        id: order.id,
+        date: new Date(date),
+        dateStr: date,
+        type: "order",
+        refNo: order.name || "Sipariş",
+        description: order.reference_name || "",
+        debit: Number(order.total_amount ?? 0),
+        credit: 0,
+        currency: order.currency || "USD",
+        link: `/orders/${order.id}`,
+      });
+    });
+
+    // Ödemeleri ekle (sadece Odendi durumundakiler bakiye etkiler)
+    (orderPayments ?? []).forEach((payment) => {
+      if (payment.status !== "Odendi") return;
+      const date = payment.payment_date || payment.created_at || new Date().toISOString();
+      const orderName = (orders ?? []).find(o => o.id === payment.order_id)?.name || "Sipariş";
+      list.push({
+        id: payment.id || Math.random().toString(),
+        date: new Date(date),
+        dateStr: date,
+        type: "payment",
+        refNo: `Ödeme (${payment.method ?? "-"})`,
+        description: `${orderName} ödemesi${payment.notes ? ` - ${payment.notes}` : ""}`,
+        debit: 0,
+        credit: Number(payment.amount ?? 0),
+        currency: payment.currency || "USD",
+        link: `/orders/${payment.order_id}`,
+      });
+    });
+
+    // Eskiden yeniye sıralayarak kümülatif bakiye hesapla
+    list.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let runningBalance = 0;
+    const finalTransactions = list.map((tx) => {
+      runningBalance += (tx.debit - tx.credit);
+      return {
+        id: tx.id,
+        dateStr: tx.dateStr,
+        type: tx.type,
+        refNo: tx.refNo,
+        description: tx.description,
+        debit: tx.debit,
+        credit: tx.credit,
+        currency: tx.currency,
+        runningBalance,
+        link: tx.link,
+      };
+    });
+
+    return finalTransactions;
+  })();
 
   return (
     <section className="space-y-6">
@@ -510,6 +576,10 @@ export default async function SupplierDetailPage({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {isPriv && canSeeFinance ? (
+        <SupplierStatement transactions={statementTransactions} supplierName={supplier.name} />
       ) : null}
 
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">

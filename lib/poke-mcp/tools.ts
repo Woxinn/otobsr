@@ -353,18 +353,28 @@ export async function searchProducts(
   input: { query?: string; limit?: number; include_finance?: boolean }
 ) {
   const limit = limitNumber(input.limit, 10, 30);
-  const query = normalizeSearch(input.query);
+  const query = input.query?.trim() ?? "";
+  const queryTokens = query
+    ? query
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+    : [];
 
   let builder = ctx.supabase
     .from("products")
-    .select("id, code, name, brand, netsis_stok_kodu, group_id, gtip_id, unit_price, created_at")
+    .select(
+      "id, code, name, brand, description, notes, netsis_stok_kodu, group_id, gtip_id, unit_price, created_at"
+    )
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (query) {
-    builder = builder.or(
-      `code.ilike.%${query}%,name.ilike.%${query}%,brand.ilike.%${query}%,netsis_stok_kodu.ilike.%${query}%`
-    );
+  if (queryTokens.length) {
+    queryTokens.forEach((term) => {
+      builder = builder.or(
+        `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
+      );
+    });
   }
 
   const { data: products, error } = await builder;

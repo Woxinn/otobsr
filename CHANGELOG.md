@@ -7,6 +7,7 @@ Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
 - Poke entegrasyonu için read-only MCP endpoint altyapısı eklendi
 - MCP tool setine dashboard öncelikleri, geciken shipmentlar, ürün arama, tedarikçi açık siparişleri, RFQ eksik fiyatları ve sipariş ödeme özeti eklendi
 - MCP erişimi `POKE_MCP_API_KEY` ile korunacak, finans verileri varsayılan kapalı olacak şekilde yapılandırıldı
+- Poke ürün arama tool'u ürünler modülündeki kelime bazlı arama mantığıyla hizalandı
 
 ## v0.3.619 - 2026-05-18
 

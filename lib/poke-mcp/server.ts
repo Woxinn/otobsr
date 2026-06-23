@@ -88,9 +88,9 @@ export function createPokeMcpServer(context: PokeMcpContext) {
     {
       title: "Search products",
       description:
-        "Searches products by product code, name, brand or Netsis stock code. Returns core fields and links.",
+        "Searches products with the same token-based search logic as the products module. Returns core fields and links.",
       inputSchema: {
-        query: z.string().optional().describe("Product code, name, brand or Netsis stock code."),
+        query: z.string().optional().describe("Product code, name, brand, description or notes."),
         limit: z.number().min(1).max(30).optional(),
         include_finance: z
           .boolean()
