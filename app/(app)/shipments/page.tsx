@@ -1,9 +1,23 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit } from "@/lib/roles";
 import { getShipmentFlags } from "@/lib/shipments";
 import { ShipmentArchiveButton } from "@/components/ShipmentArchiveButton";
+import {
+  Search,
+  Filter,
+  Ship,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  ArrowRight,
+  Plus,
+  FileSpreadsheet,
+  ChevronDown,
+  MapPin,
+  FileText,
+} from "lucide-react";
 
 type SearchParams = {
   q?: string;
@@ -453,345 +467,572 @@ export default async function ShipmentsPage({
     return { shipment, flags };
   });
 
+  const activeFilters: string[] = [];
+  if (resolvedParams.q) activeFilters.push(`Arama: "${resolvedParams.q}"`);
+  if (resolvedParams.forwarder) activeFilters.push(`Forwarder: ${resolvedParams.forwarder}`);
+  if (resolvedParams.risk) activeFilters.push(`Risk: ${resolvedParams.risk}`);
+  if (resolvedParams.origin) activeFilters.push(`Çıkış: ${resolvedParams.origin}`);
+  if (resolvedParams.destination) activeFilters.push(`Varış: ${resolvedParams.destination}`);
+  if (resolvedParams.etaFrom) activeFilters.push(`ETA Başlangıç: ${formatDate(resolvedParams.etaFrom)}`);
+  if (resolvedParams.etaTo) activeFilters.push(`ETA Bitiş: ${formatDate(resolvedParams.etaTo)}`);
+  if (resolvedParams.inSea === "1") activeFilters.push("Denizde");
+  if (resolvedParams.etaWeek === "1") activeFilters.push("Bu Hafta ETA");
+  if (resolvedParams.overdue === "1" || shipmentStatusFilter === "geciken") activeFilters.push("Geciken");
+  if (resolvedParams.missingDocs === "1") activeFilters.push("Evrak Eksik");
+  if (resolvedParams.archived === "only") activeFilters.push("Sadece Arşiv");
+  if (resolvedParams.archived === "all") activeFilters.push("Aktif + Arşiv");
+
   return (
-    <section className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-6 animate-fade-up">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-            Shipments listesi
-          </p>
-          <h2 className="text-2xl font-semibold [font-family:var(--font-display)]">
-            Konteyner bazli liste ve filtreleme
-          </h2>
-        </div>
-        {canEditPage ? (
-          <Link
-            href="/shipments/new"
-            className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white"
-          >
-            Yeni shipment
-          </Link>
-        ) : null}
-      </div>
-
-      <form className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-        <div className="grid gap-4 lg:grid-cols-4">
-          <label className="text-sm font-medium">
-            Arama
-            <input
-              name="q"
-              defaultValue={resolvedParams.q ?? ""}
-              placeholder="Dosya No, Konteyner No, Siparis"
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="text-sm font-medium">
-            Forwarder
-            <select
-              name="forwarder"
-              defaultValue={resolvedParams.forwarder ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              {forwarders?.map((forwarder) => (
-                <option key={forwarder.id} value={forwarder.name}>
-                  {forwarder.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            Risk
-            <select
-              name="risk"
-              defaultValue={resolvedParams.risk ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              <option value="Kritik">Kritik</option>
-              <option value="Uyari">Uyari</option>
-              <option value="Normal">Normal</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            Sıralama
-            <select
-              name="sort"
-              defaultValue={resolvedParams.sort ?? "eta"}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="created">Eklenme tarihi</option>
-              <option value="eta">ETA</option>
-              <option value="etd">ETD</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            Sıralama yönü
-            <select
-              name="sortDir"
-              defaultValue={resolvedParams.sortDir ?? (sortKey === "created" ? "desc" : "asc")}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="asc">Artan</option>
-              <option value="desc">Azalan</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            Çıkış limani
-            <select
-              name="origin"
-              defaultValue={resolvedParams.origin ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              {ports?.map((port) => (
-                <option key={port.id} value={port.name}>
-                  {port.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            Varış limanı
-            <select
-              name="destination"
-              defaultValue={resolvedParams.destination ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Hepsi</option>
-              {ports?.map((port) => (
-                <option key={port.id} value={port.name}>
-                  {port.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            ETA baslangic
-            <input
-              type="date"
-              name="etaFrom"
-              defaultValue={resolvedParams.etaFrom ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="text-sm font-medium">
-            ETA bitis
-            <input
-              type="date"
-              name="etaTo"
-              defaultValue={resolvedParams.etaTo ?? ""}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-            />
-          </label>
-          <div className="flex flex-col justify-end gap-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="inSea"
-                value="1"
-                defaultChecked={resolvedParams.inSea === "1"}
-              />
-              Denizde olanlar (ATD girildi)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="etaWeek"
-                value="1"
-                defaultChecked={resolvedParams.etaWeek === "1"}
-              />
-              Bu hafta ETA
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="overdue"
-                value="1"
-                defaultChecked={resolvedParams.overdue === "1"}
-              />
-              Geciken
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="missingDocs"
-                value="1"
-                defaultChecked={resolvedParams.missingDocs === "1"}
-              />
-              Evrak eksik
-            </label>
-            <label className="text-sm font-medium">
-              Arsiv
-              <select
-                name="archived"
-                defaultValue={resolvedParams.archived ?? ""}
-                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Sadece aktifler</option>
-                <option value="all">Tumu</option>
-                <option value="only">Sadece arsiv</option>
-              </select>
-            </label>
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--ocean)]/10 text-[var(--ocean)]">
+              <Ship className="h-5 w-5" />
+            </span>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-black/40">
+              Operasyon Yönetimi
+            </p>
           </div>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#1a1a1a] [font-family:var(--font-display)] md:text-3xl">
+            Sevkiyat Takip Paneli
+          </h2>
+          <p className="mt-1 text-sm text-black/50">
+            {enriched.length} sevkiyat listeleniyor • Konteyner bazlı takip ve dokümantasyon kontrolü
+          </p>
         </div>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-sm font-semibold text-white">
-            Filtrele
-          </button>
-          <Link
-            href="/shipments"
-            className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
-          >
-            Temizle
-          </Link>
-        </div>
-      </form>
-
-      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex justify-end">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Link
             href={exportUrl}
-            className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold"
+            className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-black/75 shadow-sm transition hover:bg-slate-50 hover:-translate-y-0.5"
           >
-            Export CSV
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            Dışa Aktar (CSV)
+          </Link>
+          {canEditPage && (
+            <Link
+              href="/shipments/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--ocean)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black hover:-translate-y-0.5"
+            >
+              <Plus className="h-4 w-4" />
+              Yeni Sevkiyat Ekle
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-black/8 bg-white/70 shadow-sm backdrop-blur">
+        <form className="p-4 md:p-6">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <span className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-black/40">
+                <Search className="h-4.5 w-4.5" />
+              </span>
+              <input
+                name="q"
+                defaultValue={resolvedParams.q ?? ""}
+                placeholder="Dosya No, Konteyner No veya Sipariş adı ile arayın..."
+                className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[var(--ocean)] focus:ring-2 focus:ring-[var(--ocean)]/10"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                className="rounded-xl bg-[var(--ocean)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-black transition cursor-pointer"
+              >
+                Ara
+              </button>
+              <Link
+                href="/shipments"
+                className="rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-slate-50 transition"
+              >
+                Temizle
+              </Link>
+            </div>
+          </div>
+
+          <details className="group mt-4 border-t border-black/5 pt-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--ocean)] hover:text-black select-none">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3.5 w-3.5" />
+                <span>GELİŞMİŞ FİLTRELER</span>
+                {activeFilters.length > 0 && (
+                  <span className="ml-2 rounded-full bg-[var(--ocean)]/10 px-2 py-0.5 text-[10px] text-[var(--ocean)] font-bold">
+                    {activeFilters.length} aktif
+                  </span>
+                )}
+              </div>
+              <span className="transition-transform duration-250 group-open:rotate-180">
+                <ChevronDown className="h-4 w-4" />
+              </span>
+            </summary>
+            
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 text-sm">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Forwarder</label>
+                <select
+                  name="forwarder"
+                  defaultValue={resolvedParams.forwarder ?? ""}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                >
+                  <option value="">Tümü</option>
+                  {forwarders?.map((forwarder) => (
+                    <option key={forwarder.id} value={forwarder.name}>
+                      {forwarder.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Risk Seviyesi</label>
+                <select
+                  name="risk"
+                  defaultValue={resolvedParams.risk ?? ""}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                >
+                  <option value="">Tümü</option>
+                  <option value="Kritik">Kritik (Geciken)</option>
+                  <option value="Uyari">Uyarı</option>
+                  <option value="Normal">Normal</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Çıkış Limanı</label>
+                <select
+                  name="origin"
+                  defaultValue={resolvedParams.origin ?? ""}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                >
+                  <option value="">Tümü</option>
+                  {ports?.map((port) => (
+                    <option key={port.id} value={port.name}>
+                      {port.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Varış Limanı</label>
+                <select
+                  name="destination"
+                  defaultValue={resolvedParams.destination ?? ""}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                >
+                  <option value="">Tümü</option>
+                  {ports?.map((port) => (
+                    <option key={port.id} value={port.name}>
+                      {port.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Sıralama Kriteri</label>
+                <select
+                  name="sort"
+                  defaultValue={resolvedParams.sort ?? "eta"}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                >
+                  <option value="eta">ETA (Tahmini Varış)</option>
+                  <option value="etd">ETD (Planlanan Kalkış)</option>
+                  <option value="created">Oluşturulma Tarihi</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Sıralama Yönü</label>
+                <select
+                  name="sortDir"
+                  defaultValue={resolvedParams.sortDir ?? (sortKey === "created" ? "desc" : "asc")}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                >
+                  <option value="asc">Artan</option>
+                  <option value="desc">Azalan</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">ETA Başlangıç</label>
+                <input
+                  type="date"
+                  name="etaFrom"
+                  defaultValue={resolvedParams.etaFrom ?? ""}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">ETA Bitiş</label>
+                <input
+                  type="date"
+                  name="etaTo"
+                  defaultValue={resolvedParams.etaTo ?? ""}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Arşiv Durumu</label>
+                <select
+                  name="archived"
+                  defaultValue={resolvedParams.archived ?? ""}
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--ocean)]"
+                >
+                  <option value="">Sadece Aktifler</option>
+                  <option value="all">Tümü (Aktif + Arşiv)</option>
+                  <option value="only">Sadece Arşiv</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2 md:col-span-3 lg:col-span-3 mt-2">
+                <span className="block text-xs font-bold text-black/40 uppercase tracking-wider mb-2">Durum Filtreleri</span>
+                <div className="flex flex-wrap gap-x-5 gap-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-black/70 hover:text-black">
+                    <input
+                      type="checkbox"
+                      name="inSea"
+                      value="1"
+                      defaultChecked={resolvedParams.inSea === "1"}
+                      className="rounded border-black/10 text-[var(--ocean)] focus:ring-[var(--ocean)]"
+                    />
+                    Denizde Olanlar (ATD girilmiş)
+                  </label>
+                  
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-black/70 hover:text-black">
+                    <input
+                      type="checkbox"
+                      name="etaWeek"
+                      value="1"
+                      defaultChecked={resolvedParams.etaWeek === "1"}
+                      className="rounded border-black/10 text-[var(--ocean)] focus:ring-[var(--ocean)]"
+                    />
+                    Bu Hafta ETA
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-black/70 hover:text-black">
+                    <input
+                      type="checkbox"
+                      name="overdue"
+                      value="1"
+                      defaultChecked={resolvedParams.overdue === "1"}
+                      className="rounded border-black/10 text-[var(--ocean)] focus:ring-[var(--ocean)]"
+                    />
+                    Gecikmiş Sevkiyatlar
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-black/70 hover:text-black">
+                    <input
+                      type="checkbox"
+                      name="missingDocs"
+                      value="1"
+                      defaultChecked={resolvedParams.missingDocs === "1"}
+                      className="rounded border-black/10 text-[var(--ocean)] focus:ring-[var(--ocean)]"
+                    />
+                    Kritik Evrakı Eksik
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-end gap-2 border-t border-black/5 pt-4">
+              <button
+                type="submit"
+                className="rounded-lg bg-[var(--ocean)] px-4 py-2 text-xs font-bold text-white hover:bg-black transition cursor-pointer"
+              >
+                Filtreleri Uygula
+              </button>
+            </div>
+          </details>
+        </form>
+      </div>
+
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--sand)]/30 border border-[var(--sand)]/60 px-4 py-2.5 text-xs text-[#5c4a22]">
+          <span className="font-bold uppercase tracking-wider text-[10px] text-black/55 mr-1">Aktif Filtreler:</span>
+          {activeFilters.map((filter, index) => (
+            <span key={index} className="rounded-lg bg-white/70 border border-black/5 px-2.5 py-1 font-semibold shadow-xs">
+              {filter}
+            </span>
+          ))}
+          <Link
+            href="/shipments"
+            className="ml-auto font-bold text-[var(--ocean)] hover:underline flex items-center gap-1 text-[11px]"
+          >
+            Tümünü Sıfırla
           </Link>
         </div>
-        <div className="grid gap-5 text-sm">
-          {enriched.length ? (
-            enriched.map(({ shipment, flags }) => (
+      )}
+
+      <div className="space-y-4">
+        {enriched.length ? (
+          enriched.map(({ shipment, flags }) => {
+            const missingDocsTotal = flags.missingRequiredCount + (orderMissingByShipment.get(shipment.id) ?? 0);
+            
+            let borderAccent = "border-l-[var(--ocean)]";
+            let dotColor = "bg-[var(--ocean)]";
+            let riskBadgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
+            if (flags.risk === "Kritik") {
+              borderAccent = "border-l-red-500";
+              dotColor = "bg-red-500 animate-pulse";
+              riskBadgeStyle = "bg-red-50 text-red-700 border-red-200";
+            } else if (flags.risk === "Uyari") {
+              borderAccent = "border-l-amber-500";
+              dotColor = "bg-amber-500";
+              riskBadgeStyle = "bg-amber-50 text-amber-700 border-amber-200";
+            } else if (shipment.atd_actual && !shipment.ata_actual) {
+              borderAccent = "border-l-emerald-500";
+              dotColor = "bg-emerald-500";
+            }
+
+            const normStatus = normalizeStatus(shipment.status);
+            const statusSteps = [
+              { label: "Planlandı", active: true },
+              { label: "Kalkış", active: Boolean(shipment.atd_actual) },
+              { label: "Denizde", active: Boolean(shipment.atd_actual && !shipment.ata_actual) || ["denizde"].includes(normStatus) },
+              { label: "Varış", active: Boolean(shipment.ata_actual) || ["gemiden indi", "gumrukte", "depoya teslim edildi", "teslim edildi", "tamamlandi"].includes(normStatus) },
+              { label: "Gümrük", active: ["gumrukte", "depoya teslim edildi", "teslim edildi", "tamamlandi"].includes(normStatus) },
+              { label: "Depoda", active: Boolean(shipment.warehouse_delivery_date) || ["depoya teslim edildi", "teslim edildi", "tamamlandi"].includes(normStatus) },
+            ];
+
+            const forwarderDisplay = Array.isArray(shipment.forwarders)
+              ? shipment.forwarders[0]?.name
+              : (shipment.forwarders as any)?.name ?? "-";
+            const originPortDisplay = Array.isArray(shipment.origin_port)
+              ? shipment.origin_port[0]?.name
+              : (shipment.origin_port as any)?.name ?? "-";
+            const destPortDisplay = Array.isArray(shipment.destination_port)
+              ? shipment.destination_port[0]?.name
+              : (shipment.destination_port as any)?.name ?? "-";
+
+            return (
               <div
                 key={shipment.id}
-                className={`rounded-3xl border border-black/10 p-5 shadow-sm ${
-                  flags.overdue
-                    ? "bg-[#f7d6d6]"
-                    : flags.etaApproaching
-                    ? "bg-[#f6edcf]"
-                    : "bg-white"
-                }`}
+                className={`rounded-2xl border border-black/10 bg-white/95 p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-black/15 ${borderAccent} border-l-4`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.25em] text-black/45">
-                      Shipment
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-3">
-                      <span className="text-lg font-semibold">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-[var(--ocean)]/5 px-2.5 py-1 text-xs font-bold text-[var(--ocean)]">
+                        <Ship className="h-3.5 w-3.5" />
                         {shipment.file_no}
                       </span>
-                      <span className="text-sm text-black/60">
-                        Konşimento No: {shipment.reference ?? "-"}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                      {shipment.archived_at ? (
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                          Arsivde
+                      {shipment.reference && (
+                        <span className="text-xs font-semibold text-black/50">
+                          Konşimento: <span className="text-black/80 font-bold">{shipment.reference}</span>
                         </span>
-                      ) : null}
-                      <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 font-semibold">
-                        ETA: {formatDate(shipment.eta_current)}
-                      </span>
-                      <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 font-semibold">
-                        Durum: {shipment.status ?? "-"}
-                      </span>
-                      <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 font-semibold">
-                        Risk: {flags.risk}
-                      </span>
-                      <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 font-semibold">
-                        Evrak:{" "}
-                        {flags.missingRequiredCount +
-                          (orderMissingByShipment.get(shipment.id) ?? 0) >
-                        0
-                          ? `${
-                              flags.missingRequiredCount +
-                              (orderMissingByShipment.get(shipment.id) ?? 0)
-                            } eksik`
-                          : flags.hasProblematic
-                          ? "Sorunlu"
-                          : "Tamam"}
+                      )}
+                      {shipment.container_no && (
+                        <span className="rounded-md border border-black/10 bg-slate-50 px-2 py-0.5 text-[10px] font-mono font-bold text-black/60">
+                          {shipment.container_no}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-black/60">
+                      {forwarderDisplay && (
+                        <span className="font-semibold text-black/85">
+                          {forwarderDisplay}
+                        </span>
+                      )}
+                      <span>•</span>
+                      <span className="flex items-center gap-1 font-medium">
+                        <MapPin className="h-3 w-3 text-black/40" />
+                        {originPortDisplay} → {destPortDisplay}
                       </span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-3 text-xs text-black/60">
-                    <div className="rounded-2xl border border-black/10 bg-white/70 px-4 py-2">
-                      <p className="uppercase tracking-[0.2em] text-black/40">
-                        Toplamlar
-                      </p>
-                      <p className="mt-1 text-xs text-black/70">
-                        {formatNumber(orderTotalsByShipment.get(shipment.id)?.weight ?? 0)} kg |{" "}
-                        {formatMoney(orderTotalsByShipment.get(shipment.id)?.amount ?? 0, "USD")}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/shipments/${shipment.id}`}
-                        className="rounded-full border border-black/20 px-4 py-1 text-xs font-semibold"
-                      >
-                        Detay
-                      </Link>
-                      {canEditPage ? (
-                        <ShipmentArchiveButton
-                          shipmentId={shipment.id}
-                          archived={Boolean(shipment.archived_at)}
-                        />
-                      ) : null}
-                    </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {shipment.archived_at && (
+                      <span className="rounded-lg border border-emerald-100 bg-emerald-50/50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                        Arşivde
+                      </span>
+                    )}
+
+                    <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${riskBadgeStyle}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                      Risk: {flags.risk}
+                    </span>
+
+                    {missingDocsTotal > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        {missingDocsTotal} Eksik Evrak
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Evraklar Tam
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-black/10 bg-[var(--sky)]/30 px-4 py-3">
-                  <div className="grid grid-cols-[1.8fr_0.8fr_0.9fr] gap-3 text-xs uppercase tracking-[0.2em] text-black/40">
-                    <span>Siparis</span>
-                    <span>Kg</span>
-                    <span>Tutar (USD)</span>
+                <div className="mt-5 rounded-xl border border-black/5 bg-slate-50/50 px-4 py-3">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-black/40">
+                    <span className="uppercase tracking-wider">Lojistik İlerleme Durumu</span>
+                    <span className="rounded-full bg-[var(--ocean)]/10 px-2.5 py-0.5 text-xs text-[var(--ocean)] font-bold">
+                      {shipment.status ?? "Planlandı"}
+                    </span>
                   </div>
-                  <div className="mt-2 space-y-2">
-                    {(ordersByShipment.get(shipment.id) ?? []).length ? (
-                      (ordersByShipment.get(shipment.id) ?? []).flatMap(
-                        (row) => {
+                  <div className="mt-3 flex items-center">
+                    {statusSteps.map((step, idx) => {
+                      const isLast = idx === statusSteps.length - 1;
+                      return (
+                        <div key={step.label} className="flex flex-1 items-center">
+                          <div className="flex flex-col items-center flex-1">
+                            <div className="relative w-full flex items-center justify-center">
+                              {!isLast && (
+                                <div
+                                  className={`absolute left-[50%] right-[-50%] top-[4px] h-[3px] -translate-y-1/2 transition-colors duration-300 ${
+                                    step.active && statusSteps[idx + 1]?.active
+                                      ? "bg-[var(--ocean)]"
+                                      : "bg-black/10"
+                                  }`}
+                                />
+                              )}
+                              <div
+                                className={`relative z-10 h-2.5 w-2.5 rounded-full border-2 transition-all duration-300 ${
+                                  step.active
+                                    ? "border-[var(--ocean)] bg-[var(--ocean)] scale-110 shadow-xs"
+                                    : "border-black/20 bg-white"
+                                }`}
+                                title={step.label}
+                              />
+                            </div>
+                            <span
+                              className={`mt-1.5 text-[9px] font-bold tracking-tight hidden sm:block ${
+                                step.active ? "text-[var(--ocean)] font-extrabold" : "text-black/35"
+                              }`}
+                            >
+                              {step.label}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                  <div className="rounded-xl border border-black/5 bg-white p-3 lg:col-span-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-2">Sevkiyat Siparişleri</p>
+                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                      {(ordersByShipment.get(shipment.id) ?? []).length ? (
+                        (ordersByShipment.get(shipment.id) ?? []).flatMap((row) => {
                           const orderList = row.orders
                             ? Array.isArray(row.orders)
                               ? row.orders
                               : [row.orders]
                             : [];
-                          return orderList.map((order) => (
-                            <div
-                              key={`${shipment.id}-${order.id}`}
-                              className="grid grid-cols-[1.8fr_0.8fr_0.9fr] gap-3 rounded-xl border border-black/10 bg-white px-3 py-2 text-xs"
-                            >
-                              <Link
-                                href={`/orders/${order.id}`}
-                                className="font-semibold text-[var(--ocean)] hover:underline"
+                          return orderList.map((order) => {
+                            const orderDocs = orderDocumentsByOrder.get(order.id) ?? [];
+                            const orderMissingCount = requiredOrderTypes.filter((type) => {
+                              const hasReceived = orderDocs.some(
+                                (doc) => doc.document_type_id === type.id && doc.status === "Geldi"
+                              );
+                              return !hasReceived;
+                            }).length;
+
+                            return (
+                              <div
+                                key={`${shipment.id}-${order.id}`}
+                                className="flex items-center justify-between rounded-lg border border-black/5 bg-slate-50/40 p-2 text-xs hover:bg-slate-50 transition"
                               >
-                                {order.name ?? order.reference_name ?? "-"}
-                              </Link>
-                              <span>{formatNumber(order.weight_kg)}</span>
-                              <span>{formatMoney(order.total_amount ?? null, order.currency)}</span>
-                            </div>
-                          ));
-                        }
-                      )
-                    ) : (
-                      <div className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black/60">
-                        Bu shipment icin siparis secilmedi.
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-3.5 w-3.5 text-black/35" />
+                                  <Link
+                                    href={`/orders/${order.id}`}
+                                    className="font-bold text-[var(--ocean)] hover:underline"
+                                  >
+                                    {order.name ?? order.reference_name ?? "-"}
+                                  </Link>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-black/50 font-medium">{formatNumber(order.weight_kg)} kg</span>
+                                  <span className="font-bold text-black/75">
+                                    {formatMoney(order.total_amount ?? null, order.currency)}
+                                  </span>
+                                  {orderMissingCount > 0 && (
+                                    <span className="rounded bg-red-50 border border-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-600">
+                                      {orderMissingCount} eksik evrak
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-black/10 py-3 text-center text-xs text-black/40 font-medium">
+                          Bu sevkiyata atanmış sipariş bulunamadı.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-between rounded-xl border border-black/5 bg-slate-50/30 p-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-2">Tarih & Yük Özeti</p>
+                      <div className="space-y-1.5 text-xs text-black/70">
+                        <div className="flex justify-between">
+                          <span className="text-black/55 font-medium">Planlanan ETA:</span>
+                          <span className="font-bold text-black/90 flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-black/30" />
+                            {formatDate(shipment.eta_current)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-black/55 font-medium">Toplam Ağırlık:</span>
+                          <span className="font-bold text-black/90">
+                            {formatNumber(orderTotalsByShipment.get(shipment.id)?.weight ?? 0)} kg
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-black/55 font-medium">Toplam Değer:</span>
+                          <span className="font-bold text-[var(--ocean)]">
+                            {formatMoney(orderTotalsByShipment.get(shipment.id)?.amount ?? 0, "USD")}
+                          </span>
+                        </div>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-end gap-2 border-t border-black/5 pt-2">
+                      {canEditPage && (
+                        <ShipmentArchiveButton
+                          shipmentId={shipment.id}
+                          archived={Boolean(shipment.archived_at)}
+                        />
+                      )}
+                      <Link
+                        href={`/shipments/${shipment.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--ocean)] px-3 py-1.5 text-xs font-bold text-white hover:bg-black transition"
+                      >
+                        Detaylar
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-6 text-sm text-black/70">
-              Filtrelere uygun shipment bulunamadi.
+            );
+          })
+        ) : (
+          <div className="rounded-2xl border border-black/10 bg-white p-10 text-center shadow-xs">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+              <Ship className="h-6 w-6" />
             </div>
-          )}
-        </div>
+            <h3 className="mt-3 text-sm font-semibold text-black/80">Sevkiyat Bulunamadı</h3>
+            <p className="mt-1 text-xs text-black/50">
+              Filtrelere uygun sevkiyat kaydı bulunmamaktadır. Lütfen arama kriterlerini güncelleyin.
+            </p>
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 }
-
-
-
-

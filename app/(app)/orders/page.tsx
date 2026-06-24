@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import {
@@ -11,6 +11,15 @@ import {
   Search,
   Ship,
   WalletCards,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  DollarSign,
+  ChevronDown,
+  ArrowRight,
+  Plus,
+  FileText,
+  FileSpreadsheet
 } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit, canViewFinance } from "@/lib/roles";
@@ -610,112 +619,170 @@ export default async function OrdersPage({
       : []),
   ];
 
+  const getStatusBadgeStyle = (status: string | null | undefined) => {
+    const s = (status ?? "").toLowerCase().trim();
+    if (s.includes("verildi") || s.includes("proforma")) {
+      return "bg-indigo-50/70 text-indigo-700 border-indigo-200/50";
+    }
+    if (s.includes("uretim") || s.includes("hazir")) {
+      if (s.includes("hazir")) {
+        return "bg-emerald-50/70 text-emerald-700 border-emerald-200/50";
+      }
+      return "bg-amber-50/70 text-amber-700 border-amber-200/50";
+    }
+    if (s.includes("liman") || s.includes("deniz")) {
+      return "bg-cyan-50/70 text-cyan-700 border-cyan-200/50";
+    }
+    if (s.includes("gumruk")) {
+      return "bg-rose-50/70 text-rose-700 border-rose-200/50";
+    }
+    if (s.includes("depo") || s.includes("teslim")) {
+      return "bg-slate-100/70 text-slate-700 border-slate-300/50";
+    }
+    return "bg-slate-50/70 text-slate-600 border-slate-200/50";
+  };
+
   return (
-    <section className="space-y-5">
-        <OrdersToast />
+    <section className="space-y-6 animate-fade-up">
+      <OrdersToast />
 
-        <div className="rounded-lg border border-black/10 bg-[#101817] p-5 text-white shadow-[0_24px_70px_-50px_rgba(16,24,23,0.9)]">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-[11px] uppercase tracking-[0.32em] text-white/40">
-                Sipariş Operasyonları
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold leading-tight [font-family:var(--font-display)]">
-                Siparişler
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/60">
-                ETA, sevkiyat, ödeme, evrak ve üretim durumunu tek listede takip edin.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {!isSales ? (
-                <Link href="/api/orders/items-export" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20">
-                  <Download className="h-4 w-4" />
-                  Kalem Export
-                </Link>
-              ) : null}
-              {canEditPage ? (
-                <Link href="/orders/new" className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-teal-950 transition hover:-translate-y-0.5">
-                  <FilePlus className="h-4 w-4" />
-                  Yeni Sipariş
-                </Link>
-              ) : null}
-              <Link
-                href={archivedMode === "only" ? "/orders" : "/orders?archived=only"}
-                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
-              >
-                <Archive className="h-4 w-4" />
-                {archivedMode === "only" ? "Aktifler" : "Arşiv"}
-              </Link>
-            </div>
+      <div className="rounded-2xl border border-black/10 bg-[#101817] p-6 text-white shadow-[0_24px_70px_-50px_rgba(16,24,23,0.9)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -z-10" />
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between relative z-10">
+          <div className="max-w-3xl">
+            <p className="text-[11px] uppercase tracking-[0.32em] text-white/40">
+              Sipariş Operasyonları
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold leading-tight [font-family:var(--font-display)]">
+              Siparişler
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/60">
+              ETA, sevkiyat, ödeme, evrak ve üretim durumunu tek listede takip edin.
+            </p>
           </div>
 
-          <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {statCards.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className={`rounded-lg border px-3 py-2 ${item.tone}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-[0.2em] opacity-60">
-                        {item.label}
-                      </p>
-                      <p className="mt-1 truncate text-lg font-semibold">{item.value}</p>
-                    </div>
-                    <span className="rounded-md bg-white/75 p-1.5 shadow-sm ring-1 ring-black/5">
-                      <Icon className="h-3.5 w-3.5" />
-                    </span>
-                  </div>
-                  <p className="mt-1 truncate text-[11px] font-medium opacity-65">{item.helper}</p>
-                </div>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {!isSales && (
+              <Link
+                href="/api/orders/items-export"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
+              >
+                <Download className="h-4 w-4 text-emerald-400" />
+                Kalem Export
+              </Link>
+            )}
+            {canEditPage && (
+              <Link
+                href="/orders/new"
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-teal-950 transition hover:-translate-y-0.5"
+              >
+                <FilePlus className="h-4 w-4" />
+                Yeni Sipariş
+              </Link>
+            )}
+            <Link
+              href={archivedMode === "only" ? "/orders" : "/orders?archived=only"}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
+            >
+              <Archive className="h-4 w-4" />
+              {archivedMode === "only" ? "Aktifler" : "Arşiv"}
+            </Link>
           </div>
         </div>
 
-        <form className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
-                Kontrol Merkezi
-              </p>
-              <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)]">
-                Filtreler
-              </h2>
-            </div>
-            <div className="flex flex-wrap gap-2 text-sm font-semibold">
-              <button className="inline-flex items-center gap-2 rounded-lg bg-[#101817] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5">
-                <Search className="h-4 w-4" />
-                Filtrele
-              </button>
-              <Link
-                href="/orders"
-                className="rounded-lg border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-black/60 transition hover:-translate-y-0.5 hover:bg-slate-50"
-              >
-                Temizle
-              </Link>
-            </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {statCards.map((item) => {
+            const Icon = item.icon;
+            let cardStyle = "border-white/10 bg-white/5 text-white shadow-[0_4px_20px_-10px_rgba(255,255,255,0.1)]";
+            let iconBg = "bg-white/10 text-white";
+
+            if (item.label.includes("Aktif")) {
+              cardStyle = "border-sky-500/20 bg-sky-500/5 text-white shadow-[0_4px_20px_-10px_rgba(56,189,248,0.2)] hover:border-sky-500/30 transition-all duration-200";
+              iconBg = "bg-sky-500/10 text-sky-400";
+            } else if (item.label.includes("sonucu")) {
+              cardStyle = "border-emerald-500/20 bg-emerald-500/5 text-white shadow-[0_4px_20px_-10px_rgba(52,211,153,0.2)] hover:border-emerald-500/30 transition-all duration-200";
+              iconBg = "bg-emerald-500/10 text-emerald-400";
+            } else if (item.label.includes("Geciken")) {
+              cardStyle = "border-rose-500/20 bg-rose-500/5 text-white shadow-[0_4px_20px_-10px_rgba(248,113,113,0.2)] hover:border-rose-500/30 transition-all duration-200";
+              iconBg = "bg-rose-500/10 text-rose-400";
+            } else if (item.label.includes("ödeme")) {
+              cardStyle = "border-amber-500/20 bg-amber-500/5 text-white shadow-[0_4px_20px_-10px_rgba(251,191,36,0.2)] hover:border-amber-500/30 transition-all duration-200";
+              iconBg = "bg-amber-500/10 text-amber-400";
+            }
+
+            return (
+              <div key={item.label} className={`rounded-xl border p-4 transition-all duration-250 ${cardStyle}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
+                      {item.label}
+                    </p>
+                    <p className="mt-1.5 truncate text-xl font-bold tracking-tight text-white">{item.value}</p>
+                  </div>
+                  <span className={`rounded-lg p-2 shadow-sm ${iconBg}`}>
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
+                </div>
+                <p className="mt-2 truncate text-[11px] font-medium text-white/60">{item.helper}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <form className="rounded-2xl border border-black/8 bg-white/80 p-5 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="relative flex-1">
+            <span className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-black/45">
+              <Search className="h-4.5 w-4.5" />
+            </span>
+            <input
+              name="q"
+              defaultValue={resolvedParams.q ?? ""}
+              placeholder="Sipariş adı, not veya incoterm ile arayın..."
+              className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
+            />
           </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              className="rounded-xl bg-[#101817] px-5 py-2.5 text-sm font-semibold text-white hover:bg-black transition cursor-pointer"
+            >
+              Filtrele
+            </button>
+            <Link
+              href="/orders"
+              className="rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-slate-50 transition"
+            >
+              Temizle
+            </Link>
+          </div>
+        </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <label className="text-sm font-semibold text-slate-800">
-              Arama
-              <input
-                name="q"
-                defaultValue={resolvedParams.q ?? ""}
-                placeholder="Siparis adi, not, incoterm"
-                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
-              />
-            </label>
+        <details className="group mt-4 border-t border-black/5 pt-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-bold uppercase tracking-wider text-black/60 hover:text-black select-none">
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5" />
+              <span>Gelişmiş Filtreler</span>
+              {activeFilterCount > 0 && (
+                <span className="ml-2 rounded-full bg-black/10 px-2 py-0.5 text-[10px] text-black font-bold">
+                  {activeFilterCount} aktif
+                </span>
+              )}
+            </div>
+            <span className="transition-transform duration-250 group-open:rotate-180">
+              <ChevronDown className="h-4 w-4" />
+            </span>
+          </summary>
 
-            {!isSales ? (
-              <label className="text-sm font-semibold text-slate-800">
-                Tedarikçi
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 text-sm">
+            {!isSales && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Tedarikçi</label>
                 <select
                   name="supplier"
                   defaultValue={effectiveSupplierFilter ?? ""}
-                  className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
                 >
                   <option value="">Hepsi</option>
                   {suppliers?.map((supplier) => (
@@ -724,113 +791,113 @@ export default async function OrdersPage({
                     </option>
                   ))}
                 </select>
-              </label>
-            ) : null}
+              </div>
+            )}
 
-            {!isSales ? (
-              <label className="text-sm font-semibold text-slate-800">
-                Odeme
+            {!isSales && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Ödeme Şekli</label>
                 <select
                   name="payment"
                   defaultValue={effectivePaymentFilter ?? ""}
-                  className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
                 >
                   <option value="">Hepsi</option>
                   <option value="TT">TT</option>
                   <option value="LC">LC</option>
-                  <option value="Diger">Diger</option>
+                  <option value="Diger">Diğer</option>
                 </select>
-              </label>
-            ) : null}
+              </div>
+            )}
 
-            {!isSales ? (
-              <label className="text-sm font-semibold text-slate-800">
-                Incoterm
+            {!isSales && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-black/60">Incoterm</label>
                 <input
                   name="incoterm"
                   defaultValue={effectiveIncotermFilter ?? ""}
-                  placeholder="FOB, CIF"
-                  className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                  placeholder="FOB, CIF..."
+                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
                 />
-              </label>
-            ) : null}
+              </div>
+            )}
 
-            <label className="text-sm font-semibold text-slate-800">
-              Arşiv
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-black/60">Arşiv Durumu</label>
               <select
                 name="archived"
                 defaultValue={resolvedParams.archived ?? ""}
-                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
               >
-                <option value="">Aktif</option>
-                <option value="only">Sadece arşiv</option>
+                <option value="">Aktifler</option>
+                <option value="only">Sadece Arşiv</option>
                 <option value="all">Tümü</option>
               </select>
-            </label>
+            </div>
 
-            <label className="text-sm font-semibold text-slate-800">
-              Shipment durumu
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-black/60">Sevkiyat Durumu</label>
               <select
                 name="shipmentStatus"
                 defaultValue={resolvedParams.shipmentStatus ?? ""}
-                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
               >
                 <option value="">Hepsi</option>
-                <option value="planlandi">Planlandi</option>
-                <option value="kalkis-limaninda">Kalkis Limaninda</option>
+                <option value="planlandi">Planlandı</option>
+                <option value="kalkis-limaninda">Kalkış Limanında</option>
                 <option value="denizde">Denizde</option>
-                <option value="varis-limaninda">Varis Limaninda</option>
-                <option value="gemiden-indi">Gemiden Indi</option>
+                <option value="varis-limaninda">Varış Limanında</option>
+                <option value="gemiden-indi">Gemiden İndi</option>
                 <option value="geciken">Geciken</option>
               </select>
-            </label>
+            </div>
 
-            <label className="text-sm font-semibold text-slate-800">
-              Siparis durumu
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-black/60">Sipariş Durumu</label>
               <select
                 name="orderStatus"
                 defaultValue={resolvedParams.orderStatus ?? ""}
-                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
               >
                 <option value="">Hepsi</option>
-                <option value="siparis-verildi">Siparis Verildi</option>
+                <option value="siparis-verildi">Sipariş Verildi</option>
                 <option value="proforma-geldi">Proforma Geldi</option>
-                <option value="uretimde">Uretimde</option>
-                <option value="hazir">Hazir</option>
-                <option value="kalkis-limaninda">Kalkis Limaninda</option>
+                <option value="uretimde">Üretimde</option>
+                <option value="hazir">Hazır</option>
+                <option value="kalkis-limaninda">Kalkış Limanında</option>
                 <option value="denizde">Denizde</option>
-                <option value="varis-limaninda">Varis Limaninda</option>
-                <option value="gumrukte">Gumrukte</option>
+                <option value="varis-limaninda">Varış Limanında</option>
+                <option value="gumrukte">Gümrükte</option>
                 <option value="depoya-teslim-edildi">Depoya Teslim Edildi</option>
               </select>
-            </label>
+            </div>
 
-            <label className="text-sm font-semibold text-slate-800">
-              Hazir olus (baslangic)
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-black/60">Hazır Oluş (Başlangıç)</label>
               <input
                 type="date"
                 name="readyFrom"
                 defaultValue={resolvedParams.readyFrom ?? ""}
-                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
               />
-            </label>
+            </div>
 
-            <label className="text-sm font-semibold text-slate-800">
-              Hazir olus (bitis)
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-black/60">Hazır Oluş (Bitiş)</label>
               <input
                 type="date"
                 name="readyTo"
                 defaultValue={resolvedParams.readyTo ?? ""}
-                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
               />
-            </label>
+            </div>
 
-            <label className="text-sm font-semibold text-slate-800">
-              Sayfada goster
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-black/60">Sayfada Göster</label>
               <select
                 name="perPage"
                 defaultValue={String(perPage)}
-                className="mt-2 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm focus:border-[#101817] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
               >
                 {perPageOptions.map((opt) => (
                   <option key={opt} value={opt}>
@@ -838,16 +905,17 @@ export default async function OrdersPage({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
           </div>
-        </form>
+        </details>
+      </form>
 
-        <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-4">
+      <div className="rounded-2xl border border-black/8 bg-white/90 p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
           <div>
             <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">Liste</p>
-            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
-              Sipariş kayıtları
+            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)] text-slate-800">
+              Sipariş Kayıtları
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-black/50">
@@ -865,55 +933,224 @@ export default async function OrdersPage({
             </Link>
           </div>
         </div>
+
         <div className="mt-4 space-y-3 text-sm">
           {pageItems.length ? (
             <div className="overflow-x-auto">
               {canEditPage ? (
-            <form action={bulkUpdateOrders}>
-              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-black/10 bg-slate-50 p-2 text-xs font-semibold text-black/70">
-                <span>Toplu işlem:</span>
-                <select
-                  name="bulk_action"
-                  className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs"
-                  defaultValue="archive"
-                >
-                  <option value="archive">Arşivle</option>
-                  <option value="unarchive">Arşivden çıkar</option>
-                  <option value="status">Durum değiştir</option>
-                  <option value="delete">Sil</option>
-                </select>
-                <select
-                  name="bulk_status"
-                  className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs"
-                  defaultValue=""
-                >
-                  <option value="">Durum seçin</option>
-                  {orderStatusOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-[#101817] px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5"
-                >
-                  Uygula
-                </button>
-                <span className="text-[11px] text-black/40">Seç ve uygula (sil işlemi geri alınamaz)</span>
-              </div>
-              <div className="w-full min-w-[1050px]">
-                <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
-                  <thead>
-                    <tr className="border-b border-black/10 text-left text-[11px] uppercase tracking-[0.22em] text-black/40">
-                      <th className="w-10 px-3 py-3">Seç</th>
-                      <th className="w-[13%] px-3 py-3">Order</th>
-                      <th className="w-[27%] px-3 py-3">Sipariş</th>
-                      <th className="w-[11%] px-3 py-3">ETA</th>
-                      <th className="w-[16%] px-3 py-3">Sevkiyat</th>
-                        {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Toplam</th> : null}
-                        {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Kalan</th> : null}
-                      <th className="w-[13%] px-3 py-3 text-right">İşlem</th>
+                <form action={bulkUpdateOrders}>
+                  <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-black/5 bg-slate-50/50 p-2 text-xs font-semibold text-black/70">
+                    <span>Toplu işlem:</span>
+                    <select
+                      name="bulk_action"
+                      className="rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-xs outline-none"
+                      defaultValue="archive"
+                    >
+                      <option value="archive">Arşivle</option>
+                      <option value="unarchive">Arşivden çıkar</option>
+                      <option value="status">Durum değiştir</option>
+                      <option value="delete">Sil</option>
+                    </select>
+                    <select
+                      name="bulk_status"
+                      className="rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-xs outline-none"
+                      defaultValue=""
+                    >
+                      <option value="">Durum seçin</option>
+                      {orderStatusOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-[#101817] px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 cursor-pointer"
+                    >
+                      Uygula
+                    </button>
+                    <span className="text-[11px] text-black/40 font-normal">Seç ve uygula (sil işlemi geri alınamaz)</span>
+                  </div>
+
+                  <div className="w-full min-w-[1050px]">
+                    <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
+                      <thead>
+                        <tr className="border-b border-black/5 text-left text-[11px] uppercase tracking-[0.22em] text-black/40">
+                          <th className="w-10 px-3 py-3 font-semibold">Seç</th>
+                          <th className="w-[12%] px-3 py-3 font-semibold">Order</th>
+                          <th className="w-[28%] px-3 py-3 font-semibold">Sipariş</th>
+                          <th className="w-[11%] px-3 py-3 font-semibold">ETA</th>
+                          <th className="w-[16%] px-3 py-3 font-semibold">Sevkiyat</th>
+                          {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right font-semibold">Toplam</th> : null}
+                          {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right font-semibold">Kalan</th> : null}
+                          <th className="w-[13%] px-3 py-3 text-right font-semibold">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pageItems.map((order, index) => {
+                          const detailHref = `/orders/${order.id}`;
+                          const paid = paidTotals[order.id] ?? 0;
+                          const total = Number(order.total_amount ?? 0);
+                          const remaining = remainingByOrder.get(order.id) ?? Math.max(0, total - paid);
+                          const missingDocs = canSeeFinance
+                            ? missingOrderDocsByOrder.get(order.id) ?? []
+                            : [];
+                          const rowColors = rowColorsFromId(order.id);
+                          const eta = getEarliestEta(order);
+                          const isArchived = Boolean(order.archived);
+                          return (
+                            <tr
+                              key={order.id}
+                              className="group border-b border-black/5 transition hover:bg-slate-50/60 [&>td]:border-t [&>td]:border-black/5"
+                              style={
+                                {
+                                  animationDelay: `${index * 45}ms`,
+                                  ["--row-bg" as string]: rowColors.bg,
+                                  ["--row-accent" as string]: rowColors.accent,
+                                } as CSSProperties
+                              }
+                            >
+                              <td className="px-3 py-4 text-center">
+                                <input type="checkbox" name="selected" value={order.id} className="rounded border-slate-300" />
+                              </td>
+                              <td className="px-3 py-4 text-xs font-semibold text-black/80">
+                                <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <span
+                                      className="h-9 w-1.5 rounded-full"
+                                      style={{ backgroundColor: "var(--row-accent)" }}
+                                    />
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-[0.25em] text-black/40">Order</p>
+                                      <p className="text-sm font-semibold tracking-tight">#{order.id.slice(0, 6).toUpperCase()}</p>
+                                    </div>
+                                  </div>
+                                </Link>
+                              </td>
+                              <td className="px-3 py-4">
+                                <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
+                                  <div className="text-sm font-semibold text-black hover:text-indigo-600 transition-colors">{order.name ?? "-"}</div>
+                                  <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
+                                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadgeStyle(order.order_status)}`}>
+                                      {order.order_status ?? "Sipariş Verildi"}
+                                    </span>
+                                    {isArchived ? (
+                                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                        Arşivde
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="mt-2 text-xs text-black/55 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <span className="font-semibold text-slate-700">{formatNumber(resolveOrderQuantity(order), 0)} adet</span>
+                                    <span className="text-slate-300">•</span>
+                                    <span>
+                                      {formatNumber(
+                                        packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
+                                          order.weight_kg ??
+                                          computedWeightByOrder.get(order.id) ??
+                                          null,
+                                        2
+                                      )}{" "}
+                                      kg
+                                    </span>
+                                    {isSales ? null : (
+                                      <>
+                                        <span className="text-slate-300">•</span>
+                                        <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase">{order.incoterm ?? "-"}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {order.notes && <div className="mt-1.5 text-xs text-black/40 truncate max-w-xs">{order.notes}</div>}
+                                  {missingDocs.length && !isSales ? (
+                                    <div className="group/tooltip mt-2 inline-flex flex-col items-start gap-2">
+                                      <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                                        {missingDocs.length} eksik evrak
+                                      </span>
+                                      <div className="max-h-0 w-[220px] overflow-hidden rounded-2xl border border-black/10 bg-white px-3 py-2 text-[10px] text-black/70 shadow-[0_18px_32px_-20px_rgba(12,45,52,0.55)] opacity-0 transition-all duration-200 group-hover/tooltip:max-h-[1000px] group-hover/tooltip:opacity-100">
+                                        <div className="text-[9px] font-semibold text-black/60">Eksik belgeler</div>
+                                        <div className="mt-1 space-y-0.5 font-normal">
+                                          {missingDocs.map((doc) => (
+                                            <div key={doc}>{doc}</div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </Link>
+                              </td>
+                              <td className="px-3 py-4 text-sm text-black/70">
+                                <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
+                                  {eta ? eta.toISOString().slice(0, 10) : "-"}
+                                </Link>
+                              </td>
+                              <td className="px-3 py-4 text-sm text-black/70">
+                                <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
+                                  {(shipmentsByOrder.get(order.id) ?? []).length ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {(shipmentsByOrder.get(order.id) ?? []).map((s) => (
+                                        <span
+                                          key={s.id}
+                                          className="rounded-full border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-sm"
+                                        >
+                                          {s.file_no ?? s.id.slice(0, 6).toUpperCase()}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-black/40">-</span>
+                                  )}
+                                </Link>
+                              </td>
+                              {canSeeFinance ? (
+                                <td className="px-3 py-4 text-sm font-semibold text-black text-right">
+                                  <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
+                                    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">
+                                      {formatMoney(total, order.currency)}
+                                    </span>
+                                  </Link>
+                                </td>
+                              ) : null}
+                              {canSeeFinance ? (
+                                <td className="px-3 py-4 font-semibold text-black text-right">
+                                  <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
+                                    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">
+                                      {formatMoney(remaining, order.currency)}
+                                    </span>
+                                  </Link>
+                                </td>
+                              ) : null}
+                              <td className="px-2 py-4 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Link
+                                    href={detailHref}
+                                    className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs font-semibold text-black/70 transition hover:bg-slate-50 hover:border-black/35"
+                                  >
+                                    Detay
+                                  </Link>
+                                  {canEditPage ? (
+                                    <ArchiveButton orderId={order.id} archived={isArchived} />
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </form>
+              ) : (
+                <div className="w-full min-w-[980px]">
+                  <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
+                    <thead>
+                      <tr className="border-b border-black/5 text-left text-[11px] uppercase tracking-[0.22em] text-black/40">
+                        <th className="w-[12%] px-3 py-3 font-semibold">Order</th>
+                        <th className="w-[32%] px-3 py-3 font-semibold">Sipariş</th>
+                        <th className="w-[12%] px-3 py-3 font-semibold">ETA</th>
+                        <th className="w-[16%] px-3 py-3 font-semibold">Sevkiyat</th>
+                        {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right font-semibold">Toplam</th> : null}
+                        {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right font-semibold">Kalan</th> : null}
+                        <th className="w-[12%] px-3 py-3 text-right font-semibold">İşlem</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -922,16 +1159,14 @@ export default async function OrdersPage({
                         const paid = paidTotals[order.id] ?? 0;
                         const total = Number(order.total_amount ?? 0);
                         const remaining = remainingByOrder.get(order.id) ?? Math.max(0, total - paid);
-                        const missingDocs = canSeeFinance
-                          ? missingOrderDocsByOrder.get(order.id) ?? []
-                          : [];
+                        const missingDocs = canSeeFinance ? missingOrderDocsByOrder.get(order.id) ?? [] : [];
                         const rowColors = rowColorsFromId(order.id);
                         const eta = getEarliestEta(order);
                         const isArchived = Boolean(order.archived);
                         return (
                           <tr
                             key={order.id}
-                            className="group border-b border-black/5 transition hover:bg-slate-50 [&>td]:border-t [&>td]:border-black/5"
+                            className="group border-b border-black/5 transition hover:bg-slate-50/60 [&>td]:border-t [&>td]:border-black/5"
                             style={
                               {
                                 animationDelay: `${index * 45}ms`,
@@ -940,234 +1175,95 @@ export default async function OrdersPage({
                               } as CSSProperties
                             }
                           >
-                            <td className="px-4 py-4 text-center">
-                              <input type="checkbox" name="selected" value={order.id} />
-                            </td>
-                            <td className="px-4 py-4 text-xs font-semibold text-black/80">
-                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
+                            <td className="px-3 py-4 text-xs font-semibold text-black/80">
+                              <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
                                 <div className="flex items-center gap-3">
-                                  <span
-                                    className="h-9 w-1.5 rounded-full"
-                                    style={{ backgroundColor: "var(--row-accent)" }}
-                                  />
+                                  <span className="h-9 w-1.5 rounded-full" style={{ backgroundColor: "var(--row-accent)" }} />
                                   <div>
                                     <p className="text-[10px] uppercase tracking-[0.25em] text-black/40">Order</p>
-                                    <p className="text-sm font-semibold">#{order.id.slice(0, 6).toUpperCase()}</p>
+                                    <p className="text-sm font-semibold tracking-tight">#{order.id.slice(0, 6).toUpperCase()}</p>
                                   </div>
                                 </div>
                               </Link>
                             </td>
-                            <td className="px-4 py-4">
-                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
-                                {isArchived ? (
-                                  <span className="mt-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
-                                    Arşivde
+                            <td className="px-3 py-4">
+                              <Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">
+                                <div className="text-sm font-semibold text-black hover:text-indigo-600 transition-colors">{order.name ?? "-"}</div>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
+                                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadgeStyle(order.order_status)}`}>
+                                    {order.order_status ?? "Sipariş Verildi"}
                                   </span>
-                                ) : null}
-                                <div className="mt-1 text-xs text-black/50">
-                                  {formatNumber(resolveOrderQuantity(order), 0)} adet |{" "}
-                                  {formatNumber(
-                                    packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
-                                      order.weight_kg ??
-                                      computedWeightByOrder.get(order.id) ??
-                                      null,
-                                    2
-                                  )}{" "}
-                                  kg
-                                  {isSales ? "" : ` | ${order.incoterm ?? "-"}`}
+                                  {isArchived ? (
+                                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                      Arşivde
+                                    </span>
+                                  ) : null}
                                 </div>
-                                <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>
+                                <div className="mt-2 text-xs text-black/55 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span className="font-semibold text-slate-700">{formatNumber(resolveOrderQuantity(order), 0)} adet</span>
+                                  <span className="text-slate-300">•</span>
+                                  <span>
+                                    {formatNumber(
+                                      packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
+                                        order.weight_kg ??
+                                        computedWeightByOrder.get(order.id) ??
+                                        null,
+                                      2
+                                    )}{" "}
+                                    kg
+                                  </span>
+                                </div>
+                                {order.notes && <div className="mt-1.5 text-xs text-black/40 truncate max-w-xs">{order.notes}</div>}
                                 {missingDocs.length && !isSales ? (
                                   <div className="group/tooltip mt-2 inline-flex flex-col items-start gap-2">
-                                    <span className="rounded-full border border-red-200/70 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700/80">
-                                      {missingDocs.length} eksik evrak
-                                    </span>
-                                    <div className="max-h-0 w-[220px] overflow-hidden rounded-2xl border border-black/10 bg-white px-3 py-2 text-[10px] text-black/70 shadow-[0_18px_32px_-20px_rgba(12,45,52,0.55)] opacity-0 transition-all duration-200 group-hover/tooltip:max-h-[1000px] group-hover/tooltip:opacity-100">
-                                      <div className="text-[9px] font-semibold text-black/60">Eksik belgeler</div>
-                                      <div className="mt-1 space-y-0.5">
-                                        {missingDocs.map((doc) => (
-                                          <div key={doc}>{doc}</div>
-                                        ))}
-                                      </div>
-                                    </div>
+                                    <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">{missingDocs.length} eksik evrak</span>
                                   </div>
                                 ) : null}
                               </Link>
                             </td>
-                            <td className="px-4 py-4 text-sm text-black/70">
-                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                {eta ? eta.toISOString().slice(0, 10) : "-"}
-                              </Link>
-                            </td>
-                            <td className="px-4 py-4 text-sm text-black/70">
-                              <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                {(shipmentsByOrder.get(order.id) ?? []).length ? (
-                                  <div className="flex flex-wrap gap-2">
-                                    {(shipmentsByOrder.get(order.id) ?? []).map((s) => (
-                                      <span
-                                        key={s.id}
-                                        className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-[#1f3c88] shadow-sm"
-                                      >
-                                        {s.file_no ?? s.id.slice(0, 6).toUpperCase()}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-black/40">-</span>
-                                )}
-                              </Link>
-                            </td>
-                            {canSeeFinance ? (
-                              <td className="px-4 py-4 text-sm font-semibold text-black">
-                                <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">
-                                    {formatMoney(total, order.currency)}
-                                  </span>
-                                </Link>
-                              </td>
-                            ) : null}
-                            {canSeeFinance ? (
-                              <td className="px-4 py-4 font-semibold text-black">
-                                <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-[#edf3ff] px-3 py-1 text-xs font-semibold text-[#2b4f9e]">
-                                    {formatMoney(remaining, order.currency)}
-                                  </span>
-                                </Link>
-                              </td>
-                            ) : null}
-                            <td className="px-2 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <Link
-                                  href={detailHref}
-                                  className="rounded-full border border-black/20 px-3 py-1.5 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
-                                >
-                                  Detay
-                                </Link>
-                                {canEditPage ? (
-                                  <ArchiveButton orderId={order.id} archived={isArchived} />
-                                ) : null}
-                              </div>
-                            </td>
+                            <td className="px-3 py-4 text-sm text-black/70"><Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">{eta ? eta.toISOString().slice(0, 10) : "-"}</Link></td>
+                            <td className="px-3 py-4 text-sm text-black/70"><Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4">{(shipmentsByOrder.get(order.id) ?? []).length ? <div className="flex flex-wrap gap-2">{(shipmentsByOrder.get(order.id) ?? []).map((s) => <span key={s.id} className="rounded-full border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-sm">{s.file_no ?? s.id.slice(0, 6).toUpperCase()}</span>)}</div> : <span className="text-black/40">-</span>}</Link></td>
+                            {canSeeFinance ? <td className="px-3 py-4 text-sm font-semibold text-black text-right"><Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4"><span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">{formatMoney(total, order.currency)}</span></Link></td> : null}
+                            {canSeeFinance ? <td className="px-3 py-4 font-semibold text-black text-right"><Link href={detailHref} className="block -mx-3 -my-4 px-3 py-4"><span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">{formatMoney(remaining, order.currency)}</span></Link></td> : null}
+                            <td className="px-2 py-4 text-right"><div className="flex justify-end gap-2"><Link href={detailHref} className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs font-semibold text-black/70 transition hover:bg-slate-50 hover:border-black/35">Detay</Link></div></td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-              </div>
-            </form>
-              ) : (
-              <div className="w-full min-w-[980px]">
-                <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
-                  <thead>
-                    <tr className="border-b border-black/10 text-left text-[11px] uppercase tracking-[0.22em] text-black/40">
-                      <th className="w-[13%] px-3 py-3">Order</th>
-                      <th className="w-[31%] px-3 py-3">Sipariş</th>
-                      <th className="w-[12%] px-3 py-3">ETA</th>
-                      <th className="w-[16%] px-3 py-3">Sevkiyat</th>
-                      {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Toplam</th> : null}
-                      {canSeeFinance ? <th className="w-[13%] px-3 py-3 text-right">Kalan</th> : null}
-                      <th className="w-[12%] px-3 py-3 text-right">İşlem</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageItems.map((order, index) => {
-                      const detailHref = `/orders/${order.id}`;
-                      const paid = paidTotals[order.id] ?? 0;
-                      const total = Number(order.total_amount ?? 0);
-                      const remaining = remainingByOrder.get(order.id) ?? Math.max(0, total - paid);
-                      const missingDocs = canSeeFinance ? missingOrderDocsByOrder.get(order.id) ?? [] : [];
-                      const rowColors = rowColorsFromId(order.id);
-                      const eta = getEarliestEta(order);
-                      const isArchived = Boolean(order.archived);
-                      return (
-                        <tr
-                          key={order.id}
-                          className="group border-b border-black/5 transition hover:bg-slate-50 [&>td]:border-t [&>td]:border-black/5"
-                          style={
-                            {
-                              animationDelay: `${index * 45}ms`,
-                              ["--row-bg" as string]: rowColors.bg,
-                              ["--row-accent" as string]: rowColors.accent,
-                            } as CSSProperties
-                          }
-                        >
-                          <td className="px-4 py-4 text-xs font-semibold text-black/80">
-                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                              <div className="flex items-center gap-3">
-                                <span className="h-9 w-1.5 rounded-full" style={{ backgroundColor: "var(--row-accent)" }} />
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-[0.25em] text-black/40">Order</p>
-                                  <p className="text-sm font-semibold">#{order.id.slice(0, 6).toUpperCase()}</p>
-                                </div>
-                              </div>
-                            </Link>
-                          </td>
-                          <td className="px-4 py-4">
-                            <Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">
-                              <div className="text-sm font-semibold text-black">{order.name ?? "-"}</div>
-                              {isArchived ? <span className="mt-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">Arşivde</span> : null}
-                              <div className="mt-1 text-xs text-black/50">
-                                {formatNumber(resolveOrderQuantity(order), 0)} adet |{" "}
-                                {formatNumber(
-                                  packingSummaryByOrder.get(order.id)?.total_net_weight_kg ??
-                                    order.weight_kg ??
-                                    computedWeightByOrder.get(order.id) ??
-                                    null,
-                                  2
-                                )}{" "}
-                                kg
-                              </div>
-                              <div className="mt-1 text-xs text-black/50">{order.notes ?? "-"}</div>
-                              {missingDocs.length && !isSales ? (
-                                <div className="group/tooltip mt-2 inline-flex flex-col items-start gap-2">
-                                  <span className="rounded-full border border-red-200/70 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700/80">{missingDocs.length} eksik evrak</span>
-                                </div>
-                              ) : null}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-4 text-sm text-black/70"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">{eta ? eta.toISOString().slice(0, 10) : "-"}</Link></td>
-                          <td className="px-4 py-4 text-sm text-black/70"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4">{(shipmentsByOrder.get(order.id) ?? []).length ? <div className="flex flex-wrap gap-2">{(shipmentsByOrder.get(order.id) ?? []).map((s) => <span key={s.id} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-[#1f3c88] shadow-sm">{s.file_no ?? s.id.slice(0, 6).toUpperCase()}</span>)}</div> : <span className="text-black/40">-</span>}</Link></td>
-                          {canSeeFinance ? <td className="px-4 py-4 text-sm font-semibold text-black"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4"><span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/75">{formatMoney(total, order.currency)}</span></Link></td> : null}
-                          {canSeeFinance ? <td className="px-4 py-4 font-semibold text-black"><Link href={detailHref} className="block -mx-4 -my-4 px-4 py-4"><span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-[#edf3ff] px-3 py-1 text-xs font-semibold text-[#2b4f9e]">{formatMoney(remaining, order.currency)}</span></Link></td> : null}
-                          <td className="px-2 py-4 text-right"><div className="flex justify-end gap-2"><Link href={detailHref} className="rounded-full border border-black/20 px-3 py-1.5 text-xs font-semibold text-black/70 transition group-hover:border-black/40">Detay</Link></div></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                </div>
               )}
             </div>
           ) : (
-            <div className="rounded-2xl border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-              Henüz siparis yok.
+            <div className="rounded-2xl border border-black/5 bg-[#fbfaf6] px-4 py-3 text-sm text-black/60 text-center py-8">
+              Filtrelere uygun sipariş kaydı bulunamadı.
             </div>
           )}
-          </div>
-          {totalPages > 1 ? (
-            <div className="mt-6 flex flex-wrap items-center gap-2 text-xs font-semibold text-black/70">
-              {Array.from({ length: totalPages }).map((_, idx) => {
-                const page = idx + 1;
-                const isActive = page === safePage;
-                return (
-                  <Link
-                    key={page}
-                    href={buildPageHref(page)}
-                    className={`rounded-full px-3 py-1.5 ${
-                      isActive
-                        ? "bg-black text-white"
-                        : "border border-black/20 bg-white text-black/70 hover:border-black/40"
-                    }`}
-                  >
-                    {page}
-                  </Link>
-                );
-              })}
-            </div>
-          ) : null}
         </div>
-      </section>
+
+        {totalPages > 1 ? (
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold text-black/70">
+            {Array.from({ length: totalPages }).map((_, idx) => {
+              const page = idx + 1;
+              const isActive = page === safePage;
+              return (
+                <Link
+                  key={page}
+                  href={buildPageHref(page)}
+                  className={`rounded-xl px-3 py-2 transition ${
+                    isActive
+                      ? "bg-[#101817] text-white shadow-sm"
+                      : "border border-black/10 bg-white text-black/70 hover:bg-slate-50 hover:border-black/25"
+                  }`}
+                >
+                  {page}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

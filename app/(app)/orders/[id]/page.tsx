@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUserRole, canEdit, canViewFinance } from "@/lib/roles";
@@ -33,6 +33,14 @@ import {
   ReceiptText,
   Ship,
   WalletCards,
+  ChevronDown,
+  ClipboardList,
+  AlertCircle,
+  Plus,
+  Anchor,
+  Scale,
+  Warehouse,
+  Compass
 } from "lucide-react";
 import DocumentDownloadButton from "@/components/DocumentDownloadButton";
 import type { Metadata } from "next";
@@ -867,38 +875,92 @@ export default async function OrderDetailPage({
         { key: "documents", label: "Belgeler", icon: FileArchive },
       ];
 
+  const currentStatus = (order.order_status ?? "").toLowerCase().trim();
+  const orderSteps = [
+    {
+      label: "Sipariş",
+      description: "Sipariş Verildi",
+      active: true,
+      icon: ClipboardList,
+      date: formatDate(order.created_at),
+    },
+    {
+      label: "Proforma",
+      description: "Proforma Geldi",
+      active: ["proforma geldi", "uretimde", "hazir", "kalkis limaninda", "denizde", "varis limaninda", "gumrukte", "depoya teslim edildi"].includes(currentStatus),
+      icon: FileText,
+      date: undefined,
+    },
+    {
+      label: "Üretimde",
+      description: "Ürünler üretiliyor",
+      active: ["uretimde", "hazir", "kalkis limaninda", "denizde", "varis limaninda", "gumrukte", "depoya teslim edildi"].includes(currentStatus),
+      icon: Boxes,
+      date: order.expected_ready_date ? `Hazır: ${formatDate(order.expected_ready_date)}` : undefined,
+    },
+    {
+      label: "Hazır",
+      description: "Ürünler hazırlandı",
+      active: ["hazir", "kalkis limaninda", "denizde", "varis limaninda", "gumrukte", "depoya teslim edildi"].includes(currentStatus),
+      icon: PackageCheck,
+      date: undefined,
+    },
+    {
+      label: "Lojistikte",
+      description: "Yola çıktı / Limanda",
+      active: ["kalkis limaninda", "denizde", "varis limaninda", "gumrukte", "depoya teslim edildi"].includes(currentStatus),
+      icon: Ship,
+      date: orderEta ? `ETA: ${formatDate(orderEta)}` : undefined,
+    },
+    {
+      label: "Gümrükte",
+      description: "İthalat işlemleri",
+      active: ["gumrukte", "depoya teslim edildi"].includes(currentStatus),
+      icon: Scale,
+      date: undefined,
+    },
+    {
+      label: "Teslim Edildi",
+      description: "Depoya ulaştı",
+      active: ["depoya teslim edildi"].includes(currentStatus),
+      icon: Warehouse,
+      date: undefined,
+    },
+  ];
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-6 animate-fade-up">
       <OrderItemsToast orderId={order.id} />
-      <div className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+
+      <div className="rounded-2xl border border-black/8 bg-white/80 p-6 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-black/45">
               <span className="rounded-lg border border-black/10 bg-[#f7f3ea] px-2.5 py-1 text-black/60">
                 Sipariş
               </span>
-              <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1">
-                #{order.id.slice(0, 8).toUpperCase()}
+              <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-slate-700">
+                #${order.id.slice(0, 8).toUpperCase()}
               </span>
-              <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-800">
+              <span className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-2.5 py-1 text-indigo-700">
                 {orderStatusLabel}
               </span>
-              {!isSales ? (
-                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1">
+              {!isSales && (
+                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-slate-700">
                   {order.currency ?? "USD"}
                 </span>
-              ) : null}
-              <span className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1">
-                <CalendarDays size={13} /> Hazır: {order.expected_ready_date ?? "-"} · {readyCountdown}
+              )}
+              <span className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1 text-slate-700">
+                <CalendarDays size={13} className="text-slate-400" /> Hazır: {order.expected_ready_date ?? "-"} · {readyCountdown}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1">
-                <Ship size={13} /> ETA: {formatDate(orderEta)}
+              <span className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1 text-slate-700">
+                <Ship size={13} className="text-slate-400" /> ETA: {formatDate(orderEta)}
               </span>
             </div>
-            <h1 className="mt-2 truncate text-2xl font-semibold text-black">
+            <h1 className="mt-3 truncate text-2xl font-bold tracking-tight text-slate-800 [font-family:var(--font-display)]">
               {order.name ?? "Sipariş"}
             </h1>
-            <p className="mt-1 max-w-4xl truncate text-sm text-black/55">
+            <p className="mt-1.5 max-w-4xl text-sm text-slate-500 leading-relaxed">
               {order.reference_name ?? order.notes ?? "Sipariş operasyon kaydı"}
             </p>
           </div>
@@ -906,127 +968,113 @@ export default async function OrderDetailPage({
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
             <Link
               href="/orders"
-              className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-black/70 transition hover:border-black/30"
+              className="inline-flex items-center gap-1 rounded-xl border border-black/15 bg-white px-4 py-2.5 text-black/70 hover:bg-slate-50 hover:border-black/30 transition shadow-2xs"
             >
-              <ArrowLeft size={14} /> Liste
+              <ArrowLeft size={14} className="text-black/50" /> Liste
             </Link>
-            {canEditPage ? (
+            {canEditPage && (
               <Link
                 href={`/orders/${order.id}/edit`}
-                className="inline-flex items-center gap-1 rounded-lg bg-black px-3 py-2 text-white transition hover:-translate-y-0.5 hover:shadow-md"
+                className="inline-flex items-center gap-1 rounded-xl bg-black px-4 py-2.5 text-white hover:bg-black/90 transition shadow-sm"
               >
-                <Edit3 size={14} /> Düzenle
+                <Edit3 size={14} className="text-white/70" /> Düzenle
               </Link>
-            ) : null}
-            {canEditPage ? (
+            )}
+            {canEditPage && (
               <Link
                 href={`/api/export-gumruk?orderId=${order.id}`}
-                className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-[#f7f3ea] px-3 py-2 text-black transition hover:-translate-y-0.5 hover:shadow-md"
+                className="inline-flex items-center gap-1 rounded-xl border border-black/10 bg-[#f7f3ea] px-4 py-2.5 text-black hover:bg-[#efece3] transition shadow-2xs"
                 data-skip-route-loader
               >
-                <Download size={14} /> Gümrük Excel
+                <Download size={14} className="text-black/50" /> Gümrük Excel
               </Link>
-            ) : null}
-            {canEditPage ? (
+            )}
+            {canEditPage && (
               <Link
                 href={`/api/orders/${order.id}/insurance-form`}
-                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-black/75 transition hover:border-black/30"
+                className="rounded-xl border border-black/15 bg-white px-4 py-2.5 text-black/70 hover:bg-slate-50 transition shadow-2xs"
                 data-skip-route-loader
               >
-                Navlun formu
+                Navlun Formu
               </Link>
-            ) : null}
-            {canEditPage ? (
+            )}
+            {canEditPage && (
               <Link
                 href={`/orders/${order.id}/insurance-mail`}
-                className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sky-900 transition hover:border-sky-300"
+                className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sky-900 hover:bg-sky-100/70 hover:border-sky-300 transition shadow-2xs"
               >
-                Sigorta mail
+                Sigorta Mail
               </Link>
-            ) : null}
-            {canSeeFinance ? (
+            )}
+            {canSeeFinance && (
               <Link
                 href={`/orders/${order.id}/beyanname`}
-                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950 transition hover:border-amber-300"
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-amber-950 hover:bg-amber-100/70 hover:border-amber-300 transition shadow-2xs"
               >
                 Beyanname Lab
               </Link>
-            ) : null}
-            {canEditPage ? (
+            )}
+            {canEditPage && (
               <ConfirmActionForm
                 action={deleteOrder}
-                confirmText="Bu siparis silinsin mi? Bu islem geri alinamaz."
+                confirmText="Bu siparişi silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
                 buttonText="Sil"
               >
                 <input type="hidden" name="order_id" value={order.id} />
               </ConfirmActionForm>
-            ) : null}
+            )}
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
-          {summaryChips.map((chip) => {
-            const Icon = chip.icon;
-            const isFinanceChip = chip.tone === "finance";
-            return (
-              <div
-                key={chip.label}
-                className={`min-w-0 rounded-lg border px-3 py-2 ${
-                  isFinanceChip
-                    ? "border-amber-200 bg-amber-50"
-                    : "border-black/10 bg-[#fbfaf6]"
-                }`}
-              >
+        {/* Stepper Timeline */}
+        <div className="mt-6 border-t border-black/5 pt-5">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-7 text-center">
+            {orderSteps.map((step) => {
+              const Icon = step.icon;
+              return (
                 <div
-                  className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                    isFinanceChip ? "text-amber-800/70" : "text-black/40"
+                  key={step.label}
+                  className={`rounded-xl border p-3 flex flex-col items-center justify-between text-center transition-all duration-200 ${
+                    step.active
+                      ? "bg-indigo-50/30 border-indigo-200/50 text-indigo-700"
+                      : "bg-slate-50/40 border-black/5 text-black/35"
                   }`}
                 >
-                  <Icon size={12} /> {chip.label}
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-2xs border border-black/5">
+                    <Icon className={`h-4 w-4 ${step.active ? "text-indigo-600 font-bold" : "text-black/30"}`} />
+                  </div>
+
+                  <div className="mt-2.5">
+                    <p className={`text-[11px] font-bold tracking-tight ${step.active ? "text-indigo-900" : "text-black/60"}`}>
+                      {step.label}
+                    </p>
+                    <p className="text-[9px] text-black/45 mt-0.5 font-medium leading-tight">
+                      {step.description}
+                    </p>
+                  </div>
+
+                  {step.date ? (
+                    <span className="mt-2 rounded bg-white px-2 py-0.5 text-[9px] font-bold shadow-2xs border border-black/5 text-black/65 font-mono">
+                      {step.date}
+                    </span>
+                  ) : (
+                    <span className="mt-2 text-[9px] text-black/30 font-medium font-mono">-</span>
+                  )}
                 </div>
-                <p
-                  className={`mt-1 truncate text-sm font-semibold ${
-                    isFinanceChip ? "text-amber-950" : "text-black/80"
-                  }`}
-                  title={chip.value}
-                >
-                  {chip.value}
-                </p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
-        {!isSales ? (
-          <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_1.4fr]">
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold">Eksik belgeler</p>
-                <span className="rounded-md bg-white px-2 py-0.5 font-semibold">
-                  {missingOrderTypes.length}
-                </span>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {missingOrderTypes.length ? (
-                  missingOrderTypes.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-md border border-red-200 bg-white px-2 py-0.5 text-[11px] font-semibold"
-                    >
-                      {item}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-red-700/80">Eksik belge yok.</span>
-                )}
-              </div>
-            </div>
-
-            <details className="rounded-lg border border-black/10 bg-white px-3 py-2 text-xs" open>
-              <summary className="cursor-pointer select-none font-semibold text-black/70">
-                Durum akışı · {orderStatusLabel}
+        {/* Dynamic Status Dropdown for Editing */}
+        {!isSales && (
+          <div className="mt-5 border-t border-black/5 pt-4">
+            <details className="group">
+              <summary className="cursor-pointer select-none font-bold text-xs uppercase tracking-wider text-black/50 hover:text-black flex items-center justify-between">
+                <span>Durumu Güncelle</span>
+                <ChevronDown size={14} className="transition-transform duration-200 group-open:rotate-180 text-black/40" />
               </summary>
-              <form action={updateOrderStatus} className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              <form action={updateOrderStatus} className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
                 <input type="hidden" name="order_id" value={order.id} />
                 {orderStatusOptions.map((opt) => {
                   const active = (order.order_status ?? "").toLowerCase() === opt.toLowerCase();
@@ -1036,10 +1084,10 @@ export default async function OrderDetailPage({
                       type="submit"
                       name="order_status"
                       value={opt}
-                      className={`rounded-lg px-2.5 py-1.5 font-semibold transition ${
+                      className={`rounded-lg px-3 py-1.5 font-semibold transition cursor-pointer ${
                         active
                           ? "bg-black text-white"
-                          : "border border-black/10 bg-[#fbfaf6] text-black/65 hover:border-black/30"
+                          : "border border-black/10 bg-[#fbfaf6] text-black/65 hover:border-black/35 hover:bg-slate-50"
                       }`}
                     >
                       {opt}
@@ -1049,31 +1097,99 @@ export default async function OrderDetailPage({
               </form>
             </details>
           </div>
-        ) : null}
+        )}
       </div>
 
-      <div className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/35">
-              Operasyon kayıtları
-            </p>
-            <h3 className="text-lg font-semibold">Sipariş detayları</h3>
+      {/* Summary Cards */}
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+        {summaryChips.map((chip) => {
+          const Icon = chip.icon;
+          const isFinanceChip = chip.tone === "finance";
+          const isMissingDocs = chip.label.includes("Eksik");
+
+          let cardBg = "bg-white border-black/8 shadow-2xs";
+          let labelColor = "text-black/45";
+          let valColor = "text-black/85";
+          let iconColor = "text-black/40 bg-slate-50";
+
+          if (isFinanceChip) {
+            cardBg = "bg-amber-50/40 border-amber-200/60 shadow-2xs shadow-amber-100/50";
+            labelColor = "text-amber-800/70";
+            valColor = "text-amber-950 font-bold";
+            iconColor = "text-amber-600 bg-amber-50";
+          } else if (isMissingDocs && Number(chip.value) > 0) {
+            cardBg = "bg-rose-50/40 border-rose-200/60 shadow-2xs shadow-rose-100/50";
+            labelColor = "text-rose-800/70";
+            valColor = "text-rose-950 font-bold";
+            iconColor = "text-rose-600 bg-rose-50";
+          }
+
+          return (
+            <div
+              key={chip.label}
+              className={`min-w-0 rounded-xl border p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs flex items-center gap-3 ${cardBg}`}
+            >
+              <span className={`rounded-lg p-2.5 shadow-2xs border border-black/5 ${iconColor}`}>
+                <Icon size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className={`text-[10px] font-bold uppercase tracking-[0.15em] leading-tight ${labelColor}`}>
+                  {chip.label}
+                </div>
+                <p
+                  className={`mt-1 truncate text-[13px] font-semibold tracking-tight leading-none ${valColor}`}
+                  title={chip.value}
+                >
+                  {chip.value}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Missing Docs Warning Banner */}
+      {!isSales && missingOrderTypes.length > 0 && (
+        <div className="rounded-xl border border-red-200/60 bg-red-50/50 px-4 py-3 text-xs font-semibold text-red-800 flex flex-wrap items-center gap-2 shadow-2xs">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <span>Eksik belgeler mevcut:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {missingOrderTypes.map((item) => (
+              <span
+                key={item}
+                className="rounded-md border border-red-200 bg-white px-2 py-0.5 text-[11px] font-bold"
+              >
+                {item}
+              </span>
+            ))}
           </div>
-          <div className="flex flex-wrap gap-1.5 text-sm">
+        </div>
+      )}
+
+      {/* Main Tab Segmented Control */}
+      <div className="rounded-2xl border border-black/8 bg-white/90 p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-black/35">
+              Sipariş Bilgileri
+            </p>
+            <h3 className="text-lg font-semibold text-slate-800">Sipariş Detayları</h3>
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm bg-slate-100/70 p-1 rounded-xl border border-black/5">
             {tabItems.map((tab) => {
               const Icon = tab.icon;
+              const isActive = activeTab === tab.key;
               return (
                 <Link
                   key={tab.key}
                   href={`/orders/${order.id}?tab=${tab.key}`}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                    activeTab === tab.key
-                      ? "bg-black text-white"
-                      : "border border-black/10 bg-white text-black/65 hover:border-black/30"
+                  className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all duration-200 ${
+                    isActive
+                      ? "bg-[#101817] text-white shadow-xs"
+                      : "text-black/60 hover:text-black hover:bg-white/50"
                   }`}
                 >
-                  <Icon size={14} />
+                  <Icon size={14} className={isActive ? "text-emerald-400" : "text-black/40"} />
                   {tab.label}
                 </Link>
               );
@@ -1081,20 +1197,21 @@ export default async function OrderDetailPage({
           </div>
         </div>
 
-        {activeTab === "products" ? (
-          <div className="mt-4 space-y-3 text-sm">
+        {/* Tab Contents */}
+        {activeTab === "products" && (
+          <div className="mt-4 space-y-4 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-lg font-semibold">Ürün kalemleri</h4>
+              <h4 className="text-lg font-semibold text-slate-800">Ürün Kalemleri</h4>
               <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
-                <span>
+                <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 font-semibold">
                   Toplam: {formatNumber(resolvedTotalQty, 0)} adet
                   {isSales ? "" : ` | ${formatMoney(totalsAll.amount, order.currency)}`}
                 </span>
                 {canEditPage && orderItems?.length ? (
                   <ConfirmActionForm
                     action={deleteAllOrderItems}
-                    confirmText="Tum urun kalemleri silinsin mi?"
-                    buttonText="Tumunu sil"
+                    confirmText="Tüm ürün kalemleri silinsin mi?"
+                    buttonText="Tümünü Sil"
                     className="inline"
                   >
                     <input type="hidden" name="order_id" value={order.id} />
@@ -1102,25 +1219,24 @@ export default async function OrderDetailPage({
                 ) : null}
               </div>
             </div>
-            <div className="rounded-lg border border-black/10 bg-white p-4 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+
+            <div className="rounded-xl border border-black/8 bg-slate-50/50 p-4 text-sm">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-1">
                   {!isSales ? (
                     <>
-                      <p className="text-xs uppercase tracking-[0.2em] text-black/40">
-                        Fatura import
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/45">
+                        Fatura / Kalem İçe Aktarma
                       </p>
-                      <p className="text-sm font-semibold">
-                        Uzun faturalar icin Excel/CSV import kullanin
+                      <p className="text-sm font-semibold text-slate-700">
+                        Uzun faturalar için Excel veya CSV yükleyin
                       </p>
-                      <p className="mt-1 text-xs text-black/60">
-                        Excel (.xlsx) veya UTF-8 CSV kullanabilirsiniz. Ürün kodu
-                        kullanabilirsiniz. Nitelikler urun kartindan gelir, dosyada
-                        verilen fiyat ve nitelikler ürün kartını da günceller.
+                      <p className="text-xs text-black/50 leading-relaxed max-w-2xl">
+                        Ürün kartından nitelikler otomatik getirilir. Excel dosyasında verilen fiyatlar ürün kartını da güncelleyecektir.
                       </p>
                     </>
                   ) : (
-                    <p className="text-sm font-semibold">Ürün kalemlerinde ara</p>
+                    <p className="text-sm font-semibold text-slate-700">Ürün kalemlerinde ara</p>
                   )}
                   <form className="mt-2 flex flex-wrap items-center gap-2 text-xs" method="get">
                     <input type="hidden" name="tab" value="products" />
@@ -1129,60 +1245,62 @@ export default async function OrderDetailPage({
                       name="itemsQ"
                       defaultValue={itemsQuery ?? ""}
                       placeholder="Kalem ara..."
-                      className="rounded-xl border border-black/10 bg-white px-3 py-2"
+                      className="rounded-xl border border-black/10 bg-white px-3 py-2 outline-none focus:border-black"
                     />
-                    <button className="rounded-full border border-black/10 px-3 py-2 font-semibold">
+                    <button className="rounded-xl bg-black px-3.5 py-2 font-semibold text-white cursor-pointer hover:bg-slate-800 transition">
                       Ara
                     </button>
                     <Link
                       href={`/orders/${order.id}?tab=products`}
-                      className="rounded-full border border-black/10 px-3 py-2 font-semibold"
+                      className="rounded-xl border border-black/15 bg-white px-3.5 py-2 font-semibold text-black/70 hover:bg-slate-100 transition"
                     >
                       Temizle
                     </Link>
                   </form>
                 </div>
-                {!isSales ? (
+                {!isSales && (
                   <div className="flex flex-wrap gap-2">
                     <Link
                       href="/templates/order-items-template.csv"
-                      className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
+                      className="rounded-xl border border-black/15 bg-white px-4 py-2.5 text-xs font-semibold text-black/70 hover:bg-slate-50 transition"
                     >
-                      Ürün CSV
+                      CSV Şablonu
                     </Link>
                     <Link
                       href="/api/order-items/template"
-                      className="rounded-full border border-black/15 px-4 py-2 text-xs font-semibold"
+                      className="rounded-xl border border-black/15 bg-white px-4 py-2.5 text-xs font-semibold text-black/70 hover:bg-slate-50 transition"
                     >
-                      Ürün Excel (Guncel)
+                      Excel Şablonu
                     </Link>
                   </div>
-                ) : null}
+                )}
               </div>
-              {canEditPage && !isSales ? (
+              {canEditPage && !isSales && (
                 <form
                   action={importOrderItems}
-                  className="mt-4 flex flex-wrap items-center gap-3"
+                  className="mt-4 border-t border-black/5 pt-4 flex flex-wrap items-center gap-3"
                 >
                   <input type="hidden" name="order_id" value={order.id} />
                   <input
                     type="file"
                     name="file"
                     accept=".csv,.xlsx"
-                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-1.5 text-xs outline-none focus:border-black"
                   />
-                  <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
-                    Import et
+                  <button className="rounded-xl bg-[#101817] px-4 py-2 text-xs font-bold text-white transition hover:bg-black cursor-pointer">
+                    Excel/CSV Yükle
                   </button>
                 </form>
-              ) : null}
+              )}
             </div>
+
             {orderItems?.length ? (
               <div className="space-y-4">
-                {canEditPage && !isSales ? (
-                  <details className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-                    <summary className="cursor-pointer select-none text-sm font-semibold text-[var(--ocean)]">
-                      Hizli duzenlemeyi ac
+                {canEditPage && !isSales && (
+                  <details className="rounded-xl border border-black/8 bg-white p-4 shadow-2xs">
+                    <summary className="cursor-pointer select-none text-sm font-semibold text-indigo-600 hover:text-indigo-800 flex items-center justify-between">
+                      <span>Toplu Hızlı Düzenleme Paneli</span>
+                      <ChevronDown size={16} className="text-black/40" />
                     </summary>
                     <div className="mt-3">
                       <OrderItemsQuickEdit
@@ -1200,196 +1318,206 @@ export default async function OrderDetailPage({
                       />
                     </div>
                   </details>
-                ) : null}
-              <div className="overflow-x-auto rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dashed border-black/10 pb-4">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">
-                      Invoice lines
-                    </p>
-                    <p className="text-lg font-semibold">Ürün kalemleri</p>
-                  </div>
+                )}
+
+                <div className="overflow-x-auto rounded-xl border border-black/8 bg-white p-5 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/45">
+                        Invoice lines
+                      </p>
+                      <p className="text-base font-semibold text-slate-800">Ürün Kalemleri Listesi</p>
+                    </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <div className="rounded-full border border-black/10 bg-[var(--sky)]/60 px-4 py-2 font-semibold text-black/60">
+                      <div className="rounded-lg border border-black/10 bg-indigo-50/50 px-3.5 py-1.5 font-bold text-indigo-800">
                         Toplam: {formatNumber(totalsPage.qty, 0)} adet
                         {canSeeFinance ? ` | ${formatMoney(totalsPage.amount, order.currency)}` : ""}
                       </div>
-                    {!isSales ? (
-                      <a
-                        href={`/api/orders/${order.id}/items-export?format=xlsx`}
-                        className="flex items-center gap-2 rounded-full border border-black/15 bg-white px-3 py-2 font-semibold text-black hover:bg-[var(--mint)]/50"
-                      >
-                        <Download size={14} /> Ürünleri dışa aktar (Excel)
-                      </a>
-                    ) : null}
+                      {!isSales && (
+                        <a
+                          href={`/api/orders/${order.id}/items-export?format=xlsx`}
+                          className="flex items-center gap-2 rounded-xl border border-black/15 bg-white px-3.5 py-1.5 font-semibold text-black/75 hover:bg-slate-50 transition"
+                        >
+                          <Download size={14} /> Ürünleri Dışa Aktar (Excel)
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <table className="mt-4 w-full min-w-[1100px]">
+                    <thead>
+                      <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40 border-b border-black/5">
+                        <th className="py-3 font-semibold">Ürün</th>
+                        <th className="py-3 font-semibold">Adet</th>
+                        {canSeeFinance ? <th className="py-3 font-semibold">Birim fiyat</th> : null}
+                        {canSeeFinance ? <th className="py-3 font-semibold">Önceki sip. birim fiyat</th> : null}
+                        {canSeeFinance ? <th className="py-3 font-semibold">Total</th> : null}
+                        <th className="py-3 font-semibold">Nitelikler</th>
+                        <th className="py-3 font-semibold">Not</th>
+                        {canEditPage ? <th className="py-3 text-right font-semibold">İşlem</th> : null}
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm">
+                      {orderItems.map((item, index) => {
+                        const computedTotal =
+                          item.total_amount ??
+                          (item.quantity && item.unit_price
+                            ? Number(item.quantity) * Number(item.unit_price)
+                            : null);
+                        const currentUnitPrice =
+                          item.unit_price ?? item.products?.unit_price ?? null;
+                        const previousUnitPrice =
+                          item.product_id ? previousUnitPriceByProduct.get(item.product_id) : undefined;
+                        const fallbackUnitPrice =
+                          item.products?.unit_price !== null &&
+                          item.products?.unit_price !== undefined &&
+                          Number(item.products.unit_price) > 0
+                            ? {
+                                unitPrice: Number(item.products.unit_price),
+                                orderName: "Ürün kartı",
+                                orderCreatedAt: null,
+                              }
+                            : undefined;
+                        const baselineUnitPrice = previousUnitPrice ?? fallbackUnitPrice;
+                        const unitPriceDiffPct =
+                          currentUnitPrice !== null &&
+                          currentUnitPrice !== undefined &&
+                          baselineUnitPrice?.unitPrice &&
+                          baselineUnitPrice.unitPrice > 0
+                            ? ((Number(currentUnitPrice) - baselineUnitPrice.unitPrice) /
+                                baselineUnitPrice.unitPrice) *
+                              100
+                            : null;
+                        return (
+                          <tr
+                            key={item.id}
+                            style={{ animationDelay: `${index * 45}ms` }}
+                            className="group border-b border-black/5 transition hover:bg-slate-50/50"
+                          >
+                            <td className="py-4">
+                              <Link
+                                href={item.product_id ? `/products/${item.product_id}` : "#"}
+                                className="block hover:underline"
+                              >
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-white">
+                                    {item.products?.code ?? "-"}
+                                  </span>
+                                  <p className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors font-sans">
+                                    {item.name ?? item.products?.name ?? "-"}
+                                  </p>
+                                </div>
+                                <p className="mt-1 text-xs text-black/45 leading-tight max-w-xs truncate">
+                                  {item.products?.name ?? "-"}
+                                </p>
+                              </Link>
+                            </td>
+                            <td className="py-4 font-semibold text-slate-700">
+                              {formatNumber(item.quantity ?? null, 0)}
+                            </td>
+                            {canSeeFinance ? (
+                              <td className="py-4 text-slate-700">
+                                {formatUnitPrice(
+                                  currentUnitPrice,
+                                  order.currency
+                                )}
+                              </td>
+                            ) : null}
+                            {canSeeFinance ? (
+                              <td className="py-4">
+                                {baselineUnitPrice ? (
+                                  <div className="space-y-1">
+                                    <div className="text-xs font-semibold text-slate-700">
+                                      {formatUnitPrice(baselineUnitPrice.unitPrice, order.currency)}
+                                    </div>
+                                    <div className="text-[10px] text-black/45 leading-none flex items-center gap-1 font-medium">
+                                      <span className="truncate max-w-[80px]" title={baselineUnitPrice.orderName ?? undefined}>
+                                        {baselineUnitPrice.orderName ?? "-"}
+                                      </span>
+                                      {unitPriceDiffPct !== null && (
+                                        <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${
+                                          unitPriceDiffPct > 0.01
+                                            ? "bg-rose-50 text-rose-700 border-rose-200/65"
+                                            : unitPriceDiffPct < -0.01
+                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200/65"
+                                            : "bg-slate-50 text-slate-500 border-slate-200/65"
+                                        }`}>
+                                          {unitPriceDiffPct > 0 ? "+" : ""}{formatNumber(unitPriceDiffPct, 2)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-black/35 font-medium">-</span>
+                                )}
+                              </td>
+                            ) : null}
+                            {canSeeFinance ? (
+                              <td className="py-4 font-bold text-slate-900">
+                                {formatMoney(
+                                  computedTotal !== null ? Number(computedTotal) : null,
+                                  order.currency
+                                )}
+                              </td>
+                            ) : null}
+                            <td className="py-4 text-xs text-black/55 leading-relaxed max-w-[200px]">
+                              {item.product_id
+                                ? mergedAttributesByProduct[item.product_id]?.join(", ") ?? "-"
+                                : "-"}
+                            </td>
+                            <td className="py-4 text-black/50 max-w-[150px] truncate">
+                              {item.notes ?? "-"}
+                            </td>
+                            {canEditPage && (
+                              <td className="py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Link
+                                    href={`/orders/${order.id}/items/${item.id}/edit`}
+                                    className="rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-semibold text-black/75 hover:bg-slate-50 transition"
+                                  >
+                                    Düzenle
+                                  </Link>
+                                  <ConfirmActionForm
+                                    action={deleteOrderItem}
+                                    confirmText="Ürün kalemi silinsin mi?"
+                                    buttonText="Sil"
+                                    className="inline"
+                                  >
+                                    <input type="hidden" name="order_id" value={order.id} />
+                                    <input type="hidden" name="item_id" value={item.id} />
+                                  </ConfirmActionForm>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-black/60 border-t border-black/5 pt-4">
+                    <span>Kalem toplamlarına göre hesaplanmıştır.</span>
+                    {!isSales && (
+                      <span className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-3.5 py-1.5 font-bold text-indigo-900">
+                        Genel Toplam: {formatMoney(totalsAll.amount, order.currency)}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <table className="mt-4 w-full min-w-[1100px]">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40">
-                      <th className="py-3">Ürün</th>
-                      <th className="py-3">Adet</th>
-                      {canSeeFinance ? <th className="py-3">Birim fiyat</th> : null}
-                      {canSeeFinance ? <th className="py-3">Önceki sip. birim fiyat</th> : null}
-                      {canSeeFinance ? <th className="py-3">Total</th> : null}
-                      <th className="py-3">Nitelikler</th>
-                      <th className="py-3">Not</th>
-                      {canEditPage ? <th className="py-3 text-right">İşlem</th> : null}
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {orderItems.map((item, index) => {
-                      const computedTotal =
-                        item.total_amount ??
-                        (item.quantity && item.unit_price
-                          ? Number(item.quantity) * Number(item.unit_price)
-                          : null);
-                      const currentUnitPrice =
-                        item.unit_price ?? item.products?.unit_price ?? null;
-                      const previousUnitPrice =
-                        item.product_id ? previousUnitPriceByProduct.get(item.product_id) : undefined;
-                      const fallbackUnitPrice =
-                        item.products?.unit_price !== null &&
-                        item.products?.unit_price !== undefined &&
-                        Number(item.products.unit_price) > 0
-                          ? {
-                              unitPrice: Number(item.products.unit_price),
-                              orderName: "Ürün kartı",
-                              orderCreatedAt: null,
-                            }
-                          : undefined;
-                      const baselineUnitPrice = previousUnitPrice ?? fallbackUnitPrice;
-                      const unitPriceDiffPct =
-                        currentUnitPrice !== null &&
-                        currentUnitPrice !== undefined &&
-                        baselineUnitPrice?.unitPrice &&
-                        baselineUnitPrice.unitPrice > 0
-                          ? ((Number(currentUnitPrice) - baselineUnitPrice.unitPrice) /
-                              baselineUnitPrice.unitPrice) *
-                            100
-                          : null;
-                      return (
-                        <tr
-                          key={item.id}
-                          style={{ animationDelay: `${index * 45}ms` }}
-                          className="group animate-[fade-up_0.35s_ease] border-b border-dashed border-black/10 transition hover:bg-[var(--mint)]/35"
-                        >
-                          <td className="py-4">
-                            <Link
-                              href={item.product_id ? `/products/${item.product_id}` : "#"}
-                              className="block hover:underline"
-                            >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-black px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
-                                  {item.products?.code ?? "-"}
-                                </span>
-                                <p className="font-semibold text-black">
-                                  {item.name ?? item.products?.name ?? "-"}
-                                </p>
-                              </div>
-                              <p className="mt-2 text-xs text-black/60">
-                                {item.products?.name ?? "-"}
-                              </p>
-                            </Link>
-                          </td>
-                          <td className="py-4">
-                            {formatNumber(item.quantity ?? null, 0)}
-                          </td>
-                          {canSeeFinance ? (
-                            <td className="py-4">
-                              {formatUnitPrice(
-                                currentUnitPrice,
-                                order.currency
-                              )}
-                            </td>
-                          ) : null}
-                          {canSeeFinance ? (
-                            <td className="py-4">
-                              {baselineUnitPrice ? (
-                                <div className="space-y-1">
-                                  <div>
-                                    <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-                                      {formatUnitPrice(baselineUnitPrice.unitPrice, order.currency)}
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-black/55">
-                                    {baselineUnitPrice.orderName ?? "-"}
-                                    {unitPriceDiffPct !== null
-                                      ? ` | ${unitPriceDiffPct >= 0 ? "+" : ""}${formatNumber(unitPriceDiffPct, 2)}%`
-                                      : ""}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-black/50">-</span>
-                              )}
-                            </td>
-                          ) : null}
-                          {canSeeFinance ? (
-                            <td className="py-4 font-semibold text-black">
-                              {formatMoney(
-                                computedTotal !== null ? Number(computedTotal) : null,
-                                order.currency
-                              )}
-                            </td>
-                          ) : null}
-                          <td className="py-4 text-xs text-black/60">
-                            {item.product_id
-                              ? mergedAttributesByProduct[item.product_id]?.join(", ") ?? "-"
-                              : "-"}
-                          </td>
-                          <td className="py-4 text-black/60">
-                            {item.notes ?? "-"}
-                          </td>
-                          {canEditPage ? (
-                            <td className="py-4 text-right">
-                              <div className="flex flex-wrap justify-end gap-2">
-                                <Link
-                                  href={`/orders/${order.id}/items/${item.id}/edit`}
-                                  className="rounded-full border border-black/20 px-3 py-1 text-xs font-semibold text-black/70 transition group-hover:border-black/40"
-                                >
-                                  Düzenle
-                                </Link>
-                                <ConfirmActionForm
-                                  action={deleteOrderItem}
-                                  confirmText="Ürün kalemi silinsin mi?"
-                                  buttonText="Sil"
-                                  className="inline"
-                                >
-                                  <input type="hidden" name="order_id" value={order.id} />
-                                  <input type="hidden" name="item_id" value={item.id} />
-                                </ConfirmActionForm>
-                              </div>
-                            </td>
-                          ) : null}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-black/60">
-                  <span>Line items toplamina gore hesaplanir.</span>
-                  {!isSales ? (
-                    <span className="rounded-full border border-black/10 bg-white px-3 py-1 font-semibold text-black/70">
-                      Genel toplam: {formatMoney(totalsAll.amount, order.currency)}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Ürün kalemi bulunamadı. İlk ürünü ekleyin.
+              <div className="rounded-xl border border-black/10 bg-[#fbfaf6] px-4 py-8 text-sm text-black/50 text-center">
+                Siparişte henüz ürün kalemi bulunmamaktadır. Aşağıdaki araçları kullanarak ilk kalemi ekleyin.
               </div>
             )}
 
-            {!isSales ? (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-black/10 bg-white p-4 text-sm shadow-sm">
-                  <p className="text-base font-semibold">Katalogdan ürün ekle</p>
-                  <p className="mt-1 text-xs text-black/60">
-                    Mevcut ürün kodu / adı ile arayıp hızlıca satır ekleyin.
+            {!isSales && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-black/8 bg-white p-5 text-sm shadow-2xs">
+                  <p className="text-base font-bold text-slate-800">Katalogdan Ürün Ekle</p>
+                  <p className="mt-1 text-xs text-black/45 leading-relaxed">
+                    Katalogdaki mevcut ürün kodu veya ismiyle hızlı arama yaparak siparişe kalem ekleyin.
                   </p>
-                  <div className="mt-3">
+                  <div className="mt-4">
                     <OrderItemCreateForm
                       orderId={order.id}
                       products={products ?? []}
@@ -1397,16 +1525,17 @@ export default async function OrderDetailPage({
                     />
                   </div>
                 </div>
+
                 <form
                   action={completeSingleMissingProduct}
-                  className="rounded-lg border border-black/10 bg-white p-4 text-sm shadow-sm"
+                  className="rounded-xl border border-black/8 bg-white p-5 text-sm shadow-2xs"
                 >
                   <input type="hidden" name="order_id" value={order.id} />
-                  <p className="text-base font-semibold">Yeni ürün oluştur + kalem ekle</p>
-                  <p className="mt-1 text-xs text-black/60">
-                    Eksik ürün akışındaki gelişmiş form; ürün yoksa oluşturur, varsa fiyatı günceller ve satır ekler.
+                  <p className="text-base font-bold text-slate-800">Yeni Ürün Tanımla ve Kalem Ekle</p>
+                  <p className="mt-1 text-xs text-black/45 leading-relaxed">
+                    Katalogda yer almayan yeni bir ürün kartı oluşturup aynı anda bu siparişe eklenmesini sağlar.
                   </p>
-                  <div className="mt-4 grid gap-4">
+                  <div className="mt-4">
                     <MissingProductRow
                       row={{
                         code: "",
@@ -1424,175 +1553,164 @@ export default async function OrderDetailPage({
                       showQuantity
                     />
                   </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <div className="mt-4 flex justify-end">
                     <button
                       type="submit"
-                      className="rounded-full bg-[var(--ocean)] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+                      className="rounded-xl bg-[#101817] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm"
                     >
-                      Kaydet ve ekle
+                      Yeni Ürünü Kaydet ve Ekle
                     </button>
                   </div>
                 </form>
               </div>
-            ) : null}
+            )}
           </div>
-        ) : null}
+        )}
 
-        {activeTab === "packing" ? (
-          <>
-          <div className="mt-4 space-y-3 text-sm">
+        {activeTab === "packing" && (
+          <div className="mt-4 space-y-4 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-lg font-semibold">Packing listesi</h4>
+              <h4 className="text-lg font-semibold text-slate-800">Çeki Listesi (Packing List)</h4>
               <div className="flex flex-wrap items-center gap-2 text-xs text-black/60">
-                <span>
-                  Dokuman: {hasPackingDocument ? "Var" : "Yok"} Â· Son guncelleme:{" "}
-                  {packingSummaryResolved?.updated_at ?? "-"}
+                <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 font-semibold">
+                  Doküman: {hasPackingDocument ? "Mevcut" : "Yüklenmedi"}
+                  {packingSummaryResolved?.updated_at ? ` · Son Güncelleme: ${formatDate(packingSummaryResolved.updated_at)}` : ""}
                 </span>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3 md:flex-nowrap">
-              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
-                  Koli
-                </p>
-                <p className="mt-2 text-2xl font-semibold leading-tight text-black">
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-black/8 bg-white p-4 shadow-2xs">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/45">Toplam Koli</p>
+                <p className="mt-1.5 text-2xl font-bold leading-tight text-slate-800">
                   {formatNumber(packingTotals.packages, 0)}
                 </p>
-                <p className="text-xs text-black/60">Toplam koli adedi</p>
+                <p className="text-[10px] text-black/50 mt-1">Koli / Paket Sayısı</p>
               </div>
-              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
-                  Net (kg)
+              <div className="rounded-xl border border-black/8 bg-white p-4 shadow-2xs">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/45">Net Ağırlık</p>
+                <p className="mt-1.5 text-2xl font-bold leading-tight text-slate-800">
+                  {formatNumber(packingTotals.netWeight)} kg
                 </p>
-                <p className="mt-2 text-2xl font-semibold leading-tight text-black">
-                  {formatNumber(packingTotals.netWeight)}
-                </p>
-                <p className="text-xs text-black/60">Toplam net ağırlık</p>
+                <p className="text-[10px] text-black/50 mt-1">Toplam Net Ağırlık</p>
               </div>
-              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
-                  Brut (kg)
+              <div className="rounded-xl border border-black/8 bg-white p-4 shadow-2xs">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/45">Brüt Ağırlık</p>
+                <p className="mt-1.5 text-2xl font-bold leading-tight text-slate-800">
+                  {formatNumber(packingTotals.grossWeight)} kg
                 </p>
-                <p className="mt-2 text-2xl font-semibold leading-tight text-black">
-                  {formatNumber(packingTotals.grossWeight)}
-                </p>
-                <p className="text-xs text-black/60">Toplam brüt ağırlık</p>
+                <p className="text-[10px] text-black/50 mt-1">Toplam Brüt Ağırlık</p>
               </div>
-              <div className="flex-1 min-w-[180px] rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
-                  CBM
+              <div className="rounded-xl border border-black/8 bg-white p-4 shadow-2xs">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/45">Toplam Hacim</p>
+                <p className="mt-1.5 text-2xl font-bold leading-tight text-slate-800">
+                  {formatNumber(packingTotals.cbm)} CBM
                 </p>
-                <p className="mt-2 text-2xl font-semibold leading-tight text-black">
-                  {formatNumber(packingTotals.cbm)}
-                </p>
-                <p className="text-xs text-black/60">Toplam hacim</p>
+                <p className="text-[10px] text-black/50 mt-1">Kübik Metre Hacim</p>
               </div>
             </div>
 
-            <details className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-              <summary className="cursor-pointer text-sm font-semibold">
-                Toplamları düzenle
+            <details className="rounded-xl border border-black/8 bg-white p-4 shadow-2xs">
+              <summary className="cursor-pointer text-sm font-semibold text-indigo-600 hover:text-indigo-800 flex items-center justify-between">
+                <span>Özet Çeki Listesi Toplamlarını Düzenle</span>
+                <ChevronDown size={16} className="text-black/40" />
               </summary>
               <form
                 action={saveOrderPackingListSummary}
-                className="mt-3 grid gap-3 md:grid-cols-2"
+                className="mt-3 grid gap-4 md:grid-cols-2"
               >
                 <input type="hidden" name="order_id" value={order.id} />
-                <label className="text-xs font-semibold text-black/60">
-                  Koli adedi
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-black/60">Koli Adedi</label>
                   <input
                     name="total_packages"
                     type="number"
                     step="1"
                     defaultValue={packingTotals.packages || ""}
-                    className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                    placeholder="Orn. 120"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                    placeholder="Örn: 120"
                   />
-                </label>
-                <label className="text-xs font-semibold text-black/60">
-                  Net (kg)
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-black/60">Net Ağırlık (kg)</label>
                   <input
                     name="total_net_weight_kg"
                     type="number"
                     step="0.01"
                     defaultValue={packingTotals.netWeight || ""}
-                    className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                    placeholder="Orn. 12.5"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                    placeholder="Örn: 1450.50"
                   />
-                </label>
-                <label className="text-xs font-semibold text-black/60">
-                  Brut (kg)
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-black/60">Brüt Ağırlık (kg)</label>
                   <input
                     name="total_gross_weight_kg"
                     type="number"
                     step="0.01"
                     defaultValue={packingTotals.grossWeight || ""}
-                    className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                    placeholder="Orn. 13.4"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                    placeholder="Örn: 1530.70"
                   />
-                </label>
-                <label className="text-xs font-semibold text-black/60">
-                  CBM
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-black/60">Hacim (CBM)</label>
                   <input
                     name="total_cbm"
                     type="number"
                     step="0.001"
                     defaultValue={packingTotals.cbm || ""}
-                    className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                    placeholder="Orn. 3.45"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                    placeholder="Örn: 3.45"
                   />
-                </label>
-                <label className="md:col-span-2 text-xs font-semibold text-black/60">
-                  Not
+                </div>
+                <div className="md:col-span-2 flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-black/60">Not / Açıklama</label>
                   <textarea
                     name="notes"
                     defaultValue={packingSummaryResolved?.notes ?? ""}
-                    className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                    placeholder="Tedarikçiden gelen özet / açıklama"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                    placeholder="Örn: Konteyner yükleme detayları, istif notları..."
                     rows={3}
                   />
-                </label>
-                <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-black/60">
-                    Ürün bazli satirlar yerine ozet bilgileri tutuyoruz.
+                </div>
+                <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 border-t border-black/5 pt-3">
+                  <p className="text-xs text-black/50">
+                    * Ürün bazlı satırlar yerine çeki listesi genel özet toplamlarını girmek için kullanın.
                   </p>
-                  <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
+                  <button className="rounded-xl bg-[#101817] px-4.5 py-2 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm">
                     Kaydet
                   </button>
                 </div>
               </form>
             </details>
 
-            <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-xl border border-black/8 bg-white p-5 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">
-                    Packing list dokümanı
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/45">
+                    Packing List Belgesi
                   </p>
-                  <p className="text-sm font-semibold">Belgeyi yükle ve görüntüle</p>
-                  <p className="mt-1 text-xs text-black/60">
-                    Ürün ekleme/CSV yok; sadece tedarikçinin gönderdiği dokümanı ve özet
-                    toplamlarını takip ediyoruz.
-                  </p>
+                  <p className="text-sm font-semibold text-slate-800">Doküman Yükleme & Versiyon Geçmişi</p>
                 </div>
               </div>
+
               {packingDocuments?.length ? (
-                <div className="mt-3 space-y-2">
+                <div className="mt-4 space-y-2">
                   {packingDocuments.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-black/10 bg-[var(--mint)]/30 px-3 py-2 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/20 px-3.5 py-2.5 text-sm"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-black px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
-                          Packing
+                        <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-white">
+                          Packing List
                         </span>
-                        <span className="font-semibold">{doc.file_name ?? "Dosya"}</span>
-                        {doc.storage_path ? (
-                          <DocumentDownloadButton storagePath={doc.storage_path} label="Gor" />
-                        ) : null}
-                        <span className="text-xs text-black/60">
+                        <span className="font-semibold text-slate-800">{doc.file_name ?? "Dosya"}</span>
+                        {doc.storage_path && (
+                          <DocumentDownloadButton storagePath={doc.storage_path} label="Görüntüle" />
+                        )}
+                        <span className="text-xs text-black/45">
                           {doc.uploaded_at ?? ""} {doc.status ? `| ${doc.status}` : ""}
                         </span>
                       </div>
@@ -1609,12 +1727,12 @@ export default async function OrderDetailPage({
                   ))}
                 </div>
               ) : (
-                <div className="mt-3 rounded-xl border border-dashed border-black/10 bg-[var(--peach)] px-3 py-2 text-xs text-black/70">
-                  Packing dokümanı henüz yüklenmedi.
+                <div className="mt-4 rounded-xl border border-dashed border-black/10 bg-slate-50 px-4 py-6 text-xs text-black/50 text-center">
+                  Çeki listesi belgesi henüz sisteme yüklenmedi.
                 </div>
               )}
 
-              {packingDocumentTypes.length ? (
+              {packingDocumentTypes.length > 0 && (
                 <div className="mt-4">
                   <OrderDocumentUploader
                     orderId={order.id}
@@ -1622,235 +1740,239 @@ export default async function OrderDetailPage({
                     orderCurrency={order.currency}
                   />
                 </div>
-              ) : null}
+              )}
 
               {packingDocuments?.length ? (
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-semibold text-black/60">
-                    Otomatik onizleme (ilk dokuman)
+                <div className="mt-5 border-t border-black/5 pt-4 space-y-2">
+                  <p className="text-xs font-bold text-black/60 uppercase tracking-wider">
+                    Evrak Önizleme
                   </p>
-                  <DocumentInlineViewer
-                    storagePath={packingDocuments[0].storage_path}
-                    fileName={packingDocuments[0].file_name}
-                    height="75vh"
-                  />
+                  <div className="rounded-xl overflow-hidden border border-black/10 shadow-sm bg-white">
+                    <DocumentInlineViewer
+                      storagePath={packingDocuments[0].storage_path}
+                      fileName={packingDocuments[0].file_name}
+                      height="65vh"
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>
-          </div>
 
-          {!isSales ? (
-          <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.3em] text-black/40">Packing list import</p>
-                <p className="text-sm text-black/60">
-                  Sabit CSV formatı: KoliSayısı, ÜrünKodu, KolidekiAdet, NetKg, BrutKg
-                </p>
-              </div>
-              <Link
-                href={`/orders/${order.id}/packing-import${order.supplier_id ? `?supplier=${order.supplier_id}` : ""}`}
-                className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white"
-              >
-                CSV içe aktar
-              </Link>
-            </div>
-
-            <div className="rounded-lg border border-black/10 bg-[var(--sand)]/60 p-3 text-xs text-black/70">
-              <p className="font-semibold mb-1">Toplam özet</p>
-              <div className="flex flex-wrap gap-4">
-                {(() => {
-                  const total = Array.from(packingAgg.values()).reduce(
-                    (acc, v) => {
-                      acc.qty += v.qty;
-                      acc.net += v.net;
-                      acc.gross += v.gross;
-                      acc.boxes += v.boxes;
-                      return acc;
-                    },
-                    { qty: 0, net: 0, gross: 0, boxes: 0 }
-                  );
-                  return (
-                    <>
-                      <span>Adet: {formatNumber(total.qty, 0)}</span>
-                      <span>Net: {formatNumber(total.net)} kg</span>
-                      <span>Brüt: {formatNumber(total.gross)} kg</span>
-                      <span>Koli: {formatNumber(total.boxes, 0)}</span>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {packingLists?.length ? (
-              <div className="space-y-3">
-                <div className="overflow-auto rounded-lg border border-black/10">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[var(--sky)]/50 text-left text-[11px] uppercase tracking-[0.2em] text-black/50">
-                      <tr>
-                        <th className="px-3 py-2">Dosya</th>
-                        <th className="px-3 py-2">Durum</th>
-                        <th className="px-3 py-2">Vers.</th>
-                        <th className="px-3 py-2">Adet</th>
-                        <th className="px-3 py-2">Net</th>
-                        <th className="px-3 py-2">Brüt</th>
-                        <th className="px-3 py-2">Koli</th>
-                        <th className="px-3 py-2">Tarih</th>
-                        <th className="px-3 py-2 text-right">İşlem</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-black/70">
-                      {packingLists.map((pl) => {
-                        const agg = packingAgg.get(pl.id) ?? { qty: 0, net: 0, gross: 0, boxes: 0 };
-                        return (
-                          <tr key={pl.id} className="border-b border-black/5">
-                            <td className="px-3 py-2 font-semibold">{pl.file_name ?? "-"}</td>
-                            <td className="px-3 py-2">{pl.status ?? "imported"}</td>
-                            <td className="px-3 py-2">{pl.version ?? 1}</td>
-                            <td className="px-3 py-2">{formatNumber(agg.qty, 0)}</td>
-                            <td className="px-3 py-2">{formatNumber(agg.net)} kg</td>
-                            <td className="px-3 py-2">{formatNumber(agg.gross)} kg</td>
-                            <td className="px-3 py-2">{formatNumber(agg.boxes, 0)}</td>
-                            <td className="px-3 py-2">{pl.created_at ?? "-"}</td>
-                            <td className="px-3 py-2 text-right">
-                              <ConfirmActionForm
-                                action={deletePackingList}
-                                confirmText="Packing list silinsin mi? Bu islem geri alinamaz."
-                                buttonText="Sil"
-                              >
-                                <input type="hidden" name="order_id" value={order.id} />
-                                <input type="hidden" name="packing_list_id" value={pl.id} />
-                              </ConfirmActionForm>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            {!isSales && (
+              <div className="rounded-xl border border-black/8 bg-white p-5 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/40">Kalem Import</p>
+                    <p className="text-sm font-semibold text-slate-800">Excel / CSV ile Kalem Çeki Listesi İçe Aktarma</p>
+                    <p className="text-xs text-black/45 mt-1 leading-relaxed">
+                      Sıralı format: KoliSayısı, ÜrünKodu, KolidekiAdet, NetKg, BrutKg
+                    </p>
+                  </div>
+                  <Link
+                    href={`/orders/${order.id}/packing-import${order.supplier_id ? `?supplier=${order.supplier_id}` : ""}`}
+                    className="rounded-xl bg-[#101817] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-black shadow-sm"
+                  >
+                    CSV / Excel İçe Aktar
+                  </Link>
                 </div>
 
-                <details className="rounded-lg border border-black/10 bg-[var(--mint)]/40 p-3">
-                  <summary className="cursor-pointer text-xs font-semibold text-black/70 mb-2">
-                    Ürün bazlı toplam
-                  </summary>
-                  <div className="mt-2 overflow-auto">
-                    <table className="min-w-full text-xs text-black/70">
-                      <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-[0.2em] text-black/50">
-                          <th className="px-2 py-1">Ürün kodu</th>
-                          <th className="px-2 py-1">Adet</th>
-                          <th className="px-2 py-1">Net</th>
-                          <th className="px-2 py-1">Brüt</th>
-                          <th className="px-2 py-1">Koli</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.from(productAgg.entries()).map(([code, agg]) => (
-                          <tr key={code} className="border-b border-black/5">
-                            <td className="px-2 py-1 font-semibold">{code}</td>
-                            <td className="px-2 py-1">{formatNumber(agg.qty, 0)}</td>
-                            <td className="px-2 py-1">{formatNumber(agg.net)} kg</td>
-                            <td className="px-2 py-1">{formatNumber(agg.gross)} kg</td>
-                            <td className="px-2 py-1">{formatNumber(agg.boxes, 0)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className="rounded-xl border border-black/10 bg-slate-50 p-3.5 text-xs text-slate-700">
+                  <p className="font-bold text-slate-800 mb-1">Hesaplanan Kalem Toplamları</p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-slate-600 font-medium">
+                    {(() => {
+                      const total = Array.from(packingAgg.values()).reduce(
+                        (acc, v) => {
+                          acc.qty += v.qty;
+                          acc.net += v.net;
+                          acc.gross += v.gross;
+                          acc.boxes += v.boxes;
+                          return acc;
+                        },
+                        { qty: 0, net: 0, gross: 0, boxes: 0 }
+                      );
+                      return (
+                        <>
+                          <span>Adet: {formatNumber(total.qty, 0)}</span>
+                          <span>Net: {formatNumber(total.net)} kg</span>
+                          <span>Brüt: {formatNumber(total.gross)} kg</span>
+                          <span>Koli: {formatNumber(total.boxes, 0)} adet</span>
+                        </>
+                      );
+                    })()}
                   </div>
-                </details>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-black/10 bg-[var(--sand)] px-4 py-3 text-sm text-black/70">
-                Henüz packing list importu yok.
+                </div>
+
+                {packingLists?.length ? (
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto rounded-xl border border-black/8 bg-white">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50/80 text-left text-[11px] uppercase tracking-[0.2em] text-black/40 border-b border-black/5">
+                          <tr>
+                            <th className="px-3 py-3 font-semibold">Dosya Adı</th>
+                            <th className="px-3 py-3 font-semibold">Durum</th>
+                            <th className="px-3 py-3 font-semibold">Versiyon</th>
+                            <th className="px-3 py-3 font-semibold text-right">Adet</th>
+                            <th className="px-3 py-3 text-right font-semibold">Net</th>
+                            <th className="px-3 py-3 text-right font-semibold">Brüt</th>
+                            <th className="px-3 py-3 text-right font-semibold">Koli</th>
+                            <th className="px-3 py-3 font-semibold">Tarih</th>
+                            <th className="px-3 py-3 text-right font-semibold">İşlem</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-black/70">
+                          {packingLists.map((pl) => {
+                            const agg = packingAgg.get(pl.id) ?? { qty: 0, net: 0, gross: 0, boxes: 0 };
+                            return (
+                              <tr key={pl.id} className="border-b border-black/5 hover:bg-slate-50/50">
+                                <td className="px-3 py-3 font-semibold text-slate-800">{pl.file_name ?? "-"}</td>
+                                <td className="px-3 py-3 text-xs font-semibold text-slate-500">{pl.status ?? "imported"}</td>
+                                <td className="px-3 py-3 text-xs font-bold text-slate-600">v{pl.version ?? 1}</td>
+                                <td className="px-3 py-3 text-right font-semibold text-slate-700">{formatNumber(agg.qty, 0)}</td>
+                                <td className="px-3 py-3 text-right text-slate-700">{formatNumber(agg.net)} kg</td>
+                                <td className="px-3 py-3 text-right text-slate-700">{formatNumber(agg.gross)} kg</td>
+                                <td className="px-3 py-3 text-right font-semibold text-slate-700">{formatNumber(agg.boxes, 0)}</td>
+                                <td className="px-3 py-3 text-xs text-black/50">{formatDate(pl.created_at)}</td>
+                                <td className="px-3 py-3 text-right">
+                                  <ConfirmActionForm
+                                    action={deletePackingList}
+                                    confirmText="Packing list silinsin mi? Bu işlem geri alınamaz."
+                                    buttonText="Sil"
+                                  >
+                                    <input type="hidden" name="order_id" value={order.id} />
+                                    <input type="hidden" name="packing_list_id" value={pl.id} />
+                                  </ConfirmActionForm>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <details className="rounded-xl border border-indigo-100 bg-indigo-50/15 p-4 shadow-2xs">
+                      <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-900 mb-2 flex items-center justify-between">
+                        <span>Ürün Bazlı Toplam Detayları</span>
+                        <ChevronDown size={14} className="text-indigo-400" />
+                      </summary>
+                      <div className="mt-3 overflow-x-auto rounded-lg bg-white border border-indigo-100/50">
+                        <table className="min-w-full text-xs text-slate-700">
+                          <thead>
+                            <tr className="text-left text-[11px] uppercase tracking-[0.2em] text-black/40 border-b border-black/5 bg-slate-50/50">
+                              <th className="px-3 py-2 font-semibold">Ürün Kodu</th>
+                              <th className="px-3 py-2 text-right font-semibold">Adet</th>
+                              <th className="px-3 py-2 text-right font-semibold">Net</th>
+                              <th className="px-3 py-2 text-right font-semibold">Brüt</th>
+                              <th className="px-3 py-2 text-right font-semibold">Koli</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Array.from(productAgg.entries()).map(([code, agg]) => (
+                              <tr key={code} className="border-b border-black/5 hover:bg-slate-50/40">
+                                <td className="px-3 py-2 font-bold text-slate-800">{code}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-slate-700">{formatNumber(agg.qty, 0)}</td>
+                                <td className="px-3 py-2 text-right text-slate-600">{formatNumber(agg.net)} kg</td>
+                                <td className="px-3 py-2 text-right text-slate-600">{formatNumber(agg.gross)} kg</td>
+                                <td className="px-3 py-2 text-right font-semibold text-slate-700">{formatNumber(agg.boxes, 0)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-black/10 bg-[#fbfaf6] px-4 py-6 text-sm text-black/50 text-center">
+                    Henüz içe aktarılmış kalem çeki listesi bulunmamaktadır.
+                  </div>
+                )}
               </div>
             )}
           </div>
-          ) : null}
-        </>
-      ) : null}
+        )}
 
-      {activeTab === "payments" ? (
-          <div className="mt-4 space-y-3 text-sm">
+        {activeTab === "payments" && (
+          <div className="mt-4 space-y-4 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-lg font-semibold">Odemeler</h4>
-              <span className="text-xs text-black/60">
-                {orderPayments?.length ?? 0} odeme kaydi
+              <h4 className="text-lg font-semibold text-slate-800">Ödemeler (Payment Ledger)</h4>
+              <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-black/60">
+                {orderPayments?.length ?? 0} adet ödeme kaydı
               </span>
             </div>
+
             {orderPayments?.length ? (
-              <div className="overflow-x-auto rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dashed border-black/10 pb-4">
+              <div className="overflow-x-auto rounded-xl border border-black/8 bg-white p-5 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4">
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.35em] text-black/40">
-                      Payment ledger
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/40">
+                      Payment Ledger
                     </p>
-                    <p className="text-lg font-semibold">Odeme kalemleri</p>
+                    <p className="text-base font-semibold text-slate-800">Ödeme Detay Tablosu</p>
                   </div>
-                  <div className="rounded-full border border-black/10 bg-[var(--sky)]/60 px-4 py-2 text-xs font-semibold text-black/60">
-                    Odenen: {formatMoney(paidTotal, order.currency)} | Kalan:{" "}
-                    {formatMoney(remainingTotal, order.currency)}
+                  <div className="rounded-lg border border-amber-100 bg-amber-50/50 px-3.5 py-1.5 text-xs font-bold text-amber-900">
+                    Ödenen: {formatMoney(paidTotal, order.currency)} | Kalan: {formatMoney(remainingTotal, order.currency)}
                   </div>
                 </div>
+
                 <table className="mt-4 w-full min-w-[900px]">
                   <thead>
-                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40">
-                      <th className="py-3">Tarih</th>
-                      <th className="py-3">Tutar</th>
-                      <th className="py-3">Yontem</th>
-                      <th className="py-3">Durum</th>
-                      <th className="py-3">Not</th>
-                      <th className="py-3 text-right">İşlem</th>
+                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40 border-b border-black/5">
+                      <th className="py-3 font-semibold">Ödeme Tarihi</th>
+                      <th className="py-3 font-semibold">Tutar</th>
+                      <th className="py-3 font-semibold">Ödeme Yöntemi</th>
+                      <th className="py-3 font-semibold">Ödeme Durumu</th>
+                      <th className="py-3 font-semibold">Not</th>
+                      <th className="py-3 text-right font-semibold">İşlem</th>
                     </tr>
                   </thead>
-                  <tbody className="text-sm">
+                  <tbody className="text-sm text-slate-700">
                     {orderPayments.map((payment, index) => (
                       <tr
                         key={payment.id}
                         style={{ animationDelay: `${index * 45}ms` }}
-                        className="group animate-[fade-up_0.35s_ease] border-b border-dashed border-black/10 transition hover:bg-[var(--mint)]/35"
+                        className="group border-b border-black/5 hover:bg-slate-50/40"
                       >
-                        <td className="py-4">{payment.payment_date ?? "-"}</td>
-                        <td className="py-4 font-semibold">
+                        <td className="py-4 font-medium text-slate-700">{formatDate(payment.payment_date)}</td>
+                        <td className="py-4 font-bold text-slate-900">
                           {formatMoney(payment.amount ?? null, payment.currency)}
                         </td>
-                        <td className="py-4">{payment.method ?? "-"}</td>
+                        <td className="py-4 text-xs font-semibold text-slate-500 uppercase">{payment.method ?? "-"}</td>
                         <td className="py-4">
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
                               payment.status === "Odendi"
-                                ? "bg-[#d8f2e1] text-[#1b6a3f]"
-                                : "bg-[#ffe9c5] text-[#8a5b1a]"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
                             }`}
                           >
                             {payment.status ?? "-"}
                           </span>
                         </td>
-                        <td className="py-4 text-black/60">
+                        <td className="py-4 text-xs text-black/50 max-w-[200px] truncate">
                           {payment.notes ?? "-"}
                         </td>
                         <td className="py-4 text-right">
-                          <ConfirmActionForm
-                            action={deleteOrderPayment}
-                            confirmText="Odeme silinsin mi?"
-                            buttonText="Sil"
-                            className="inline"
-                          >
-                            <input type="hidden" name="order_id" value={order.id} />
-                            <input type="hidden" name="payment_id" value={payment.id} />
-                          </ConfirmActionForm>
-                          {(() => {
-                            const notes = payment.notes ?? "";
-                            const docIdMatch = notes.match(/doc:([0-9a-f-]+)/i);
-                            const pathMatch = notes.match(/path:([\\w\\-\\/.]+)/i);
-                            const doc =
-                              (docIdMatch && docById.get(docIdMatch[1])) ||
-                              (pathMatch && docByPath.get(pathMatch[1]));
-                            return doc ? (
-                              <div className="mt-2">
+                          <div className="flex items-center justify-end gap-3">
+                            {(() => {
+                              const notes = payment.notes ?? "";
+                              const docIdMatch = notes.match(/doc:([0-9a-f-]+)/i);
+                              const pathMatch = notes.match(/path:([\\w\\-\\/.]+)/i);
+                              const doc =
+                                (docIdMatch && docById.get(docIdMatch[1])) ||
+                                (pathMatch && docByPath.get(pathMatch[1]));
+                              return doc ? (
                                 <PaymentDocLink storagePath={doc.storage_path} fileName={doc.file_name} />
-                              </div>
-                            ) : null;
-                          })()}
+                              ) : null;
+                            })()}
+                            <ConfirmActionForm
+                              action={deleteOrderPayment}
+                              confirmText="Ödeme silinsin mi?"
+                              buttonText="Sil"
+                              className="inline"
+                            >
+                              <input type="hidden" name="order_id" value={order.id} />
+                              <input type="hidden" name="payment_id" value={payment.id} />
+                            </ConfirmActionForm>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1858,89 +1980,113 @@ export default async function OrderDetailPage({
                 </table>
               </div>
             ) : (
-              <div className="rounded-lg border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Ödeme kaydı bulunamadı.
+              <div className="rounded-xl border border-black/10 bg-[#fbfaf6] px-4 py-8 text-sm text-black/50 text-center">
+                Bu siparişe kayıtlı ödeme işlemi bulunmamaktadır.
               </div>
             )}
 
             <form
               action={createOrderPayment}
-              className="rounded-lg border border-dashed border-black/10 bg-white p-4 text-sm"
+              className="rounded-xl border border-black/8 bg-white p-5 text-sm shadow-2xs"
             >
               <input type="hidden" name="order_id" value={order.id} />
-              <p className="font-semibold">Yeni odeme ekle</p>
-              <div className="mt-3 grid gap-3 lg:grid-cols-3">
-                <input
-                  name="amount"
-                  placeholder="Tutar"
-                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                />
-                <input
-                  name="currency"
-                  defaultValue={order.currency ?? "USD"}
-                  placeholder="USD"
-                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                />
-                <input
-                  type="date"
-                  name="payment_date"
-                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                />
-                <input
-                  name="method"
-                  placeholder="Yontem (TT/LC)"
-                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                />
-                <select
-                  name="status"
-                  defaultValue="Bekleniyor"
-                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="Bekleniyor">Bekleniyor</option>
-                  <option value="Odendi">Odendi</option>
-                </select>
-                <input
-                  name="notes"
-                  placeholder="Not"
-                  className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm lg:col-span-3"
-                />
+              <p className="font-bold text-slate-800 text-base">Ödeme İşlemi Girin</p>
+              <p className="text-xs text-black/45 mt-1 leading-relaxed">
+                Tedarikçiye yapılan ödemelerin vadelerini, miktarlarını ve dekont eşleşmelerini takip etmek için ekleyin.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-black/60">Tutar</label>
+                  <input
+                    name="amount"
+                    placeholder="Örn: 25000"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-black/60">Para Birimi</label>
+                  <input
+                    name="currency"
+                    defaultValue={order.currency ?? "USD"}
+                    placeholder="USD"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-black/60">Ödeme Tarihi</label>
+                  <input
+                    type="date"
+                    name="payment_date"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-black/60">Yöntem</label>
+                  <input
+                    name="method"
+                    placeholder="Örn: TT veya LC"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-black/60">Durum</label>
+                  <select
+                    name="status"
+                    defaultValue="Bekleniyor"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                  >
+                    <option value="Bekleniyor">Bekleniyor</option>
+                    <option value="Odendi">Ödendi</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-5 flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-black/60">Notlar</label>
+                  <input
+                    name="notes"
+                    placeholder="Örn: %30 peşinat ödemesi"
+                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                  />
+                </div>
               </div>
-              <button className="mt-4 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
-                Odeme ekle
-              </button>
+              <div className="mt-4 flex justify-end">
+                <button className="rounded-xl bg-[#101817] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm">
+                  Ödemeyi Kaydet
+                </button>
+              </div>
             </form>
           </div>
-        ) : null}
+        )}
 
-        {activeTab === "documents" ? (
-          <div className="mt-4 space-y-3 text-sm">
+        {activeTab === "documents" && (
+          <div className="mt-4 space-y-4 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-lg font-semibold">Belgeler</h4>
-              <span className="text-xs text-black/60">
-                {orderDocuments?.length ?? 0} belge
+              <h4 className="text-lg font-semibold text-slate-800">Sipariş Belgeleri</h4>
+              <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-black/60">
+                {orderDocuments?.length ?? 0} adet yüklenen belge
               </span>
             </div>
-            <div className="rounded-lg border border-black/10 bg-[var(--sand)] px-4 py-3 text-xs text-black/70">
-              Eksik evraklar:{" "}
-              {missingOrderTypes.length ? missingOrderTypes.join(", ") : "Yok"}
+
+            <div className="rounded-xl border border-rose-100 bg-rose-50/45 px-4 py-3.5 text-xs font-semibold text-rose-800 shadow-2xs">
+              Eksik Belge Listesi: <span className="font-bold text-rose-950">{missingOrderTypes.length ? missingOrderTypes.join(", ") : "Eksik evrak bulunmamaktadır."}</span>
             </div>
+
             {orderDocuments?.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] border-separate border-spacing-y-3">
+              <div className="overflow-x-auto rounded-xl border border-black/8 bg-white p-5 shadow-2xs">
+                <table className="w-full min-w-[900px]">
                   <thead>
-                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40">
-                      <th className="px-3 py-2">Tip</th>
-                      <th className="px-3 py-2">Dosya</th>
-                      <th className="px-3 py-2">Durum</th>
-                      <th className="px-3 py-2">Navlun tutari</th>
-                      <th className="px-3 py-2">Not</th>
-                      <th className="px-3 py-2">Tarih</th>
-                      <th className="px-3 py-2 text-right">İşlem</th>
+                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-black/40 border-b border-black/5">
+                      <th className="py-3 font-semibold">Belge Tipi</th>
+                      <th className="py-3 font-semibold">Dosya Adı</th>
+                      <th className="py-3 font-semibold">Durum / Tarih</th>
+                      <th className="py-3 font-semibold">Ek Bilgi</th>
+                      <th className="py-3 font-semibold">Not</th>
+                      <th className="py-3 font-semibold">Yüklenme Tarihi</th>
+                      <th className="py-3 text-right font-semibold">İşlem</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="text-slate-700">
                     {orderDocuments.map((doc, index) => {
-                      const dt = (doc as any).document_types;
+                      const dt = doc.document_types as any;
                       const docTypeName = Array.isArray(dt) ? dt[0]?.name ?? "-" : dt?.name ?? "-";
                       const docTypeLower = docTypeName.toLowerCase();
                       const isPaymentDoc =
@@ -1952,82 +2098,77 @@ export default async function OrderDetailPage({
                         <tr
                           key={doc.id}
                           style={{ animationDelay: `${index * 45}ms` }}
-                          className="group animate-[fade-up_0.35s_ease] transition hover:-translate-y-0.5 [&>td]:border [&>td]:border-black/15 [&>td]:bg-white [&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:shadow-[0_16px_26px_-24px_rgba(15,61,62,0.6)] hover:[&>td]:bg-[var(--mint)] hover:[&>td]:shadow-[0_20px_30px_-24px_rgba(15,61,62,0.7)]"
+                          className="group border-b border-black/5 hover:bg-slate-50/40"
                         >
-                        <td className="px-3 py-4 text-xs font-semibold text-black/70">
-                          {docTypeName}
-                        </td>
-                        <td className="px-3 py-4">
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="font-semibold">
-                              {doc.file_name ?? "Dosya"}
-                            </span>
-                            {doc.storage_path ? (
-                              <DocumentDownloadButton
-                                storagePath={doc.storage_path}
-                                label="Gor"
-                              />
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-3 py-4 text-xs font-semibold">
-                          {doc.status ?? "Bekleniyor"}
-                          {doc.received_at ? ` | ${doc.received_at}` : ""}
-                        </td>
-                        <td className="px-3 py-4 text-xs font-semibold text-black/70">
-                          {doc.freight_amount !== null && doc.freight_amount !== undefined
-                            ? formatMoney(
-                                Number(doc.freight_amount),
-                                doc.freight_currency ?? order.currency
-                              )
-                            : doc.insurance_amount !== null && doc.insurance_amount !== undefined
-                            ? formatMoney(
-                                Number(doc.insurance_amount),
-                                doc.insurance_currency ?? order.currency
-                              )
-                            : "-"}
-                        </td>
-                        <td className="px-3 py-4 text-black/60">
-                          {doc.notes ?? "-"}
-                        </td>
-                        <td className="px-3 py-4">{doc.uploaded_at ?? "-"}</td>
-                        <td className="px-3 py-4 text-right">
-                          <div className="flex flex-col items-end gap-2">
-                              {isPaymentDoc && doc.storage_path ? (
-                                <span className="text-[11px] text-black/50">
-                                  Ödeme bilgisi manuel girildi.
+                          <td className="py-4 font-bold text-slate-800 text-xs">
+                            {docTypeName}
+                          </td>
+                          <td className="py-4">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-700">{doc.file_name ?? "Dosya"}</span>
+                              {doc.storage_path && (
+                                <DocumentDownloadButton
+                                  storagePath={doc.storage_path}
+                                  label="Görüntüle"
+                                />
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-4 text-xs font-semibold text-slate-500">
+                            {doc.status ?? "Bekleniyor"}
+                            {doc.received_at ? ` | Alındı: ${formatDate(doc.received_at)}` : ""}
+                          </td>
+                          <td className="py-4 text-xs font-semibold text-slate-600">
+                            {doc.freight_amount !== null && doc.freight_amount !== undefined
+                              ? `Navlun: ${formatMoney(Number(doc.freight_amount), doc.freight_currency ?? order.currency)}`
+                              : doc.insurance_amount !== null && doc.insurance_amount !== undefined
+                              ? `Sigorta: ${formatMoney(Number(doc.insurance_amount), doc.insurance_currency ?? order.currency)}`
+                              : "-"}
+                          </td>
+                          <td className="py-4 text-xs text-black/50 max-w-[150px] truncate">
+                            {doc.notes ?? "-"}
+                          </td>
+                          <td className="py-4 text-xs text-black/45">{doc.uploaded_at ? formatDate(doc.uploaded_at) : "-"}</td>
+                          <td className="py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {isPaymentDoc && doc.storage_path && (
+                                <span className="text-[10px] font-medium text-black/40">
+                                  Ödeme ilişkili
                                 </span>
-                              ) : null}
-                            <ConfirmActionForm
-                              action={deleteOrderDocument}
-                              confirmText="Belge silinsin mi?"
-                              buttonText="Sil"
-                              className="inline"
-                            >
-                              <input type="hidden" name="order_id" value={order.id} />
-                              <input type="hidden" name="document_id" value={doc.id} />
-                            </ConfirmActionForm>
-                          </div>
-                        </td>
-                      </tr>
+                              )}
+                              <ConfirmActionForm
+                                action={deleteOrderDocument}
+                                confirmText="Belge silinsin mi?"
+                                buttonText="Sil"
+                                className="inline"
+                              >
+                                <input type="hidden" name="order_id" value={order.id} />
+                                <input type="hidden" name="document_id" value={doc.id} />
+                              </ConfirmActionForm>
+                            </div>
+                          </td>
+                        </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="rounded-lg border border-black/10 bg-[var(--peach)] px-4 py-3 text-sm text-black/70">
-                Belge bulunamadı.
+              <div className="rounded-xl border border-black/10 bg-[#fbfaf6] px-4 py-8 text-sm text-black/50 text-center">
+                Bu siparişe yüklenmiş bir doküman bulunmamaktadır.
               </div>
             )}
 
-            <OrderDocumentUploader
-              orderId={order.id}
-              documentTypes={orderDocumentTypes}
-              orderCurrency={order.currency}
-            />
+            <div className="rounded-xl border border-black/8 bg-white p-5 shadow-2xs">
+              <p className="font-bold text-slate-800 text-base mb-3">Yeni Belge Yükle</p>
+              <OrderDocumentUploader
+                orderId={order.id}
+                documentTypes={orderDocumentTypes}
+                orderCurrency={order.currency}
+              />
+            </div>
           </div>
-        ) : null}
+        )}
       </div>
     </section>
   );
