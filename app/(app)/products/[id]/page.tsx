@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { deleteProduct } from "@/app/actions/products";
 import { computeCosts, pickWeightKg, GtipRow } from "@/lib/gtipCost";
@@ -12,16 +12,16 @@ import type { Metadata } from "next";
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   BarChart3,
-  ClipboardList,
+  Calendar,
   Factory,
-  FileText,
+  MapPin,
   Package,
   Pencil,
   Scale,
   ShieldCheck,
-  ShoppingCart,
-  Tags,
+  Truck,
 } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -70,10 +70,10 @@ const fmtDate = (value: string | null | undefined) => {
   });
 };
 
-const sectionClass = "rounded-lg border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/60 p-3 shadow-sm";
-const sectionHeaderClass = "flex flex-wrap items-center justify-between gap-2 border-b border-black/8 pb-2";
+const sectionClass = "rounded-xl border border-slate-100 bg-white p-5 shadow-sm";
+const sectionHeaderClass = "flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3";
 const tableLinkButtonClass =
-  "rounded-md border border-black/10 bg-white px-2 py-1 text-xs font-semibold text-black/60 transition hover:bg-slate-50";
+  "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800";
 
 export default async function ProductDetailPage({
   params,
@@ -156,7 +156,7 @@ export default async function ProductDetailPage({
     supabase
       .from("order_items")
       .select(
-        "order_id, product_id, unit_price, quantity, orders(id, name, created_at, expected_ready_date, currency, extra_cost_percent, suppliers:orders_supplier_id_fkey(name, country))"
+        "order_id, product_id, unit_price, quantity, orders(id, name, order_status, created_at, expected_ready_date, currency, extra_cost_percent, archived_at, suppliers:orders_supplier_id_fkey(name, country))"
       )
       .eq("product_id", product.id),
     supabase
@@ -229,32 +229,143 @@ export default async function ProductDetailPage({
   const { data: orderShipmentLinks } = linkedOrderIds.length
     ? await supabase
         .from("shipment_orders")
-        .select("order_id, shipments(eta_current)")
+        .select("order_id, shipments(id, file_no, status, eta_current, warehouse_delivery_date, container_no, origin_port:ports!origin_port_id(name), destination_port:ports!destination_port_id(name))")
         .in("order_id", linkedOrderIds)
     : { data: [] as any[] };
 
   const orderEtaByOrder = new Map<string, string | null>();
+  const productQtyByOrder = new Map<string, number>();
+
+  (orderItems ?? []).forEach((item) => {
+    if (item.order_id) {
+      const qty = Number(item.quantity) || 0;
+      productQtyByOrder.set(item.order_id, (productQtyByOrder.get(item.order_id) ?? 0) + qty);
+    }
+  });
+
+  const transitShipmentMap = new Map<string, {
+    id: string;
+    file_no: string;
+    status: string | null;
+    orderStatus: string | null;
+    eta_current: string | null;
+    container_no: string | null;
+    origin_port: string | null;
+    destination_port: string | null;
+    totalQty: number;
+    orders: { id: string; name: string; quantity: number; status: string | null }[];
+  }>();
+
   (orderShipmentLinks ?? []).forEach((row: any) => {
     const orderId = row.order_id as string | null;
     if (!orderId) return;
+    const orderQty = productQtyByOrder.get(orderId) ?? 0;
+
     const shipments = Array.isArray(row.shipments) ? row.shipments : row.shipments ? [row.shipments] : [];
+    
+    // ETA mapping
     const etaDates = shipments
       .map((s: any) => s?.eta_current as string | null)
       .filter(Boolean)
       .map((d: string) => new Date(d))
       .filter((d: Date) => !Number.isNaN(d.getTime()));
-    if (!etaDates.length) return;
-    const earliest = etaDates.sort((a: Date, b: Date) => a.getTime() - b.getTime())[0];
-    const current = orderEtaByOrder.get(orderId);
-    if (!current) {
-      orderEtaByOrder.set(orderId, earliest.toISOString());
-      return;
+    if (etaDates.length) {
+      const earliest = etaDates.sort((a: Date, b: Date) => a.getTime() - b.getTime())[0];
+      const current = orderEtaByOrder.get(orderId);
+      if (!current) {
+        orderEtaByOrder.set(orderId, earliest.toISOString());
+      } else {
+        const currentDate = new Date(current);
+        if (earliest.getTime() < currentDate.getTime()) {
+          orderEtaByOrder.set(orderId, earliest.toISOString());
+        }
+      }
     }
-    const currentDate = new Date(current);
-    if (earliest.getTime() < currentDate.getTime()) {
-      orderEtaByOrder.set(orderId, earliest.toISOString());
-    }
+
+    // Transit tracking
+    shipments.forEach((shipment: any) => {
+      if (shipment?.eta_current && !shipment.warehouse_delivery_date) {
+        const orderItem = (orderItems ?? []).find(item => item.order_id === orderId);
+        const orderObj = Array.isArray(orderItem?.orders) 
+          ? orderItem.orders[0] 
+          : (orderItem?.orders as any);
+        
+        // Skip archived orders for transit tracking
+        if (orderObj?.archived_at) return;
+
+        const shipId = shipment.id as string;
+        const existing = transitShipmentMap.get(shipId);
+        const orderName = orderObj?.name ?? "Sipariş";
+        const orderStatus = orderObj?.order_status ?? null;
+
+        if (existing) {
+          if (orderQty > 0) {
+            existing.totalQty += orderQty;
+            if (!existing.orders.some(o => o.id === orderId)) {
+              existing.orders.push({ id: orderId, name: orderName, quantity: orderQty, status: orderStatus });
+            }
+          }
+        } else {
+          transitShipmentMap.set(shipId, {
+            id: shipId,
+            file_no: shipment.file_no ?? "Sevkiyat",
+            status: shipment.status ?? null,
+            orderStatus: orderStatus,
+            eta_current: shipment.eta_current ?? null,
+            container_no: shipment.container_no ?? null,
+            origin_port: shipment.origin_port?.name ?? null,
+            destination_port: shipment.destination_port?.name ?? null,
+            totalQty: orderQty,
+            orders: orderQty > 0 ? [{ id: orderId, name: orderName, quantity: orderQty, status: orderStatus }] : [],
+          });
+        }
+      }
+    });
   });
+
+  const transitShipmentsList = Array.from(transitShipmentMap.values()).sort((a, b) => {
+    return String(a.eta_current ?? "").localeCompare(String(b.eta_current ?? ""));
+  });
+
+  const transitQtyTotal = transitShipmentsList.reduce((sum, item) => sum + item.totalQty, 0);
+
+  const getDaysRemaining = (etaStr: string | null | undefined) => {
+    if (!etaStr) return null;
+    const etaDate = new Date(etaStr);
+    if (Number.isNaN(etaDate.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eta = new Date(etaDate);
+    eta.setHours(0, 0, 0, 0);
+    const diffTime = eta.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getOrderStepIndex = (status: string | null) => {
+    const norm = (status ?? "").toLowerCase().trim();
+    if (norm.includes("siparis verildi") || norm.includes("sipariş verildi")) return 0;
+    if (norm.includes("proforma geldi")) return 1;
+    if (norm.includes("uretimde") || norm.includes("üretimde")) return 2;
+    if (norm.includes("hazir") || norm.includes("hazır")) return 3;
+    if (norm.includes("kalkis") || norm.includes("kalkış")) return 4;
+    if (norm.includes("deniz")) return 5;
+    if (norm.includes("varis") || norm.includes("varış")) return 6;
+    if (norm.includes("gumruk") || norm.includes("gümrük")) return 7;
+    if (norm.includes("depoya teslim") || norm.includes("depoda") || norm.includes("teslim edildi")) return 8;
+    return 0;
+  };
+
+  const orderSteps = [
+    { label: "Sipariş" },
+    { label: "Proforma" },
+    { label: "Üretim" },
+    { label: "Hazır" },
+    { label: "Liman" },
+    { label: "Denizde" },
+    { label: "Varış" },
+    { label: "Gümrük" },
+    { label: "Teslim" }
+  ];
 
   const linkedOrders = (() => {
     const grouped = new Map<
@@ -499,7 +610,20 @@ export default async function ProductDetailPage({
       value: stockCode ? "Aktif" : "Kod yok",
       helper: stockCode || "Netsis kodu yok",
       icon: Package,
-      tone: "border-sky-200 bg-sky-50 text-sky-950",
+      bg: "bg-sky-50/50 border-sky-100/60 text-sky-950",
+      iconBg: "bg-sky-100/80 text-sky-700",
+      helperColor: "text-sky-700/80",
+    },
+    {
+      label: "Yolda (Transit)",
+      value: transitQtyTotal > 0 ? `${fmt(transitQtyTotal)} adet` : "0",
+      helper: transitShipmentsList.length > 0
+        ? `En erken ETA: ${fmtDate(transitShipmentsList[0].eta_current)}`
+        : "Yolda ürün yok",
+      icon: Truck,
+      bg: "bg-indigo-50/50 border-indigo-100/60 text-indigo-950",
+      iconBg: "bg-indigo-100/80 text-indigo-700",
+      helperColor: "text-indigo-700/80",
     },
     ...(canSeeFinance
       ? [
@@ -512,14 +636,18 @@ export default async function ProductDetailPage({
                 : "-",
             helper: latestPricePoint ? fmtDate(latestPricePoint.date) : "Ürün kartı fiyatı",
             icon: BarChart3,
-            tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
+            bg: "bg-emerald-50/50 border-emerald-100/60 text-emerald-950",
+            iconBg: "bg-emerald-100/80 text-emerald-700",
+            helperColor: "text-emerald-700/80",
           },
           {
             label: "KDV'siz maliyet",
             value: fmt(latestUnitCost),
             helper: latestLinkedOrder?.supplier_name ?? "Son siparişe göre",
             icon: Scale,
-            tone: "border-amber-200 bg-amber-50 text-amber-950",
+            bg: "bg-amber-50/50 border-amber-100/60 text-amber-950",
+            iconBg: "bg-amber-100/80 text-amber-700",
+            helperColor: "text-amber-700/80",
           },
         ]
       : []),
@@ -528,110 +656,69 @@ export default async function ProductDetailPage({
       value: fmt(stillInProductionTotal),
       helper: `Proforma ${fmt(proformaQtyTotal)} / Fatura ${fmt(invoiceQtyTotal)}`,
       icon: Factory,
-      tone: "border-orange-200 bg-orange-50 text-orange-950",
+      bg: "bg-orange-50/50 border-orange-100/60 text-orange-950",
+      iconBg: "bg-orange-100/80 text-orange-700",
+      helperColor: "text-orange-700/80",
     },
     {
       label: "Uyumluluk",
       value: productGtipCode ? productGtipCode : "GTİP yok",
       helper: `${(countryRates ?? []).length} ülke oranı`,
       icon: ShieldCheck,
-      tone: productGtipCode
-        ? "border-teal-200 bg-teal-50 text-teal-950"
-        : "border-rose-200 bg-rose-50 text-rose-950",
-    },
-  ];
-  const cockpitLinks = [
-    {
-      label: "Sipariş",
-      value: linkedOrders.length,
-      href: "#orders",
-      icon: ShoppingCart,
-      tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
-      iconTone: "bg-emerald-100 text-emerald-700",
-    },
-    {
-      label: "RFQ",
-      value: linkedRfqs.length,
-      href: "#rfqs",
-      icon: ClipboardList,
-      tone: "border-cyan-200 bg-cyan-50 text-cyan-950",
-      iconTone: "bg-cyan-100 text-cyan-700",
-    },
-    {
-      label: "Proforma",
-      value: linkedProformas.length,
-      href: "#proformas",
-      icon: FileText,
-      tone: "border-orange-200 bg-orange-50 text-orange-950",
-      iconTone: "bg-orange-100 text-orange-700",
-    },
-    {
-      label: "Nitelik",
-      value: mergedAttributeCards.length,
-      href: "#attributes",
-      icon: Tags,
-      tone: "border-sky-200 bg-sky-50 text-sky-950",
-      iconTone: "bg-sky-100 text-sky-700",
+      bg: productGtipCode
+        ? "bg-teal-50/50 border-teal-100/60 text-teal-950"
+        : "bg-rose-50/50 border-rose-100/60 text-rose-950",
+      iconBg: productGtipCode
+        ? "bg-teal-100/80 text-teal-700"
+        : "bg-rose-100/80 text-rose-700",
+      helperColor: productGtipCode ? "text-teal-700/80" : "text-rose-700/80",
     },
   ];
 
   return (
-    <section className="space-y-3">
-      <div className="rounded-lg border border-teal-200/40 bg-[linear-gradient(135deg,#113b5a_0%,#15736f_48%,#df9a57_100%)] p-3 text-white shadow-[0_24px_70px_-50px_rgba(21,115,111,0.9)]">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 max-w-4xl">
-            <p className="text-[11px] uppercase tracking-[0.32em] text-white/45">
-              Ürün Kokpiti
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="rounded-lg border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-bold text-white/78">
+    <section className="space-y-4 bg-slate-50/40 p-2 rounded-2xl">
+      <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm border-l-4 border-l-[#15736f]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+              <Link href="/products" className="hover:text-slate-600 transition">Ürünler</Link>
+              <span>/</span>
+              <span className="text-slate-600">Ürün Detayı</span>
+            </div>
+            
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
                 {product.code}
               </span>
-              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1 text-xs font-semibold text-white/68">
+              <span className="inline-flex items-center rounded-md bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 border border-slate-200">
                 {product.brand ?? "Marka yok"}
               </span>
             </div>
-            <h1 className="mt-2 text-xl font-semibold leading-tight [font-family:var(--font-display)]">
+
+            <h1 className="mt-3 text-2xl font-bold leading-tight text-slate-900 [font-family:var(--font-display)]">
               {product.name}
             </h1>
-            <p className="mt-1 max-w-3xl text-sm leading-5 text-white/62 line-clamp-2">
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
               {product.description ?? product.notes ?? "Ürün açıklaması veya operasyon notu yok."}
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold text-white/68">
-              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
-                Grup: {group?.name ?? "Yok"}
-              </span>
-              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
-                GTİP: {productGtipCode ?? "-"}
-              </span>
-              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
-                Stok kodu: {product.netsis_stok_kodu ?? "-"}
-              </span>
-              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
-                Ağırlık: {weightKg !== null ? `${fmt(weightKg)} kg` : "-"}
-              </span>
-              <span className="rounded-lg border border-white/20 bg-white/12 px-2.5 py-1">
-                Canlı stok:{" "}
-                <ProductLiveStockInline stockCode={stockCode || null} />
-              </span>
-            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 xl:justify-end">
+          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
             {canSeeFinance ? (
               <Link
                 href={`/products/${product.id}/costs`}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:-translate-y-0.5"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50"
               >
-                <Scale className="h-3.5 w-3.5" />
-                Maliyet
+                <Scale className="h-3.5 w-3.5 text-slate-500" />
+                Maliyet Hesaplayıcı
               </Link>
             ) : null}
             {canEdit ? (
               <>
                 <Link
                   href={`/products/${product.id}/edit`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/12 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/18"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#101817]/10 bg-[#101817] px-3 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#182322]"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   Düzenle
@@ -641,7 +728,7 @@ export default async function ProductDetailPage({
                   confirmText="Ürün silinsin mi? Bu işlem geri alınamaz."
                   buttonText="Sil"
                   className="inline"
-                  buttonClassName="inline-flex items-center gap-1.5 rounded-lg border border-rose-300/30 bg-rose-400/15 px-2.5 py-1.5 text-xs font-semibold text-rose-50 transition hover:-translate-y-0.5 hover:bg-rose-400/25"
+                  buttonClassName="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:bg-rose-100"
                 >
                   <input type="hidden" name="product_id" value={product.id} />
                 </ConfirmActionForm>
@@ -649,31 +736,33 @@ export default async function ProductDetailPage({
             ) : null}
             <Link
               href="/products"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/12 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/18"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
               Liste
             </Link>
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           {quickStats.map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.label} className={`rounded-lg border px-2.5 py-2 ${item.tone}`}>
-                <div className="flex items-start justify-between gap-2">
+              <div key={item.label} className={`rounded-xl border p-4 shadow-sm transition hover:shadow-md ${item.bg}`}>
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-[0.2em] opacity-60">
+                    <p className="text-[11px] uppercase tracking-[0.2em] font-bold opacity-60">
                       {item.label}
                     </p>
-                    <p className="mt-1 truncate text-base font-semibold">{item.value}</p>
+                    <p className="mt-2 truncate text-base font-bold leading-none">
+                      {item.value}
+                    </p>
                   </div>
-                  <span className="rounded-md bg-white/75 p-1.5 shadow-sm ring-1 ring-black/5">
-                    <Icon className="h-3.5 w-3.5" />
+                  <span className={`rounded-lg p-2 ${item.iconBg}`}>
+                    <Icon className="h-4 w-4" />
                   </span>
                 </div>
-                <p className="mt-1 truncate text-[11px] font-medium opacity-65">{item.helper}</p>
+                <p className={`mt-2.5 truncate text-xs font-semibold ${item.helperColor}`}>{item.helper}</p>
               </div>
             );
           })}
@@ -681,308 +770,557 @@ export default async function ProductDetailPage({
       </div>
 
       {!isSales && warnings.length ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-sm">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Eksikler: {warnings.join(", ")}
-          </div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm flex items-center gap-2.5">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          Eksikler: {warnings.join(", ")}
         </div>
       ) : null}
 
-      <div className="grid gap-2 md:grid-cols-4">
-        {cockpitLinks.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`rounded-lg border px-2.5 py-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.tone}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.2em] opacity-55">
-                    {item.label}
-                  </p>
-                  <p className="mt-0.5 text-lg font-semibold">{item.value}</p>
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px]">
+        {/* LEFT COLUMN: Actions and Tables */}
+        <div className="space-y-5 min-w-0">
+          {/* Yoldaki Sevkiyatlar Takip Paneli */}
+          {transitShipmentsList.length > 0 && (
+            <section className={`${sectionClass} border-t-4 border-t-indigo-600 overflow-hidden`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-indigo-50 p-1.5 text-indigo-700">
+                    <Truck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                      Lojistik Takip
+                    </p>
+                    <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                      Yoldaki Ürünler ve Sevkiyat Durumu
+                    </h2>
+                  </div>
                 </div>
-                <span className={`rounded-md p-1.5 ${item.iconTone}`}>
-                  <Icon className="h-3.5 w-3.5" />
+                <div className="rounded-lg px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100">
+                  Toplam {fmt(transitQtyTotal)} adet yolda
+                </div>
+              </div>
+              <div className="mt-5 space-y-6">
+                {transitShipmentsList.map((shipment) => {
+                  const stepIndex = getOrderStepIndex(shipment.orderStatus);
+                  const days = getDaysRemaining(shipment.eta_current);
+                  
+                  return (
+                    <div 
+                      key={shipment.id} 
+                      className="rounded-xl border border-slate-100 bg-slate-50/20 p-5 hover:border-slate-200 hover:shadow-sm transition"
+                    >
+                      {/* Üst Bilgi Satırı */}
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-slate-100/60 pb-4">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link 
+                              href={`/shipments/${shipment.id}`}
+                              className="text-sm font-bold text-indigo-700 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                            >
+                              {shipment.file_no}
+                            </Link>
+                            {shipment.container_no && (
+                              <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                Konteyner: {shipment.container_no}
+                              </span>
+                            )}
+                            {shipment.orderStatus && (
+                              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-100">
+                                {shipment.orderStatus}
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{shipment.origin_port ?? "Bilinmeyen Liman"}</span>
+                            <ArrowRight className="h-3 w-3 text-slate-450" />
+                            <span>{shipment.destination_port ?? "Bilinmeyen Liman"}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-left sm:text-right space-y-1">
+                          <span className="text-xs font-medium text-slate-400 block">Planlanan Varış (ETA)</span>
+                          <div className="flex items-center gap-2 sm:justify-end">
+                            <span className="text-sm font-bold text-slate-800 flex items-center gap-1">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              {fmtDate(shipment.eta_current)}
+                            </span>
+                            {days !== null && (
+                              days > 0 ? (
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                                  {days} gün kaldı
+                                </span>
+                              ) : days === 0 ? (
+                                <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                                  Bugün varış
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center rounded-full bg-rose-50 border border-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                                  Gecikti ({Math.abs(days)} gün)
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Miktar ve Bağlantı */}
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-sm text-slate-600 font-medium">
+                          Bu Sevkiyattaki Ürün Miktarı:{" "}
+                          <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100/50 rounded-lg px-2.5 py-1 inline-block ml-1">
+                            {fmt(shipment.totalQty)} adet
+                          </span>
+                        </div>
+                        {shipment.orders.length > 0 && (
+                          <div className="text-xs text-slate-400">
+                            Sipariş: {shipment.orders.map(o => o.name).join(", ")}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stepper Durum Çubuğu */}
+                      <div className="mt-6 pt-2">
+                        <div className="relative">
+                          {/* Arka plan çizgisi */}
+                          <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-100 -translate-y-1/2 z-0 rounded-full" />
+                          {/* İlerleme çizgisi */}
+                          <div 
+                            className="absolute top-1/2 left-0 h-1 bg-gradient-to-r from-teal-500 to-indigo-600 -translate-y-1/2 z-0 rounded-full transition-all duration-500"
+                            style={{ width: `${(stepIndex / 8) * 100}%` }}
+                          />
+
+                          {/* İlerleme Adımları */}
+                          <div className="relative z-10 flex justify-between">
+                            {orderSteps.map((step, idx) => {
+                              const isCompleted = idx <= stepIndex;
+                              const isCurrent = idx === stepIndex;
+                              
+                              return (
+                                <div key={idx} className="flex flex-col items-center">
+                                  <div 
+                                    className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-[10px] font-bold shadow-sm transition-all duration-300 ${
+                                      isCurrent 
+                                        ? "border-indigo-600 bg-indigo-600 text-white ring-4 ring-indigo-100" 
+                                        : isCompleted 
+                                          ? "border-teal-500 bg-teal-500 text-white" 
+                                          : "border-slate-200 bg-white text-slate-400"
+                                    }`}
+                                    title={step.label}
+                                  >
+                                    {idx + 1}
+                                  </div>
+                                  <span className={`mt-2 text-[9px] font-bold uppercase tracking-wider hidden sm:block ${
+                                    isCurrent ? "text-indigo-600 font-extrabold" : isCompleted ? "text-slate-700 font-semibold" : "text-slate-400"
+                                  }`}>
+                                    {step.label}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section id="orders" className={`${sectionClass} border-t-4 border-t-emerald-600`}>
+            <div className={sectionHeaderClass}>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                  Operasyon
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                  Bağlı Siparişler
+                </h2>
+              </div>
+              <span className="rounded-lg bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                {linkedOrders.length} sipariş
+              </span>
+            </div>
+            {linkedOrders.length ? (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[980px] text-sm">
+                  <thead className="text-left text-[11px] uppercase tracking-[0.22em] text-slate-400 font-semibold border-b border-slate-100">
+                    <tr>
+                      <th className="px-3 py-3">Sipariş</th>
+                      <th className="px-3 py-3">ETA</th>
+                      {canSeeFinance ? <th className="px-3 py-3 text-right">Birim fiyat</th> : null}
+                      <th className="px-3 py-3 text-right">Adet</th>
+                      {role !== "Satis" ? <th className="px-3 py-3">Tedarikçi</th> : null}
+                      <th className="px-3 py-3">Ülke</th>
+                      {canSeeFinance ? <th className="px-3 py-3 text-right">Birim maliyet</th> : null}
+                      {canSeeFinance ? <th className="px-3 py-3 text-right">Fark</th> : null}
+                      <th className="px-3 py-3 text-right">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-600">
+                    {linkedOrdersWithPrev.map((linked) => (
+                      <tr key={linked.id} className="group hover:bg-slate-50 transition">
+                        <td className="px-3 py-3 font-semibold text-slate-900 group-hover:text-black">
+                          {linked.name ?? "Sipariş"}
+                        </td>
+                        <td className="px-3 py-3">{fmtDate(linked.shipment_eta)}</td>
+                        {canSeeFinance ? (
+                          <td className="px-3 py-3 text-right font-medium text-slate-700">{fmtUnitPrice(linked.unit_price)}</td>
+                        ) : null}
+                        <td className="px-3 py-3 text-right font-semibold text-slate-900">{linked.quantity ?? "-"}</td>
+                        {role !== "Satis" ? (
+                          <td className="px-3 py-3 truncate max-w-[150px]">{linked.supplier_name ?? "-"}</td>
+                        ) : null}
+                        <td className="px-3 py-3">{linked.country ?? "-"}</td>
+                        {canSeeFinance ? (
+                          <td className="px-3 py-3 text-right font-semibold text-slate-900">
+                            {fmt(linked.unitCost)}
+                          </td>
+                        ) : null}
+                        {canSeeFinance ? (
+                          <td className="px-3 py-3 text-right">
+                            <span
+                              className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${
+                                linked.diffPct === null
+                                  ? "bg-slate-50 text-slate-400"
+                                  : linked.diffPct > 0
+                                    ? "bg-rose-50 text-rose-600 border border-rose-100"
+                                    : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                              }`}
+                            >
+                              {fmtPercent(linked.diffPct)}
+                            </span>
+                          </td>
+                        ) : null}
+                        <td className="px-3 py-3 text-right">
+                          <Link href={`/orders/${linked.id}`} className={tableLinkButtonClass}>
+                            Detay
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-4 text-xs text-slate-400">
+                  * Birim maliyet son sipariş fiyatı, ülke bazlı GTİP oranları ve yurtiçi masraf bilgisiyle hesaplanır.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500 text-center">
+                Henüz bu ürüne bağlı sipariş yok.
+              </div>
+            )}
+          </section>
+
+          {canSeeFinance ? (
+            <div className={`${sectionClass} border-t-4 border-t-indigo-500`}>
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                  Analiz
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                  Fiyat Değişim Geçmişi
+                </h2>
+              </div>
+              <ProductPriceHistoryChart data={priceHistory} />
+            </div>
+          ) : null}
+
+          <section id="proformas" className={`${sectionClass} border-t-4 border-t-amber-500`}>
+            <div className={sectionHeaderClass}>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                  Proforma
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                  Bağlı Proformalar
+                </h2>
+              </div>
+              <span className="rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                {linkedProformas.length} proforma
+              </span>
+            </div>
+            {linkedProformas.length ? (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[820px] text-sm">
+                  <thead className="text-left text-[11px] uppercase tracking-[0.22em] text-slate-400 font-semibold border-b border-slate-100">
+                    <tr>
+                      <th className="px-3 py-3">Proforma</th>
+                      <th className="px-3 py-3">Tedarikçi</th>
+                      <th className="px-3 py-3">Durum</th>
+                      <th className="px-3 py-3">Tarih</th>
+                      <th className="px-3 py-3 text-right">Adet</th>
+                      {canSeeFinance ? <th className="px-3 py-3 text-right">Tutar</th> : null}
+                      <th className="px-3 py-3 text-right">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-600">
+                    {linkedProformas.map((proforma: any) => (
+                      <tr key={proforma.id} className="group hover:bg-slate-50 transition">
+                        <td className="px-3 py-3 font-semibold text-slate-900 group-hover:text-black">{proforma.proforma_no ?? "-"}</td>
+                        <td className="px-3 py-3 truncate max-w-[150px]">{proforma?.suppliers?.name ?? "-"}</td>
+                        <td className="px-3 py-3">
+                          <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${
+                            proforma.status === "onayli" || proforma.status === "completed"
+                              ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                              : "bg-amber-50 text-amber-600 border border-amber-100"
+                          }`}>
+                            {proforma.status ?? "-"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">{fmtDate(proforma.proforma_date)}</td>
+                        <td className="px-3 py-3 text-right font-semibold text-slate-900">{fmt(proforma.totalQty)}</td>
+                        {canSeeFinance ? (
+                          <td className="px-3 py-3 text-right font-semibold text-slate-950">
+                            {fmt(proforma.totalAmount)} <span className="text-xs text-slate-400 font-normal">{proforma.currency ?? ""}</span>
+                          </td>
+                        ) : null}
+                        <td className="px-3 py-3 text-right">
+                          <Link href={`/proformalar/${proforma.id}`} className={tableLinkButtonClass}>
+                            Detay
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500 text-center">
+                Henüz bu ürüne bağlı proforma yok.
+              </div>
+            )}
+          </section>
+
+          <section id="rfqs" className={`${sectionClass} border-t-4 border-t-cyan-500`}>
+            <div className={sectionHeaderClass}>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                  Satınalma
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                  Bağlı RFQ'lar
+                </h2>
+              </div>
+              <span className="rounded-lg bg-cyan-50 border border-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-700">
+                {linkedRfqs.length} RFQ
+              </span>
+            </div>
+            {linkedRfqs.length ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {linkedRfqs.map((rfq: any) => (
+                  <Link
+                    key={rfq.id}
+                    href={`/rfqs/${rfq.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3.5 transition hover:border-[#101817] hover:shadow-sm"
+                  >
+                    <div className="min-w-0">
+                      <span className="inline-flex rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                        {rfq.code ?? "-"}
+                      </span>
+                      <span className="mt-1.5 block truncate text-sm font-semibold text-slate-955">
+                        {rfq.title ?? "-"}
+                      </span>
+                    </div>
+                    <span className="shrink-0 self-center rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-100">
+                      {fmt(rfq.totalQty)} adet
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500 text-center">
+                Henüz bu ürüne bağlı RFQ yok.
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* RIGHT COLUMN: Sidebar (Metadata & Specifications) */}
+        <div className="space-y-5">
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm border-t-4 border-t-sky-500">
+            <div className="border-b border-slate-100 pb-3">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                Özet
+              </p>
+              <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                Lojistik ve Stok
+              </h2>
+            </div>
+            <div className="mt-4 divide-y divide-slate-50">
+              <div className="flex justify-between py-2.5 text-sm">
+                <span className="font-medium text-slate-500">Canlı Stok</span>
+                <span className="font-bold text-[#101817]">
+                  <ProductLiveStockInline stockCode={stockCode || null} />
                 </span>
               </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      <section id="attributes" className="rounded-lg border border-sky-200 bg-sky-50/60 p-3 shadow-sm">
-        <div className={sectionHeaderClass}>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-sky-700/60">
-              Teknik
-            </p>
-            <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
-              Nitelikler
-            </h2>
-          </div>
-          <span className="rounded-lg border border-sky-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-sky-800">
-            {mergedAttributeCards.length} alan
-          </span>
-        </div>
-        {mergedAttributeCards.length ? (
-          <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {mergedAttributeCards.map((attr) => (
-              <div key={attr.key} className="rounded-lg border border-sky-100 bg-white/75 px-2.5 py-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-700/55">
-                  {attr.name}
-                  {attr.unit ? ` (${attr.unit})` : ""}
-                </p>
-                <p className="mt-0.5 truncate text-sm font-semibold text-black">{attr.value}</p>
+              <div className="flex justify-between py-2.5 text-sm">
+                <span className="font-medium text-slate-500">Stok Kodu</span>
+                <span className="font-semibold text-slate-900">{product.netsis_stok_kodu ?? "-"}</span>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
-            Kategori seçilmedi veya nitelik yok.
-          </div>
-        )}
-      </section>
+              <div className="flex justify-between py-2.5 text-sm">
+                <span className="font-medium text-slate-500">Kategori</span>
+                <span className="font-semibold text-slate-900">{group?.name ?? "Yok"}</span>
+              </div>
+              <div className="flex justify-between py-2.5 text-sm">
+                <span className="font-medium text-slate-500">Ağırlık</span>
+                <span className="font-semibold text-slate-900">{weightKg !== null ? `${fmt(weightKg)} kg` : "-"}</span>
+              </div>
+            </div>
+          </section>
 
-      <section id="orders" className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 shadow-sm">
-        <div className={sectionHeaderClass}>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-700/60">
-              Operasyon
-            </p>
-            <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
-              Bağlı siparişler
-            </h2>
-          </div>
-          <span className="rounded-lg border border-emerald-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-            {linkedOrders.length} sipariş
-          </span>
-        </div>
-        {linkedOrders.length ? (
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="text-left text-[11px] uppercase tracking-[0.22em] text-emerald-800/55">
-                <tr>
-                  <th className="px-2.5 py-1.5">Sipariş</th>
-                  <th className="px-2.5 py-1.5">ETA</th>
-                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Birim fiyat</th> : null}
-                  <th className="px-2.5 py-1.5 text-right">Adet</th>
-                  {role !== "Satis" ? <th className="px-2.5 py-1.5">Tedarikçi</th> : null}
-                  <th className="px-2.5 py-1.5">Ülke</th>
-                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Birim maliyet</th> : null}
-                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Fark</th> : null}
-                  <th className="px-2.5 py-1.5 text-right">İşlem</th>
-                </tr>
-              </thead>
-              <tbody className="text-black/70">
-                {linkedOrdersWithPrev.map((linked, idx) => (
-                  <tr key={linked.id} className={idx % 2 === 0 ? "bg-white/75" : "bg-emerald-50/55"}>
-                    <td className="border-t border-black/6 px-2.5 py-1.5 font-semibold text-black">
-                      {linked.name ?? "Sipariş"}
-                    </td>
-                    <td className="border-t border-black/6 px-2.5 py-1.5">{fmtDate(linked.shipment_eta)}</td>
-                    {canSeeFinance ? (
-                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right">{fmtUnitPrice(linked.unit_price)}</td>
-                    ) : null}
-                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">{linked.quantity ?? "-"}</td>
-                    {role !== "Satis" ? (
-                      <td className="border-t border-black/6 px-2.5 py-1.5">{linked.supplier_name ?? "-"}</td>
-                    ) : null}
-                    <td className="border-t border-black/6 px-2.5 py-1.5">{linked.country ?? "-"}</td>
-                    {canSeeFinance ? (
-                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right font-semibold text-black">
-                        {fmt(linked.unitCost)}
-                      </td>
-                    ) : null}
-                    {canSeeFinance ? (
-                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
-                        <span
-                          className={`inline-flex rounded-md px-2 py-1 text-[11px] font-semibold ${
-                            linked.diffPct === null
-                              ? "bg-slate-100 text-black/50"
-                              : linked.diffPct > 0
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-emerald-100 text-emerald-700"
-                          }`}
-                        >
-                          {fmtPercent(linked.diffPct)}
-                        </span>
-                      </td>
-                    ) : null}
-                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
-                      <Link href={`/orders/${linked.id}`} className={tableLinkButtonClass}>
-                        Detay
-                      </Link>
-                    </td>
-                  </tr>
+
+
+          <section id="attributes" className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm border-t-4 border-t-teal-600">
+            <div className={sectionHeaderClass}>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                  Teknik
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                  Nitelikler
+                </h2>
+              </div>
+              <span className="rounded-lg bg-teal-50 border border-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-700">
+                {mergedAttributeCards.length} alan
+              </span>
+            </div>
+            {mergedAttributeCards.length ? (
+              <div className="mt-4 divide-y divide-slate-100">
+                {mergedAttributeCards.map((attr) => (
+                  <div key={attr.key} className="flex justify-between items-center py-2.5 text-sm gap-2">
+                    <span className="font-medium text-slate-500 truncate max-w-[180px]">
+                      {attr.name}
+                      {attr.unit ? ` (${attr.unit})` : ""}
+                    </span>
+                    <span className="font-semibold text-slate-900 truncate text-right">
+                      {attr.value}
+                    </span>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            <p className="mt-2 text-[11px] text-black/45">
-              Birim maliyet son sipariş fiyatı, ülke bazlı GTİP oranları ve yurtiçi masraf bilgisiyle hesaplanır.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-2 rounded-lg border border-emerald-200 bg-white/70 px-3 py-2 text-sm text-emerald-900/70">
-            Henüz bu ürüne bağlı sipariş yok.
-          </div>
-        )}
-      </section>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500 text-center">
+                Nitelik bulunamadı.
+              </div>
+            )}
+          </section>
 
-      <section className="grid gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 pb-2">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-amber-800/65">
-                Üretim
-              </p>
-              <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
-                Üretimde kalan
-              </h2>
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm border-t-4 border-t-orange-500">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                  Üretim
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                  Üretimde Kalan
+                </h2>
+              </div>
+              <span className="rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                {fmt(stillInProductionTotal)} adet
+              </span>
             </div>
-            <span className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-900">
-              {fmt(stillInProductionTotal)}
-            </span>
-          </div>
-          <div className="mt-2.5">
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/70">
-              <div
-                className="h-full rounded-full bg-amber-600"
-                style={{ width: `${Math.max(4, openProductionRatio)}%` }}
-              />
+            <div className="mt-4">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-[#101817]"
+                  style={{ width: `${Math.max(4, openProductionRatio)}%` }}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-medium text-slate-500">
+                <span>Fatura: {fmt(invoiceQtyTotal)}</span>
+                <span>Proforma: {fmt(proformaQtyTotal)}</span>
+              </div>
             </div>
-            <p className="mt-1.5 text-xs font-medium text-amber-900/75">
-              Proforma {fmt(proformaQtyTotal)} / Fatura {fmt(invoiceQtyTotal)}
-            </p>
-          </div>
-          {stillInProductionRows.length ? (
-            <div className="mt-2.5 space-y-1.5">
-              {stillInProductionRows.slice(0, 6).map((item: any) => (
-                <Link
-                  key={`in-production-${item.id}`}
-                  href={`/proformalar/${item.id}`}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white/75 px-2.5 py-1.5 text-sm transition hover:bg-white"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold text-black">{item.proforma_no ?? "-"}</span>
-                    <span className="block truncate text-xs text-black/50">{item?.suppliers?.name ?? "-"}</span>
-                  </span>
-                  <span className="text-sm font-semibold text-amber-800">{fmt(item.openQty)}</span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
-              Açıkta kalan ürün yok.
-            </div>
-          )}
-        </div>
-
-        <div id="rfqs" className="rounded-lg border border-cyan-200 bg-cyan-50/55 p-3 shadow-sm">
-          <div className={sectionHeaderClass}>
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-700/60">
-                Satınalma
-              </p>
-              <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
-                Bağlı RFQ'lar
-              </h2>
-            </div>
-            <span className="rounded-lg border border-cyan-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-cyan-800">
-              {linkedRfqs.length} RFQ
-            </span>
-          </div>
-          {linkedRfqs.length ? (
-            <div className="mt-2 grid gap-1.5">
-              {linkedRfqs.slice(0, 8).map((rfq: any) => (
-                <Link
-                  key={rfq.id}
-                  href={`/rfqs/${rfq.id}`}
-                  className="grid gap-2 rounded-lg border border-cyan-100 bg-white/75 px-2.5 py-1.5 text-sm transition hover:bg-white hover:shadow-sm sm:grid-cols-[1fr_auto]"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold text-black">{rfq.code ?? "-"}</span>
-                    <span className="block truncate text-xs text-black/50">{rfq.title ?? "-"}</span>
-                  </span>
-                  <span className="self-center rounded-md border border-cyan-100 bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-800">
-                    {fmt(rfq.totalQty)} adet
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-2 rounded-lg border border-cyan-200 bg-white/70 px-3 py-2 text-sm text-cyan-900/70">
-              Henüz bu ürüne bağlı RFQ yok.
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section id="proformas" className="rounded-lg border border-orange-200 bg-orange-50/50 p-3 shadow-sm">
-        <div className={sectionHeaderClass}>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-orange-700/60">
-              Proforma
-            </p>
-            <h2 className="mt-0.5 text-lg font-semibold [font-family:var(--font-display)]">
-              Bağlı proformalar
-            </h2>
-          </div>
-          <span className="rounded-lg border border-orange-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-orange-800">
-            {linkedProformas.length} proforma
-          </span>
-        </div>
-        {linkedProformas.length ? (
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full min-w-[820px] text-sm">
-              <thead className="text-left text-[11px] uppercase tracking-[0.22em] text-orange-800/55">
-                <tr>
-                  <th className="px-2.5 py-1.5">Proforma</th>
-                  <th className="px-2.5 py-1.5">Tedarikçi</th>
-                  <th className="px-2.5 py-1.5">Durum</th>
-                  <th className="px-2.5 py-1.5">Tarih</th>
-                  <th className="px-2.5 py-1.5 text-right">Adet</th>
-                  {canSeeFinance ? <th className="px-2.5 py-1.5 text-right">Tutar</th> : null}
-                  <th className="px-2.5 py-1.5 text-right">İşlem</th>
-                </tr>
-              </thead>
-              <tbody className="text-black/70">
-                {linkedProformas.map((proforma: any, idx: number) => (
-                  <tr key={proforma.id} className={idx % 2 === 0 ? "bg-white/75" : "bg-orange-50/55"}>
-                    <td className="border-t border-black/6 px-2.5 py-1.5 font-semibold text-black">{proforma.proforma_no ?? "-"}</td>
-                    <td className="border-t border-black/6 px-2.5 py-1.5">{proforma?.suppliers?.name ?? "-"}</td>
-                    <td className="border-t border-black/6 px-2.5 py-1.5 capitalize">{proforma.status ?? "-"}</td>
-                    <td className="border-t border-black/6 px-2.5 py-1.5">{fmtDate(proforma.proforma_date)}</td>
-                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">{fmt(proforma.totalQty)}</td>
-                    {canSeeFinance ? (
-                      <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
-                        {fmt(proforma.totalAmount)} {proforma.currency ?? ""}
-                      </td>
-                    ) : null}
-                    <td className="border-t border-black/6 px-2.5 py-1.5 text-right">
-                      <Link href={`/proformalar/${proforma.id}`} className={tableLinkButtonClass}>
-                        Detay
-                      </Link>
-                    </td>
-                  </tr>
+            {stillInProductionRows.length ? (
+              <div className="mt-4 space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {stillInProductionRows.slice(0, 6).map((item: any) => (
+                  <Link
+                    key={`in-production-${item.id}`}
+                    href={`/proformalar/${item.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-sm transition hover:border-slate-350 hover:bg-slate-50"
+                  >
+                    <div className="min-w-0">
+                      <span className="block truncate font-semibold text-slate-900">{item.proforma_no ?? "-"}</span>
+                      <span className="block truncate text-xs text-slate-400">{item?.suppliers?.name ?? "-"}</span>
+                    </div>
+                    <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
+                      {fmt(item.openQty)} adet
+                    </span>
+                  </Link>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="mt-2 rounded-lg border border-orange-200 bg-white/70 px-3 py-2 text-sm text-orange-900/70">
-            Henüz bu ürüne bağlı proforma yok.
-          </div>
-        )}
-      </section>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg bg-emerald-50/50 border border-emerald-100/60 p-3 text-xs text-emerald-800 font-medium text-center">
+                Açık ürün bulunmuyor.
+              </div>
+            )}
+          </section>
 
-      {canSeeFinance ? (
-        <ProductPriceHistoryChart data={priceHistory} />
-      ) : null}
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm border-t-4 border-t-rose-500">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                  Gümrük & Lojistik
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900 [font-family:var(--font-display)]">
+                  GTİP Oranları
+                </h2>
+              </div>
+              <span className="rounded-lg bg-rose-50 border border-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                {productGtipCode ?? "Bağlı değil"}
+              </span>
+            </div>
+            
+            {gtip ? (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-2 text-xs border-b border-slate-50 pb-3">
+                  <div>
+                    <span className="text-slate-400 block">KDV Oranı</span>
+                    <span className="font-semibold text-slate-900 block mt-0.5">%20</span>
+                  </div>
+                  {gtip.anti_dumping_applicable ? (
+                    <div>
+                      <span className="text-slate-400 block">Damping Oranı</span>
+                      <span className="font-semibold text-rose-600 block mt-0.5">
+                        {fmtPercent(gtip.anti_dumping_rate)}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+
+                {countryRates?.length ? (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Ülke Bazlı Vergiler</p>
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                      {countryRates.map((rate) => (
+                        <div key={rate.country} className="flex justify-between items-center py-1.5 text-xs border-b border-slate-50 last:border-0">
+                          <span className="font-semibold text-slate-700">{rate.country}</span>
+                          <div className="text-right">
+                            <span className="text-slate-500">GV: {fmtPercent(rate.customs_duty_rate)}</span>
+                            {rate.additional_duty_rate > 0 ? (
+                              <span className="text-slate-500 ml-2">İGV: {fmtPercent(rate.additional_duty_rate)}</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">Ülke bazlı vergi oranı girilmemiş.</p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg bg-rose-50/50 border border-rose-100/60 p-3 text-xs text-rose-800 font-medium text-center">
+                GTİP tanımı bağlı değil.
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
     </section>
   );
-
 }

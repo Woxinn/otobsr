@@ -6,6 +6,7 @@ import { updateSupplier } from "@/app/actions/master-data";
 import CountrySelect from "@/components/CountrySelect";
 import SupplierStatement from "@/components/SupplierStatement";
 import type { Metadata } from "next";
+import SubmitButton from "@/components/SubmitButton";
 import {
   ArrowLeft,
   Building2,
@@ -538,12 +539,12 @@ export default async function SupplierDetailPage({
             </div>
 
             <div className="flex justify-end border-t border-black/5 pt-4">
-              <button
-                type="submit"
+              <SubmitButton
                 className="rounded-xl bg-black px-6 py-2.5 text-xs font-bold text-white hover:bg-black/90 transition shadow-sm cursor-pointer"
+                pendingLabel="Güncelleniyor..."
               >
                 Bilgileri Güncelle
-              </button>
+              </SubmitButton>
             </div>
           </form>
         </div>

@@ -60,6 +60,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: `Sipariş | ${title}` };
 }
 import ConfirmActionForm from "@/components/ConfirmActionForm";
+import SubmitButton from "@/components/SubmitButton";
 import MissingProductRow from "@/components/MissingProductRow";
 import OrderItemCreateForm from "@/components/OrderItemCreateForm";
 import OrderItemsQuickEdit from "@/components/OrderItemsQuickEdit";
@@ -1079,11 +1080,11 @@ export default async function OrderDetailPage({
                 {orderStatusOptions.map((opt) => {
                   const active = (order.order_status ?? "").toLowerCase() === opt.toLowerCase();
                   return (
-                    <button
+                    <SubmitButton
                       key={opt}
-                      type="submit"
                       name="order_status"
                       value={opt}
+                      pendingLabel={opt}
                       className={`rounded-lg px-3 py-1.5 font-semibold transition cursor-pointer ${
                         active
                           ? "bg-black text-white"
@@ -1091,7 +1092,7 @@ export default async function OrderDetailPage({
                       }`}
                     >
                       {opt}
-                    </button>
+                    </SubmitButton>
                   );
                 })}
               </form>
@@ -1287,9 +1288,9 @@ export default async function OrderDetailPage({
                     accept=".csv,.xlsx"
                     className="rounded-xl border border-black/10 bg-white px-3 py-1.5 text-xs outline-none focus:border-black"
                   />
-                  <button className="rounded-xl bg-[#101817] px-4 py-2 text-xs font-bold text-white transition hover:bg-black cursor-pointer">
+                  <SubmitButton className="rounded-xl bg-[#101817] px-4 py-2 text-xs font-bold text-white transition hover:bg-black cursor-pointer" pendingLabel="Yükleniyor...">
                     Excel/CSV Yükle
-                  </button>
+                  </SubmitButton>
                 </form>
               )}
             </div>
@@ -1554,12 +1555,12 @@ export default async function OrderDetailPage({
                     />
                   </div>
                   <div className="mt-4 flex justify-end">
-                    <button
-                      type="submit"
+                    <SubmitButton
                       className="rounded-xl bg-[#101817] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm"
+                      pendingLabel="Kaydediliyor..."
                     >
                       Yeni Ürünü Kaydet ve Ekle
-                    </button>
+                    </SubmitButton>
                   </div>
                 </form>
               </div>
@@ -1678,9 +1679,9 @@ export default async function OrderDetailPage({
                   <p className="text-xs text-black/50">
                     * Ürün bazlı satırlar yerine çeki listesi genel özet toplamlarını girmek için kullanın.
                   </p>
-                  <button className="rounded-xl bg-[#101817] px-4.5 py-2 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm">
+                  <SubmitButton className="rounded-xl bg-[#101817] px-4.5 py-2 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm" pendingLabel="Kaydediliyor...">
                     Kaydet
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             </details>
@@ -2049,9 +2050,9 @@ export default async function OrderDetailPage({
                 </div>
               </div>
               <div className="mt-4 flex justify-end">
-                <button className="rounded-xl bg-[#101817] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm">
+                <SubmitButton className="rounded-xl bg-[#101817] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black cursor-pointer shadow-sm" pendingLabel="Kaydediliyor...">
                   Ödemeyi Kaydet
-                </button>
+                </SubmitButton>
               </div>
             </form>
           </div>

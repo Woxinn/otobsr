@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
+import SubmitButton from "@/components/SubmitButton";
 
 type ProductGroup = {
   id: string;
@@ -352,9 +353,9 @@ export default function ProductForm({
         </p>
       </div>
 
-      <button className="mt-6 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
+      <SubmitButton className="mt-6 rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white" pendingLabel="Kaydediliyor...">
         {mode === "edit" ? "Kaydet" : "Ürün olustur"}
-      </button>
+      </SubmitButton>
     </form>
   );
 }

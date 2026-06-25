@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
@@ -13,6 +13,7 @@ import DocumentUploader from "@/components/DocumentUploader";
 import DocumentDownloadButton from "@/components/DocumentDownloadButton";
 import ShipmentOrdersSelector from "@/components/ShipmentOrdersSelector";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
+import SubmitButton from "@/components/SubmitButton";
 
 const statusOptions = [
   "Planlandi",
@@ -425,9 +426,9 @@ export default async function ShipmentEditPage({
             </div>
           ) : null}
 
-          <button className="mt-6 rounded-full bg-[var(--ocean)] px-5 py-2 text-sm font-semibold text-white">
+          <SubmitButton className="mt-6 rounded-full bg-[var(--ocean)] px-5 py-2 text-sm font-semibold text-white" pendingLabel="Kaydediliyor...">
             Degisiklikleri kaydet
-          </button>
+          </SubmitButton>
         </form>
 
         <div className="space-y-6">
@@ -441,7 +442,10 @@ export default async function ShipmentEditPage({
                 <form key={option} action={updateShipmentStatus}>
                   <input type="hidden" name="shipment_id" value={shipment.id} />
                   <input type="hidden" name="status" value={option} />
-                  <button
+                  <SubmitButton
+                    name="status"
+                    value={option}
+                    pendingLabel={option}
                     className={`rounded-full border px-4 py-2 text-xs font-semibold ${
                       shipment.status === option
                         ? "border-[var(--ocean)] bg-[var(--ocean)] text-white"
@@ -449,7 +453,7 @@ export default async function ShipmentEditPage({
                     }`}
                   >
                     {option}
-                  </button>
+                  </SubmitButton>
                 </form>
               ))}
             </div>
@@ -471,9 +475,9 @@ export default async function ShipmentEditPage({
                 selectedIds={[...selectedOrderIds]}
                 disabledById={Object.fromEntries(disabledById)}
               />
-              <button className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white">
+              <SubmitButton className="rounded-full bg-[var(--ocean)] px-4 py-2 text-xs font-semibold text-white" pendingLabel="Kaydediliyor...">
                 Siparisleri kaydet
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </div>
@@ -549,9 +553,9 @@ export default async function ShipmentEditPage({
                     />
                   </div>
                   <div className="mt-3 flex gap-2">
-                    <button className="rounded-full bg-[var(--ocean)] px-4 py-1 text-xs font-semibold text-white">
+                    <SubmitButton className="rounded-full bg-[var(--ocean)] px-4 py-1 text-xs font-semibold text-white" pendingLabel="Güncelleniyor...">
                       Güncelle
-                    </button>
+                    </SubmitButton>
                       <ConfirmActionForm
                         action={deleteDocument}
                         confirmText="Belge silinsin mi?"

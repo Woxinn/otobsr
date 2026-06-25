@@ -1,6 +1,5 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import type { Metadata } from "next";
-import type { CSSProperties } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ConfirmActionForm from "@/components/ConfirmActionForm";
 import ProductsListToast from "@/components/ProductsListToast";
@@ -9,6 +8,7 @@ import { deleteAllProducts, deleteSelectedProducts } from "@/app/actions/product
 import { computeCosts, GtipRow, pickWeightKg } from "@/lib/gtipCost";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
 import ProductLiveStockInline from "@/components/ProductLiveStockInline";
+import ProductFilterForm from "@/components/ProductFilterForm";
 import {
   Boxes,
   Download,
@@ -16,7 +16,6 @@ import {
   Filter,
   Layers3,
   PackagePlus,
-  Search,
   ShieldCheck,
   Tags,
   Upload,
@@ -37,6 +36,7 @@ type SearchParams = {
   page?: string;
   perPage?: string;
   netsis?: string;
+  deepSearch?: string;
 };
 
 type OrderItemRow = {
@@ -98,21 +98,19 @@ export default async function ProductsPage({
   const effectiveSupplierFilter = isSales ? undefined : resolvedParams.supplier;
 
   const [
-    { data: groups, error: groupsError },
     { data: suppliers, error: suppliersError },
     { data: gtips, error: gtipsError },
     { data: groupStatsRaw, error: groupStatsError },
     { count: totalProductsCount, error: totalProductsError },
     { count: uncategorizedCount, error: uncategorizedError },
   ] = await Promise.all([
-    supabase.from("product_groups").select("id, name").order("name"),
     supabase.from("suppliers").select("id, name").order("name"),
     supabase.from("gtips").select("id, code").order("code"),
     supabase.from("product_groups").select("id, name, products(count)").order("name"),
     supabase.from("products").select("id", { count: "exact", head: true }),
     supabase.from("products").select("id", { count: "exact", head: true }).is("group_id", null),
   ]);
-  logError("groups", groupsError);
+  const groups = groupStatsRaw;
   logError("suppliers", suppliersError);
   logError("gtips", gtipsError);
   logError("groupStats", groupStatsError);
@@ -160,19 +158,17 @@ export default async function ProductsPage({
       queryBuilder = queryBuilder.not("netsis_stok_kodu", "is", null);
     }
     if (queryTokens.length) {
-      if (queryTokens.length === 1) {
-        const term = queryTokens[0];
-        queryBuilder = queryBuilder.or(
-          `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
-        );
-      } else {
-        // Tum kelimelerin en az bir alanda bulunmasini isteriz (daha isabetli).
-        queryTokens.forEach((term) => {
-          queryBuilder = queryBuilder.or(
-            `code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%,description.ilike.%${term}%,notes.ilike.%${term}%`
-          );
-        });
-      }
+      const isDeepSearch = resolvedParams.deepSearch === "true";
+      const searchFields = isDeepSearch
+        ? ["code", "name", "brand", "description", "notes"]
+        : ["code", "name", "brand"];
+
+      queryTokens.forEach((term) => {
+        const orFilters = searchFields
+          .map((field) => `${field}.ilike.%${term}%`)
+          .join(",");
+        queryBuilder = queryBuilder.or(orFilters);
+      });
     }
     if (selectedGroupIds.length > 0) {
       queryBuilder = queryBuilder.in("group_id", selectedGroupIds);
@@ -439,19 +435,6 @@ export default async function ProductsPage({
     };
   });
 
-  const rowColorsFromId = (id: string) => {
-    let hash = 0;
-    for (let i = 0; i < id.length; i += 1) {
-      hash = id.charCodeAt(i) + ((hash << 5) - hash);
-      hash &= hash;
-    }
-    const hue = Math.abs(hash) % 360;
-    return {
-      bg: `hsl(${hue}, 85%, 96%)`,
-      accent: `hsl(${hue}, 70%, 45%)`,
-    };
-  };
-
   const buildQuery = (overrides: Partial<SearchParams>) => {
     const params = new URLSearchParams();
     const q = overrides.q ?? resolvedParams.q;
@@ -466,6 +449,7 @@ export default async function ProductsPage({
     const netsis = overrides.netsis ?? resolvedParams.netsis;
     const perPageValue = overrides.perPage ?? String(perPage);
     const pageValue = overrides.page ?? String(currentPage);
+    const deepSearch = overrides.deepSearch ?? resolvedParams.deepSearch;
 
     if (q) params.set("q", q);
     if (normalizedGroups.length) params.set("group", normalizedGroups.join(","));
@@ -474,6 +458,7 @@ export default async function ProductsPage({
     if (netsis) params.set("netsis", netsis);
     if (perPageValue) params.set("perPage", String(perPageValue));
     if (pageValue && Number(pageValue) > 1) params.set("page", String(pageValue));
+    if (deepSearch === "true") params.set("deepSearch", "true");
 
     const queryString = params.toString();
     return queryString ? `?${queryString}` : "";
@@ -587,167 +572,13 @@ export default async function ProductsPage({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <form className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-          <input type="hidden" name="page" value="1" />
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
-                Filtre Merkezi
-              </p>
-              <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
-                Hızlı arama ve daraltma
-              </h2>
-            </div>
-            <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-black/60">
-              {activeFilterCount ? `${activeFilterCount} aktif` : "Filtre yok"}
-            </span>
-          </div>
-
-          <div className={`mt-4 grid gap-3 ${isSales ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50 lg:col-span-2">
-              Arama
-              <span className="mt-1 flex items-center gap-2 rounded-lg border border-black/10 bg-slate-50 px-3 py-2">
-                <Search className="h-4 w-4 text-black/35" />
-                <input
-                  name="q"
-                  defaultValue={resolvedParams.q ?? ""}
-                  placeholder="Ürün kodu, ad, marka, not"
-                  className="w-full bg-transparent text-sm font-medium normal-case tracking-normal text-black outline-none placeholder:text-black/35"
-                />
-              </span>
-            </label>
-            {!isSales ? (
-              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
-                Tedarikçi
-                <select
-                  name="supplier"
-                  defaultValue={effectiveSupplierFilter ?? ""}
-                  className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
-                >
-                  <option value="">Hepsi</option>
-                  {suppliers?.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
-              GTİP
-              <select
-                name="gtip"
-                defaultValue={resolvedParams.gtip ?? ""}
-                className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
-              >
-                <option value="">Hepsi</option>
-                <option value="none">GTİP yok</option>
-                {gtips?.map((gtip) => (
-                  <option key={gtip.id} value={gtip.id}>
-                    {gtip.code}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
-              Stok kodu
-              <select
-                name="netsis"
-                defaultValue={resolvedParams.netsis ?? ""}
-                className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
-              >
-                <option value="">Hepsi</option>
-                <option value="none">Stok kodu yok</option>
-                <option value="exists">Stok kodu var</option>
-              </select>
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
-              Sayfada
-              <select
-                name="perPage"
-                defaultValue={String(perPage)}
-                className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 px-3 py-2 text-sm font-medium normal-case tracking-normal text-black"
-              >
-                {perPageOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option} ürün
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <details
-            className="mt-4 rounded-lg border border-black/10 bg-slate-50 p-3"
-            open={selectedGroupIds.length > 0}
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-black/50">
-                Kategori filtresi
-              </span>
-              <span className="rounded-md border border-black/10 bg-white px-2 py-1 text-[11px] font-bold text-black/60">
-                {selectedGroupIds.length ? `${selectedGroupIds.length} seçili` : "Hepsi"}
-              </span>
-            </summary>
-            <div className="mt-3 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1">
-              {groupStats.map((group) => (
-                <label key={group.id} className="inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    name="group"
-                    value={group.id}
-                    defaultChecked={selectedGroupIds.includes(group.id)}
-                    className="peer sr-only"
-                  />
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/65 transition hover:border-black/20 peer-checked:border-[#101817] peer-checked:bg-[#101817] peer-checked:text-white">
-                    <span>{group.name}</span>
-                    <span className="rounded-md bg-black/8 px-1.5 py-[1px] text-[10px] peer-checked:bg-white/15">
-                      {group.count}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </details>
-
-          {activeFilterCount ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {safeQuery ? (
-                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
-                  Arama: {safeQuery}
-                </span>
-              ) : null}
-              {selectedGroupNames.map((name) => (
-                <span key={name} className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
-                  {name}
-                </span>
-              ))}
-              {resolvedParams.gtip ? (
-                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
-                  GTİP: {resolvedParams.gtip === "none" ? "yok" : "seçili"}
-                </span>
-              ) : null}
-              {resolvedParams.netsis ? (
-                <span className="rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
-                  Stok kodu: {resolvedParams.netsis === "none" ? "yok" : "var"}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button className="inline-flex items-center gap-2 rounded-lg bg-[#101817] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5">
-              <Filter className="h-4 w-4" />
-              Filtrele
-            </button>
-            <Link
-              href="/products"
-              className="rounded-lg border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-black/65 transition hover:-translate-y-0.5 hover:bg-slate-50"
-            >
-              Temizle
-            </Link>
-          </div>
-        </form>
+        <ProductFilterForm
+          resolvedParams={resolvedParams}
+          suppliers={suppliers}
+          gtips={gtips}
+          groupStats={groupStats}
+          isSales={isSales}
+        />
 
         <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
           <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
@@ -860,7 +691,6 @@ export default async function ProductsPage({
                 </thead>
                 <tbody>
                   {productsList.map((product, index) => {
-                    const rowColors = rowColorsFromId(product.id);
                     const detailHref = `/products/${product.id}`;
                     const groupName =
                       groups?.find((group) => group.id === product.group_id)?.name ?? "-";
@@ -875,8 +705,7 @@ export default async function ProductsPage({
                     return (
                       <tr
                         key={product.id}
-                        className="group border-b border-black/6 transition hover:bg-slate-50"
-                        style={{ ["--row-accent" as string]: rowColors.accent } as CSSProperties}
+                        className="group border-b border-black/6 transition hover:bg-slate-50 bg-white"
                       >
                         {canEdit ? (
                           <td className="border-t border-black/6 px-3 py-4 align-top">
@@ -893,8 +722,7 @@ export default async function ProductsPage({
                           <Link href={detailHref} className="block">
                             <div className="flex items-start gap-3">
                               <span
-                                className="mt-1 h-10 w-1.5 shrink-0 rounded-full"
-                                style={{ backgroundColor: "var(--row-accent)" }}
+                                className="mt-1 h-10 w-1.5 shrink-0 rounded-full bg-slate-200 group-hover:bg-[#101817] transition-colors duration-200"
                               />
                               <span className="min-w-0">
                                 <span className="inline-flex max-w-full rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] font-bold text-black/65">

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createSupplier } from "@/app/actions/master-data";
-import CountrySelect from "@/components/CountrySelect";
 import { ArrowLeft, Plus } from "lucide-react";
+import CountrySelect from "@/components/CountrySelect";
+import SubmitButton from "@/components/SubmitButton";
 
 export default function SupplierCreatePage() {
   return (
@@ -128,12 +129,12 @@ export default function SupplierCreatePage() {
           </div>
 
           <div className="flex justify-end border-t border-black/5 pt-4">
-            <button
-              type="submit"
+            <SubmitButton
               className="inline-flex items-center gap-1.5 rounded-xl bg-black px-6 py-2.5 text-xs font-bold text-white hover:bg-black/90 transition shadow-sm cursor-pointer"
+              pendingLabel={<><Plus size={14} /> Kaydediliyor...</>}
             >
               <Plus size={14} /> Tedarikçiyi Kaydet
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

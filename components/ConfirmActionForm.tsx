@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
 
 type ConfirmActionFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -24,26 +25,36 @@ export default function ConfirmActionForm({
 }: ConfirmActionFormProps) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const handleConfirm = () => {
-    setOpen(false);
-    formRef.current?.requestSubmit();
+    if (formRef.current) {
+      const formData = new FormData(formRef.current);
+      startTransition(async () => {
+        try {
+          await action(formData);
+          setOpen(false);
+        } catch (error) {
+          console.error("Action failed:", error);
+        }
+      });
+    }
   };
 
   return (
     <>
       <form action={action} ref={formRef} className={className} id={formId}>
-      {children}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={
-          buttonClassName ??
-          "rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-18px_rgba(185,28,28,0.6)]"
-        }
-      >
-        {buttonText}
-      </button>
+        {children}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={
+            buttonClassName ??
+            "rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-18px_rgba(185,28,28,0.6)]"
+          }
+        >
+          {buttonText}
+        </button>
       </form>
       {open ? (
         <div
@@ -60,22 +71,31 @@ export default function ConfirmActionForm({
                 {confirmText}
               </h4>
               <p className="mt-2 text-sm text-black/60">
-                Bu islem geri alinamaz.
+                Bu işlem geri alınamaz.
               </p>
               <div className="mt-6 flex items-center justify-end gap-2">
                 <button
                   type="button"
+                  disabled={isPending}
                   onClick={() => setOpen(false)}
-                  className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/60"
+                  className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black/60 disabled:opacity-50 transition"
                 >
-                  Vazgec
+                  Vazgeç
                 </button>
                 <button
                   type="button"
+                  disabled={isPending}
                   onClick={handleConfirm}
-                  className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(185,28,28,0.7)]"
+                  className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(185,28,28,0.7)] disabled:opacity-50 inline-flex items-center gap-1.5 transition"
                 >
-                  Sil
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Siliniyor...
+                    </>
+                  ) : (
+                    "Sil"
+                  )}
                 </button>
               </div>
             </div>
