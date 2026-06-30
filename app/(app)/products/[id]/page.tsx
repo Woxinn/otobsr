@@ -8,6 +8,7 @@ import ProductLiveStockInline from "@/components/ProductLiveStockInline";
 import ProductPriceHistoryChart, {
   ProductPriceHistoryPoint,
 } from "@/components/ProductPriceHistoryChart";
+import ProductNotesWidget from "@/components/ProductNotesWidget";
 import type { Metadata } from "next";
 import {
   AlertTriangle,
@@ -118,6 +119,7 @@ export default async function ProductDetailPage({
     { data: orderItems },
     { data: rfqItems },
     { data: proformaItems },
+    { data: productNotes },
   ] = await Promise.all([
     product.group_id
       ? supabase
@@ -169,6 +171,11 @@ export default async function ProductDetailPage({
         "proforma_id, quantity, line_total, proformas!inner(id, proforma_no, proforma_date, status, created_at, currency, suppliers(name))"
       )
       .eq("product_id", product.id),
+    supabase
+      .from("product_notes")
+      .select("id, product_id, content, created_at, updated_at")
+      .eq("product_id", product.id)
+      .order("created_at", { ascending: false }),
   ]);
 
   const valueByAttribute = new Map(
@@ -700,7 +707,7 @@ export default async function ProductDetailPage({
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              {product.description ?? product.notes ?? "Ürün açıklaması veya operasyon notu yok."}
+              {product.description ?? "Ürün açıklaması yok."}
             </p>
           </div>
 
@@ -1319,6 +1326,12 @@ export default async function ProductDetailPage({
               </div>
             )}
           </section>
+
+          <ProductNotesWidget
+            productId={product.id}
+            notes={productNotes ?? []}
+            canEdit={canEdit}
+          />
         </div>
       </div>
     </section>
