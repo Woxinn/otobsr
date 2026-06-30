@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getShipmentFlags } from "@/lib/shipments";
 import { canViewFinance, getCurrentUserRole } from "@/lib/roles";
-import MonthlyOrdersChart from "@/components/MonthlyOrdersChart";
 import SupplierDonutChart from "@/components/SupplierDonutChart";
+import DashboardUploadInbox from "@/components/DashboardUploadInbox";
+import ActionCenterList from "@/components/ActionCenterList";
+import DashboardChartsCard from "@/components/DashboardChartsCard";
 import {
   BarChart3,
   CalendarClock,
@@ -203,96 +205,78 @@ export default async function DashboardPage() {
   );
   const liveStatusStrip = [
     {
-      label: "Planlandi",
+      label: "Planlandı",
       value: shipmentStatusCounts.planlandi,
-      tone: "from-slate-500/20 to-slate-200/50",
       filter: "planlandi",
+      barColor: "from-slate-400 to-slate-500",
     },
     {
-      label: "Kalkis Limaninda",
+      label: "Kalkış Limanında",
       value: shipmentStatusCounts.kalkisLimaninda,
-      tone: "from-amber-500/20 to-amber-200/50",
       filter: "kalkis-limaninda",
+      barColor: "from-amber-400 to-amber-500",
     },
     {
       label: "Denizde",
       value: shipmentStatusCounts.denizde,
-      tone: "from-sky-600/20 to-sky-200/50",
       filter: "denizde",
+      barColor: "from-sky-400 to-sky-500",
     },
     {
-      label: "Varis Limaninda",
+      label: "Varış Limanında",
       value: shipmentStatusCounts.varisLimaninda,
-      tone: "from-indigo-600/20 to-indigo-200/50",
       filter: "varis-limaninda",
+      barColor: "from-indigo-400 to-indigo-500",
     },
     {
-      label: "Gemiden Indi",
+      label: "Gemiden İndi",
       value: shipmentStatusCounts.gemidenIndi,
-      tone: "from-emerald-600/20 to-emerald-200/50",
       filter: "gemiden-indi",
+      barColor: "from-emerald-400 to-emerald-500",
     },
     {
       label: "Geciken",
       value: delayed,
-      tone: "from-rose-600/20 to-rose-200/50",
       filter: "geciken",
+      barColor: "from-rose-400 to-rose-500",
     },
   ];
   const orderLiveStatusStrip = [
     {
-      label: "Siparis Verildi",
+      label: "Sipariş Verildi",
       value: orderStatusCounts.siparisVerildi,
-      tone: "from-slate-500/20 to-slate-200/50",
       filter: "siparis-verildi",
+      barColor: "from-slate-400 to-slate-500",
     },
     {
       label: "Proforma Geldi",
       value: orderStatusCounts.proformaGeldi,
-      tone: "from-amber-500/20 to-amber-200/50",
       filter: "proforma-geldi",
+      barColor: "from-amber-400 to-amber-500",
     },
     {
-      label: "Uretimde",
+      label: "Üretimde",
       value: orderStatusCounts.uretimde,
-      tone: "from-rose-500/20 to-rose-200/50",
       filter: "uretimde",
+      barColor: "from-rose-400 to-rose-500",
     },
     {
-      label: "Hazir",
+      label: "Hazır",
       value: orderStatusCounts.hazir,
-      tone: "from-emerald-600/20 to-emerald-200/50",
       filter: "hazir",
+      barColor: "from-emerald-400 to-emerald-500",
     },
     {
-      label: "Kalkis Limaninda",
-      value: orderStatusCounts.kalkisLimaninda,
-      tone: "from-sky-600/20 to-sky-200/50",
-      filter: "kalkis-limaninda",
-    },
-    {
-      label: "Denizde",
-      value: orderStatusCounts.denizde,
-      tone: "from-indigo-600/20 to-indigo-200/50",
-      filter: "denizde",
-    },
-    {
-      label: "Varis Limaninda",
-      value: orderStatusCounts.varisLimaninda,
-      tone: "from-violet-600/20 to-violet-200/50",
-      filter: "varis-limaninda",
-    },
-    {
-      label: "Gumrukte",
+      label: "Gümrükte",
       value: orderStatusCounts.gumrukte,
-      tone: "from-orange-600/20 to-orange-200/50",
       filter: "gumrukte",
+      barColor: "from-orange-400 to-orange-500",
     },
     {
       label: "Depoya Teslim",
       value: orderStatusCounts.depoTeslim,
-      tone: "from-emerald-700/20 to-emerald-200/50",
       filter: "depoya-teslim-edildi",
+      barColor: "from-teal-400 to-teal-500",
     },
   ];
 
@@ -513,7 +497,7 @@ export default async function DashboardPage() {
     .filter(({ diffDays }) => diffDays !== null && diffDays <= 7)
     .sort((a, b) => (a.diffDays ?? 999) - (b.diffDays ?? 999));
 
-  const delayedShipmentActions = (flags ?? [])
+    const delayedShipmentActions = (flags ?? [])
     .filter((item) => item.flags.overdue)
     .sort((a, b) =>
       String(a.shipment.eta_current ?? "").localeCompare(String(b.shipment.eta_current ?? ""))
@@ -525,9 +509,9 @@ export default async function DashboardPage() {
       description: `ETA gecikti · ${formatDate(item.shipment.eta_current)}`,
       meta: "Sevkiyat",
       href: `/shipments/${item.shipment.id}`,
-      tone: "critical",
+      tone: "critical" as const,
       priority: 1,
-      icon: Ship,
+      icon: "Ship" as const,
     }));
 
   const missingDocumentActions = ordersWithMissing.slice(0, 5).map((item) => ({
@@ -536,9 +520,9 @@ export default async function DashboardPage() {
     description: `${item.missing.length} eksik evrak · ${item.missing.slice(0, 2).join(", ")}`,
     meta: formatDate(item.order.expected_ready_date),
     href: `/orders/${item.order.id}`,
-    tone: "warning",
+    tone: "warning" as const,
     priority: 2,
-    icon: FileWarning,
+    icon: "FileWarning" as const,
   }));
 
   const productionActions = urgentProductionRows.slice(0, 4).map(({ order, diffDays }) => ({
@@ -554,9 +538,9 @@ export default async function DashboardPage() {
             : `${diffDays} gün içinde hazır`,
     meta: supplierNameOf(order),
     href: `/orders/${order.id}`,
-    tone: diffDays !== null && diffDays < 0 ? "critical" : "info",
+    tone: diffDays !== null && diffDays < 0 ? ("critical" as const) : ("info" as const),
     priority: diffDays !== null && diffDays < 0 ? 1 : 3,
-    icon: CalendarClock,
+    icon: "CalendarClock" as const,
   }));
 
   const paymentActions = canSeeFinance
@@ -566,9 +550,9 @@ export default async function DashboardPage() {
         description: `${formatMoney(row.remaining)} ${row.currency} kalan ödeme`,
         meta: formatDate(row.expected_ready_date),
         href: `/orders/${row.id}`,
-        tone: "money",
+        tone: "money" as const,
         priority: 4,
-        icon: CircleDollarSign,
+        icon: "CircleDollarSign" as const,
       }))
     : [];
 
@@ -579,28 +563,51 @@ export default async function DashboardPage() {
     ...paymentActions,
   ]
     .sort((a, b) => a.priority - b.priority)
-    .slice(0, 12);
+    .slice(0, 12) as any[];
 
   const statusTone = {
     critical: {
-      shell: "border-rose-200 bg-rose-50 text-rose-900",
-      icon: "bg-rose-600 text-white",
-      pill: "bg-rose-100 text-rose-700",
+      shell: "border-slate-100 hover:border-rose-250 border-l-4 border-l-rose-500 bg-white",
+      icon: "bg-rose-50 text-rose-600",
+      pill: "bg-rose-50 text-rose-700 border border-rose-100",
+      btn: "text-rose-600 hover:text-rose-800 hover:bg-rose-50",
     },
     warning: {
-      shell: "border-amber-200 bg-amber-50 text-amber-950",
-      icon: "bg-amber-500 text-white",
-      pill: "bg-amber-100 text-amber-800",
+      shell: "border-slate-100 hover:border-amber-250 border-l-4 border-l-amber-500 bg-white",
+      icon: "bg-amber-50 text-amber-600",
+      pill: "bg-amber-50 text-amber-800 border border-amber-100",
+      btn: "text-amber-600 hover:text-amber-800 hover:bg-amber-50",
     },
     info: {
-      shell: "border-sky-200 bg-sky-50 text-sky-950",
-      icon: "bg-sky-600 text-white",
-      pill: "bg-sky-100 text-sky-700",
+      shell: "border-slate-100 hover:border-sky-250 border-l-4 border-l-sky-500 bg-white",
+      icon: "bg-sky-50 text-sky-600",
+      pill: "bg-sky-50 text-sky-700 border border-sky-100",
+      btn: "text-sky-600 hover:text-sky-800 hover:bg-sky-50",
     },
     money: {
-      shell: "border-emerald-200 bg-emerald-50 text-emerald-950",
-      icon: "bg-emerald-600 text-white",
-      pill: "bg-emerald-100 text-emerald-700",
+      shell: "border-slate-100 hover:border-emerald-250 border-l-4 border-l-emerald-500 bg-white",
+      icon: "bg-emerald-50 text-emerald-600",
+      pill: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+      btn: "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50",
+    },
+  };
+
+  const statusStyles = {
+    critical: {
+      border: "border-l-4 border-l-rose-500 border-slate-100 hover:border-rose-200/80",
+      iconBg: "bg-rose-50 text-rose-600",
+    },
+    warning: {
+      border: "border-l-4 border-l-amber-500 border-slate-100 hover:border-amber-200/80",
+      iconBg: "bg-amber-50 text-amber-600",
+    },
+    info: {
+      border: "border-l-4 border-l-sky-500 border-slate-100 hover:border-sky-200/80",
+      iconBg: "bg-sky-50 text-sky-600",
+    },
+    success: {
+      border: "border-l-4 border-l-emerald-500 border-slate-100 hover:border-emerald-200/80",
+      iconBg: "bg-emerald-50 text-emerald-600",
     },
   };
 
@@ -608,18 +615,18 @@ export default async function DashboardPage() {
     {
       label: "Geciken sevkiyat",
       value: delayed,
-      helper: `${totalOpen} açık shipment`,
+      helper: `${totalOpen} açık sevkiyat`,
       href: "/shipments?shipmentStatus=geciken",
       icon: Ship,
-      accent: "border-rose-200 bg-rose-50 text-rose-900",
+      status: "critical" as const,
     },
     {
       label: "Eksik evrak",
       value: ordersWithMissing.length,
-      helper: "Sipariş dosyası",
+      helper: "Sipariş dökümanı",
       href: "/orders",
       icon: FileWarning,
-      accent: "border-amber-200 bg-amber-50 text-amber-950",
+      status: "warning" as const,
     },
     {
       label: "Yakın üretim",
@@ -627,26 +634,27 @@ export default async function DashboardPage() {
       helper: "7 gün ve gecikenler",
       href: "/orders?orderStatus=uretimde",
       icon: CalendarClock,
-      accent: "border-sky-200 bg-sky-50 text-sky-950",
+      status: "info" as const,
     },
     canSeeFinance
       ? {
           label: "Kalan ödeme",
-          value: formatMoney(remainingPayments),
-          helper: "USD toplam",
+          value: `${formatMoney(remainingPayments)} USD`,
+          helper: "Ödenecek toplam tutar",
           href: "/orders",
           icon: CircleDollarSign,
-          accent: "border-emerald-200 bg-emerald-50 text-emerald-950",
+          status: "success" as const,
         }
       : {
           label: "Hazır sipariş",
           value: producedOrders.length,
-          helper: "Üretim tamam",
+          helper: "Üretimi tamamlanmış",
           href: "/orders?orderStatus=hazir",
           icon: PackageCheck,
-          accent: "border-emerald-200 bg-emerald-50 text-emerald-950",
+          status: "success" as const,
         },
   ];
+
 
   const TR_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
   const orderMonthlyData = (() => {
@@ -687,21 +695,21 @@ export default async function DashboardPage() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border border-black/10 bg-[#101817] p-5 text-white shadow-[0_24px_70px_-50px_rgba(16,24,23,0.9)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="rounded-2xl border border-emerald-950/20 bg-[#101817] p-6 text-white shadow-lg">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-2xl">
-            <p className="text-[11px] uppercase tracking-[0.32em] text-white/45">
+            <p className="text-[10px] font-bold uppercase tracking-[0.32em] text-white/50">
               Operasyon Masası
             </p>
-            <h1 className="mt-2 text-3xl font-semibold leading-tight [font-family:var(--font-display)]">
+            <h1 className="mt-2 text-2xl font-bold leading-tight text-white [font-family:var(--font-display)]">
               Bugünün odak işleri
             </h1>
-            <p className="mt-2 text-sm leading-6 text-white/62">
+            <p className="mt-2 text-sm leading-6 text-white/70">
               Kritik sevkiyat, evrak, üretim ve ödeme sinyalleri tek ekranda.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-lg border border-white/10 bg-white/8 px-3 py-2 font-semibold text-white/75">
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            <span className="rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 font-semibold text-white/80">
               {new Date().toLocaleDateString("tr-TR", {
                 day: "2-digit",
                 month: "long",
@@ -710,126 +718,107 @@ export default async function DashboardPage() {
             </span>
             <Link
               href="/orders"
-              className="rounded-lg border border-white/15 bg-white px-3 py-2 font-semibold text-[#101817] transition hover:-translate-y-0.5"
+              className="rounded-lg bg-white px-3.5 py-2 font-bold text-[#101817] transition hover:-translate-y-0.5 hover:bg-slate-50"
             >
               Siparişler
             </Link>
             <Link
               href="/shipments"
-              className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/15"
+              className="rounded-lg border border-white/10 bg-white/10 px-3.5 py-2 font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/15"
             >
-              Shipments
+              Sevkiyatlar
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {focusCards.map((card) => {
           const Icon = card.icon;
+          const style = statusStyles[card.status];
           return (
             <Link
               key={card.label}
               href={card.href}
-              className={`group rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.accent}`}
+              className={`group rounded-xl border bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${style.border}`}
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.24em] opacity-60">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
                     {card.label}
                   </p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight">
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900 group-hover:text-black">
                     {card.value}
                   </p>
                 </div>
-                <span className="rounded-lg bg-white/80 p-2 shadow-sm ring-1 ring-black/5 transition group-hover:scale-105">
-                  <Icon className="h-4 w-4" />
+                <span className={`rounded-xl p-2.5 shadow-sm transition-all duration-200 group-hover:scale-105 ${style.iconBg}`}>
+                  <Icon className="h-5 w-5" />
                 </span>
               </div>
-              <p className="mt-3 text-xs font-medium opacity-65">{card.helper}</p>
+              <p className="mt-3 text-xs font-semibold text-slate-450 group-hover:text-slate-500">
+                {card.helper}
+              </p>
             </Link>
           );
         })}
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.8fr)]">
-        <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
-                Aksiyon Merkezi
-              </p>
-              <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
-                Öncelikli takip listesi
-              </h2>
-            </div>
-            <span className="rounded-lg border border-black/10 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-black/65">
-              {actionItems.length} aksiyon
-            </span>
-          </div>
-
-          <div className="mt-4 grid gap-3">
-            {actionItems.length ? (
-              actionItems.map((item) => {
-                const Icon = item.icon;
-                const tone = statusTone[item.tone as keyof typeof statusTone];
-                return (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    className={`grid gap-3 rounded-lg border p-3 transition hover:-translate-y-0.5 hover:shadow-sm sm:grid-cols-[auto_1fr_auto] ${tone.shell}`}
-                  >
-                    <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${tone.icon}`}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-black">{item.title}</p>
-                        <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${tone.pill}`}>
-                          {item.meta}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-black/62">{item.description}</p>
-                    </div>
-                    <span className="self-center text-xs font-semibold text-black/45">Aç</span>
-                  </Link>
-                );
-              })
-            ) : (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-5 text-sm font-medium text-emerald-800">
-                Şu an kritik aksiyon görünmüyor.
+        <div className="space-y-5">
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 font-bold">
+                  Aksiyon Merkezi
+                </p>
+                <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)] text-slate-800">
+                  Öncelikli takip listesi
+                </h2>
               </div>
-            )}
-          </div>
-        </section>
+              <span className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-655">
+                {actionItems.length} aksiyon
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <ActionCenterList actionItems={actionItems} statusTone={statusTone} />
+            </div>
+          </section>
+
+          <DashboardUploadInbox
+            orders={orders ?? []}
+            shipments={shipments ?? []}
+            documentTypes={documentTypes ?? []}
+          />
+        </div>
 
         <aside className="space-y-5">
-          <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 font-bold">
                   Canlı Akış
                 </p>
-                <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)]">
+                <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)] text-slate-800">
                   Sipariş durumları
                 </h2>
               </div>
-              <ClipboardList className="h-5 w-5 text-black/35" />
+              <ClipboardList className="h-5 w-5 text-slate-355" />
             </div>
             <div className="mt-4 space-y-3">
               {orderLiveStatusStrip.map((item) => (
                 <Link
                   key={item.label}
                   href={`/orders?orderStatus=${item.filter}`}
-                  className="block rounded-lg border border-black/8 bg-slate-50 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                  className="block rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 transition-all duration-200 hover:bg-white hover:shadow-sm hover:border-slate-200"
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="font-semibold text-black/70">{item.label}</span>
-                    <span className="font-bold text-black">{item.value}</span>
+                    <span className="font-semibold text-slate-600">{item.label}</span>
+                    <span className="font-bold text-slate-800">{item.value}</span>
                   </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/8">
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-full rounded-full bg-[var(--ocean)]"
+                      className={`h-full rounded-full bg-gradient-to-r ${item.barColor}`}
                       style={{ width: `${Math.max(6, (item.value / orderMax) * 100)}%` }}
                     />
                   </div>
@@ -839,32 +828,32 @@ export default async function DashboardPage() {
           </section>
 
           {!isSales ? (
-            <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+            <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 font-bold">
                     Sevkiyat
                   </p>
-                  <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)]">
+                  <h2 className="mt-1 text-lg font-semibold [font-family:var(--font-display)] text-slate-800">
                     Shipment durumları
                   </h2>
                 </div>
-                <Ship className="h-5 w-5 text-black/35" />
+                <Ship className="h-5 w-5 text-slate-355" />
               </div>
               <div className="mt-4 space-y-3">
                 {liveStatusStrip.map((item) => (
                   <Link
                     key={item.label}
                     href={`/shipments?shipmentStatus=${item.filter}`}
-                    className="block rounded-lg border border-black/8 bg-slate-50 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                    className="block rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 transition-all duration-200 hover:bg-white hover:shadow-sm hover:border-slate-200"
                   >
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="font-semibold text-black/70">{item.label}</span>
-                      <span className="font-bold text-black">{item.value}</span>
+                      <span className="font-semibold text-slate-600">{item.label}</span>
+                      <span className="font-bold text-slate-800">{item.value}</span>
                     </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/8">
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <div
-                        className="h-full rounded-full bg-[var(--clay)]"
+                        className={`h-full rounded-full bg-gradient-to-r ${item.barColor}`}
                         style={{ width: `${Math.max(6, (item.value / shipmentMax) * 100)}%` }}
                       />
                     </div>
@@ -876,17 +865,17 @@ export default async function DashboardPage() {
         </aside>
       </div>
 
-      <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
+      <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 font-bold">
               Üretim Akışı
             </p>
-            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)] text-slate-800">
               Hazırlık ve teslim odağı
             </h2>
           </div>
-          <PackageCheck className="h-5 w-5 text-black/35" />
+          <PackageCheck className="h-5 w-5 text-slate-350" />
         </div>
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
           {[
@@ -900,7 +889,7 @@ export default async function DashboardPage() {
                 href: `/orders/${order.id}`,
               })),
               empty: "Tarihsiz sipariş yok.",
-              tone: "border-amber-200 bg-amber-50",
+              borderTop: "border-t-4 border-t-amber-500/80",
             },
             {
               label: "Üretimde",
@@ -917,12 +906,12 @@ export default async function DashboardPage() {
                       : diffDays < 0
                         ? `${Math.abs(diffDays)} gün gecikti`
                         : diffDays === 0
-                          ? "Bugün"
-                          : `${diffDays} gün`,
+                          ? "Bugün hazır olmalı"
+                          : `${diffDays} gün içinde hazır`,
                   href: `/orders/${order.id}`,
                 })),
               empty: "Üretimde sipariş yok.",
-              tone: "border-sky-200 bg-sky-50",
+              borderTop: "border-t-4 border-t-sky-500/80",
             },
             {
               label: "Hazır",
@@ -934,30 +923,30 @@ export default async function DashboardPage() {
                 href: `/orders/${order.id}`,
               })),
               empty: "Hazır sipariş yok.",
-              tone: "border-emerald-200 bg-emerald-50",
+              borderTop: "border-t-4 border-t-emerald-500/80",
             },
           ].map((column) => (
-            <div key={column.label} className={`rounded-lg border p-4 ${column.tone}`}>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-black">{column.label}</p>
-                <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-bold text-black/70">
+            <div key={column.label} className={`rounded-xl border border-slate-100 bg-slate-50/40 p-4 shadow-sm ${column.borderTop}`}>
+              <div className="flex items-center justify-between gap-2 pb-3">
+                <p className="text-sm font-semibold text-slate-800">{column.label}</p>
+                <span className="rounded-md bg-white border border-slate-200/50 px-2 py-0.5 text-xs font-bold text-slate-650">
                   {column.count}
                 </span>
               </div>
-              <div className="mt-3 space-y-2">
+              <div className="space-y-2">
                 {column.rows.length ? (
                   column.rows.map((row) => (
                     <Link
                       key={row.id}
                       href={row.href}
-                      className="block rounded-lg border border-black/8 bg-white/75 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                      className="block rounded-lg border border-slate-100 bg-white px-3 py-2.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-200"
                     >
-                      <p className="truncate text-sm font-semibold text-black">{row.title}</p>
-                      <p className="mt-1 truncate text-xs text-black/55">{row.meta}</p>
+                      <p className="truncate text-sm font-semibold text-slate-800">{row.title}</p>
+                      <p className="mt-1 truncate text-xs text-slate-400">{row.meta}</p>
                     </Link>
                   ))
                 ) : (
-                  <div className="rounded-lg border border-black/8 bg-white/65 px-3 py-3 text-xs font-medium text-black/55">
+                  <div className="rounded-lg border border-slate-100 bg-white/50 px-3 py-3 text-xs font-medium text-slate-400 text-center">
                     {column.empty}
                   </div>
                 )}
@@ -969,29 +958,29 @@ export default async function DashboardPage() {
 
       {canSeeFinance ? (
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-          <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3 border-b border-black/8 pb-4">
+          <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 font-bold">
                   Finans
                 </p>
-                <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+                <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)] text-slate-800">
                   Ödeme görünümü
                 </h2>
               </div>
-              <CircleDollarSign className="h-5 w-5 text-black/35" />
+              <CircleDollarSign className="h-5 w-5 text-slate-350" />
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               {[
-                { label: "Bu ay ödendi", value: monthlyPaid, tone: "bg-emerald-50 text-emerald-900" },
-                { label: "Bekleyen", value: pendingPayments, tone: "bg-amber-50 text-amber-950" },
-                { label: "Kalan", value: remainingPayments, tone: "bg-rose-50 text-rose-900" },
+                { label: "Bu ay ödendi", value: monthlyPaid, border: "border-l-4 border-l-emerald-500", textTone: "text-emerald-700" },
+                { label: "Bekleyen", value: pendingPayments, border: "border-l-4 border-l-amber-500", textTone: "text-amber-700" },
+                { label: "Kalan", value: remainingPayments, border: "border-l-4 border-l-rose-500", textTone: "text-rose-700" },
               ].map((item) => (
-                <div key={item.label} className={`rounded-lg border border-black/8 p-4 ${item.tone}`}>
-                  <p className="text-[11px] uppercase tracking-[0.2em] opacity-65">
+                <div key={item.label} className={`rounded-lg border border-slate-100 bg-white p-4 shadow-sm ${item.border}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
                     {item.label}
                   </p>
-                  <p className="mt-2 text-xl font-semibold">{formatMoney(item.value)} USD</p>
+                  <p className={`mt-2 text-xl font-bold ${item.textTone}`}>{formatMoney(item.value)} USD</p>
                 </div>
               ))}
             </div>
@@ -1001,59 +990,69 @@ export default async function DashboardPage() {
                   <Link
                     key={row.id}
                     href={`/orders/${row.id}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-black/8 bg-slate-50 px-3 py-2 text-sm transition hover:bg-white hover:shadow-sm"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5 text-sm transition-all duration-200 hover:bg-white hover:shadow-sm hover:border-slate-200"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-black">{row.name}</p>
-                      <p className="text-xs text-black/50">{formatDate(row.expected_ready_date)}</p>
+                      <p className="truncate font-semibold text-slate-800">{row.name}</p>
+                      <p className="text-xs text-slate-400">{formatDate(row.expected_ready_date)}</p>
                     </div>
-                    <p className="whitespace-nowrap text-sm font-semibold text-rose-700">
+                    <p className="whitespace-nowrap text-sm font-semibold text-rose-750">
                       {formatMoney(row.remaining)} {row.currency}
                     </p>
                   </Link>
                 ))
               ) : (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-800">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-800 text-center">
                   Kalan ödemesi olan sipariş yok.
                 </div>
               )}
             </div>
           </div>
-          <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-            <p className="mb-4 text-[11px] uppercase tracking-[0.28em] text-black/40">
-              Aylık Ödeme
-            </p>
-            <MonthlyOrdersChart data={paymentMonthlyData} />
-          </div>
+          
+          <DashboardChartsCard
+            orderMonthlyData={orderMonthlyData}
+            paymentMonthlyData={paymentMonthlyData}
+            canSeeFinance={canSeeFinance}
+          />
         </section>
       ) : null}
 
       {!isSales ? (
-        <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-black/8 pb-4">
+        <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-black/40">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 font-bold">
                 Analiz
               </p>
-              <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)]">
+              <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-display)] text-slate-800">
                 Trend ve dağılım
               </h2>
             </div>
-            <BarChart3 className="h-5 w-5 text-black/35" />
+            <BarChart3 className="h-5 w-5 text-slate-350" />
           </div>
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <div className="rounded-lg border border-black/8 bg-slate-50 p-4">
-              <p className="mb-3 text-sm font-semibold text-black/70">Aylık sipariş trendi</p>
-              <MonthlyOrdersChart data={orderMonthlyData} />
+          
+          {canSeeFinance ? (
+            <div className="mt-5">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 max-w-2xl mx-auto">
+                <p className="mb-3 text-sm font-semibold text-slate-650 text-center">Tedarikçi dağılımı</p>
+                <SupplierDonutChart data={supplierDistributionData} />
+              </div>
             </div>
-            <div className="rounded-lg border border-black/8 bg-slate-50 p-4">
-              <p className="mb-3 text-sm font-semibold text-black/70">Tedarikçi dağılımı</p>
-              <SupplierDonutChart data={supplierDistributionData} />
+          ) : (
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <DashboardChartsCard
+                orderMonthlyData={orderMonthlyData}
+                paymentMonthlyData={paymentMonthlyData}
+                canSeeFinance={canSeeFinance}
+              />
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-600">Tedarikçi dağılımı</p>
+                <SupplierDonutChart data={supplierDistributionData} />
+              </div>
             </div>
-          </div>
+          )}
         </section>
       ) : null}
     </section>
   );
-
 }
