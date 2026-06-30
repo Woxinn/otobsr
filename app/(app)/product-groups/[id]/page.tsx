@@ -35,8 +35,8 @@ export default async function ProductGroupDetailPage({
   }
 
   const [
-    { data: attributes },
-    { data: groupNotes },
+    attributesRes,
+    groupNotesRes,
   ] = await Promise.all([
     supabase
       .from("product_attributes")
@@ -50,6 +50,9 @@ export default async function ProductGroupDetailPage({
       .eq("group_id", group.id)
       .order("created_at", { ascending: false }),
   ]);
+
+  const attributes = attributesRes?.data ?? [];
+  const groupNotes = groupNotesRes?.data ?? [];
 
   return (
     <section className="space-y-6">

@@ -110,16 +110,16 @@ export default async function ProductDetailPage({
   const stockCode = product.netsis_stok_kodu ? String(product.netsis_stok_kodu).trim() : "";
 
   const [
-    { data: group },
-    { data: gtip },
-    { data: countryRates },
-    { data: attributes },
-    { data: values },
-    { data: extraAttributes },
-    { data: orderItems },
-    { data: rfqItems },
-    { data: proformaItems },
-    { data: productNotes },
+    groupRes,
+    gtipRes,
+    countryRatesRes,
+    attributesRes,
+    valuesRes,
+    extraAttributesRes,
+    orderItemsRes,
+    rfqItemsRes,
+    proformaItemsRes,
+    productNotesRes,
   ] = await Promise.all([
     product.group_id
       ? supabase
@@ -177,6 +177,17 @@ export default async function ProductDetailPage({
       .eq("product_id", product.id)
       .order("created_at", { ascending: false }),
   ]);
+
+  const group = groupRes?.data;
+  const gtip = gtipRes?.data;
+  const countryRates = countryRatesRes?.data ?? [];
+  const attributes = attributesRes?.data ?? [];
+  const values = valuesRes?.data ?? [];
+  const extraAttributes = extraAttributesRes?.data ?? [];
+  const orderItems = orderItemsRes?.data ?? [];
+  const rfqItems = rfqItemsRes?.data ?? [];
+  const proformaItems = proformaItemsRes?.data ?? [];
+  const productNotes = productNotesRes?.data ?? [];
 
   const valueByAttribute = new Map(
     (values ?? []).map((value) => [value.attribute_id, value])
