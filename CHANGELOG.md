@@ -1,6 +1,26 @@
-﻿# Changelog
+# Changelog
 
 Bu dosya uygulama değişikliklerini sürüm bazında takip eder.
+
+## v0.3.621 - 2026-07-02
+
+- **Ürün ve Kategori Detaylarında Kronolojik Operasyonel Notlar:**
+  - Ürün ve Kategori detay sayfalarına sağ tarafta (sidebar) konumlanmış kronolojik operasyonel notlar widget'ları entegre edildi.
+  - Rol tabanlı yetki kontrolü ile Satış rolünün yalnızca okuyabileceği, Yönetim/Admin rollerinin ise hızlı not ekleme, inline düzenleme (düzenlendi rozetiyle) ve silme onayı eylemlerini yapabileceği dinamik yapılar kuruldu.
+  - Not ekleme, güncelleme ve silme işlemleri sırasında ağ gecikmelerini göstermek için buton seviyesinde `Loader2` yükleniyor animasyonları eklendi.
+  - Eski `products.notes` ve `product_groups.notes` verilerini yeni oluşturulan RLS muafiyetli `product_notes` ve `product_group_notes` tablolarına taşıyan otomatik SQL veritabanı göçü ve RLS muafiyeti uygulandı.
+- **Proformalar Modülü Tasarımsal Yenilemesi:**
+  - Proformalar listeleme, detay ve yeni proforma içe aktarma arayüzleri premium tasarım dilimizle tamamen yenilendi.
+  - Proforma detay sayfasına Lucide ikonları ile renklendirilmiş (indigo, teal, emerald) üst sınır vurgulu özet kartları (`stats widgets`) eklendi.
+  - Tedarikçinin son sipariş birim fiyatı ile karşılaştırma yapıp fiyat sapmalarını (fiyat artışları için kırmızı/rose, tasarruflar için yeşil/emerald) gösteren sapma rozetleri (`price deviation badges`) eklendi.
+  - İçe aktarma ekranına sürükle-bırak destekli, sürükleme esnasında renk değiştiren ve seçilen dosyayı temizleme butonu barındıran modern bir Excel/CSV yükleme alanı (`dropzone`) ile çift tıklama korumalı yükleme butonu entegre edildi.
+- **Genel İthalat Maliyet Hesaplama Modülü (`/maliyet-hesaplama`):**
+  - Ürün kartından bağımsız veya katalog ürünlerini referans alabilen genel amaçlı bağımsız bir ithalat maliyet simülatörü modülü geliştirildi.
+  - Katalog ürün arama desteği ile ürün kodu veya adına göre arama yapılıp ürünün fiyat, ağırlık, yurtiçi masraf ve GTİP kodu bilgilerinin tek tıkla otomatik doldurulması sağlandı.
+  - GTİP koduna göre gümrük vergisi, ilave gümrük vergisi, anti-dumping, gözetim ve KDV oranlarını veritabanından çekip ülkelere göre otomatik hesaplayan ve istenirse oranların elle ezilmesine izin veren yapı kuruldu.
+  - GTİP'ten bağımsız olarak tüm ithalat vergilerinin elle girilebildiği manuel oranlar modu eklendi.
+  - Hesaplanan net maliyet, brüt maliyet, matrah farkları ve önerilen satış fiyatlarının adım adım formül dökümünü içeren canlı simülasyon arayüzü ve ülkeler arası maliyet kıyaslama tablosu entegre edildi.
+  - Yeni sayfa "Planlama" menüsü altında "Maliyet Hesaplayıcı" adıyla navigasyona kaydedildi ve Satış rolüne erişim engellendi.
 
 ## v0.3.620 - 2026-06-10
 

@@ -31,6 +31,7 @@ import {
   ChevronUp,
   LogOut,
   User as UserIcon,
+  Calculator,
 } from "lucide-react";
 
 interface HeaderProps {
@@ -78,6 +79,7 @@ export default function Header({ email, role }: HeaderProps) {
 
   const planningNav = [
     { key: "order-plan", href: "/konteyner-planlama", label: "Konteyner Planlama", description: "Yük ve hacim planı", icon: Boxes },
+    { key: "cost-calculator", href: "/maliyet-hesaplama", label: "Maliyet Hesaplayıcı", description: "İthalat vergi ve maliyet simülasyonu", icon: Calculator },
   ];
 
   const libraryNav = [

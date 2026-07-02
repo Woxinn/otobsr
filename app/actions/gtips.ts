@@ -80,3 +80,26 @@ export async function deleteGtip(formData: FormData) {
   revalidatePath("/gtips");
   redirect("/gtips");
 }
+
+export async function getGtipDetailsWithRates(gtipId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: gtip, error: gtipError } = await supabase
+    .from("gtips")
+    .select("*")
+    .eq("id", gtipId)
+    .maybeSingle();
+
+  if (gtipError || !gtip) {
+    return { gtip: null, countryRates: [] };
+  }
+
+  const { data: countryRates } = await supabase
+    .from("gtip_country_rates")
+    .select("*")
+    .eq("gtip_id", gtipId)
+    .order("country");
+
+  return { gtip, countryRates: countryRates ?? [] };
+}
+
+
